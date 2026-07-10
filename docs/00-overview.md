@@ -41,6 +41,7 @@ HMusic-Server（`/Users/pchu/AICODE/HMusic-Server`）是自建音乐后端——
 | `05-interactions-animations.md` | 交互模式与动画规范（含桌面/移动差异、原生增强） | 写交互的人 |
 | `06-platform-native.md` | 各平台原生能力（托盘/全局快捷键/媒体键/深链/通知） | 做原生集成的人 |
 | `07-roadmap.md` | 里程碑拆解与验收清单 | 排期与验收 |
+| `08-audio-plugin.md` | 移动音频插件完整规格（命令/事件/中断矩阵/两端实现/验收） | 写移动本机播放的人 |
 
 ## 里程碑速览（详见 `07-roadmap.md`）
 

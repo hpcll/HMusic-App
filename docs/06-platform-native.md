@@ -60,32 +60,13 @@ main.js 本机播放引擎抽出「音频后端」接口，两个实现：
 
 ### tauri-plugin-hmusic-audio（自研移动插件，M4 主工程量）
 
-JS ↔ 原生命令面：
+**完整规格见 `08-audio-plugin.md`**（命令/事件/错误码/中断矩阵/两端实现要点/验收矩阵），
+此处只留形态结论：
 
-| 命令 | 参数 | 说明 |
-|---|---|---|
-| `load` | `{url, title, artist, coverUrl?, durationMs?, positionMs?, autoplay}` | 换源 + 喂锁屏元数据 |
-| `play` / `pause` / `stop` | — | |
-| `seek` | `{positionMs}` | |
-| `position` | → `{positionMs, durationMs, playing}` | JS 每 1s 轮询（复用现有 localTick 节奏） |
-
-事件（原生 → JS）：
-- `audio:ended` → JS 调 `POST /playback/local-report {ended:true}` 推进队列（链路不变）
-- `audio:error` → toast 音源失效提示
-- `media:play|pause|next|previous` → 锁屏/耳机按键，与桌面媒体键**同一事件名**，boot.js 一套监听通吃
-
-原生实现：
-- **iOS（Swift）**：AVPlayer 流播 streamUrl；`AVAudioSession` category=`.playback`（后台不断声）；
-  `MPNowPlayingInfoCenter` 喂元数据；`MPRemoteCommandCenter` 接锁屏/耳机控制。
-  Xcode 工程勾 **Background Modes → Audio**。
-- **Android（Kotlin）**：media3 **ExoPlayer** + **MediaSessionService**（前台服务 + MediaStyle 常驻通知，
-  通知即锁屏控制）。manifest 声明 `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK`。
-
-### 明文 HTTP 两个必踩坑（家庭服务器是 http://IP:8090）
-
-1. **iOS ATS**：Info.plist 加 `NSAppTransportSecurity → NSAllowsArbitraryLoads=true`，
-   否则 AVPlayer 拒载 http 流——症状是**无声也无报错**，极难排查。
-2. **Android**：application 标签加 `android:usesCleartextTraffic="true"`（或 networkSecurityConfig 放行内网段）。
+- 插件是「迷你客户端」：持有 serverBase+token。**后台 webview JS 会被系统挂起**，
+  锁屏控制、播完推进队列等原生自主动作由插件**直连服务端**完成，再广播 `audio:state`
+  给（可能活着的）JS 对齐——这消灭了双重推进与前后台状态打架两类必然 bug。
+- 锁屏/耳机控制不走 `media:*` 事件回 JS（JS 可能睡着）；`media:*` 仅桌面媒体键使用。
 
 ### 其余移动事项
 

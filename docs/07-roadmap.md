@@ -44,8 +44,9 @@
 - [ ] main.js 音频后端抽象（决策 E）合入 HMusic-Server；网页/桌面回归零变化
 - [ ] tauri-plugin-hmusic-audio · iOS：AVPlayer + Background Audio + 锁屏元数据/控制 + ATS 放行 http
 - [ ] tauri-plugin-hmusic-audio · Android：ExoPlayer + 前台服务通知 + cleartext 放行
+- [ ] **后台自续播**：JS 挂起时插件直连服务端推进队列（08 §4，锁屏播完自动下一首）
 - [ ] `tauri ios/android init` 工程跑通，窄屏布局命中现有响应式
-- [ ] **真机后台验收**：锁屏连续播放 30 分钟不断、播完自动下一曲（ended 链路）、耳机线控/锁屏控制生效
+- [ ] **真机过 08 §9 验收矩阵全项**（锁屏 30 分钟、来电中断、拔耳机、锁屏面板控制…）
 - [ ] 手势层：封面滑动切歌、列表左滑操作、下拉刷新
 - [ ] 真机各一台过 M1 全部验收项
 

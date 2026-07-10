@@ -26,6 +26,7 @@ cargo tauri build          # 打包当前平台
 6. [05 交互动画](docs/05-interactions-animations.md) —— 既有语言 + 桌面/移动增强
 7. [06 原生能力](docs/06-platform-native.md) —— 托盘/媒体键/后台播放
 8. [07 路线图](docs/07-roadmap.md) —— 里程碑验收清单 + 风险登记
+9. [08 音频插件](docs/08-audio-plugin.md) —— 移动本机播放插件完整规格
 
 ## 铁律
 
