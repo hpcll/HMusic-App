@@ -8,12 +8,12 @@ SERVER_WEB="${1:-$HERE/../HMusic-Server/web}"
 DEST="$HERE/src"
 
 if [[ ! -f "$SERVER_WEB/index.html" ]]; then
-  echo "找不到 HMusic-Server/web（试了：$SERVER_WEB）" >&2
+  echo "找不到 HMusic-Server/web（试了：${SERVER_WEB}）" >&2
   echo "用法：bash scripts/sync-web.sh [/path/to/HMusic-Server/web]" >&2
   exit 1
 fi
 
-echo "同步 $SERVER_WEB → $DEST（保留 src/native/）"
+echo "同步 ${SERVER_WEB} → ${DEST}（保留 src/native/）"
 mkdir -p "$DEST"
 rsync -a --delete --exclude 'native/' "$SERVER_WEB/" "$DEST/"
 
