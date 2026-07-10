@@ -23,6 +23,8 @@
 - `ended` 事件 → POST `/local-report {ended:true}` → 服务端推进队列 → 立即接着放。
 - `localSeek/localPlay/localPause/localPositionMs/localDurationMs`：播放页直接操作 <audio>。
 - **客户端差异**：streamUrl 要用 `getServerBase()+path`（见 01 章决策 B/D）。
+- **移动端差异**：引擎的「出声后端」换成原生播放器（01 章决策 E + 06 章 M4 插件），
+  编排逻辑（换源/回写/ended 推进）不变；prime 在原生后端为 no-op。
 
 ---
 

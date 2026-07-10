@@ -40,18 +40,60 @@ webview ↔ Rust 只走两条路：
 ### 开机自启
 - tauri-plugin-autostart，设置页加开关（存 localStorage，boot 时 invoke 同步）。
 
-## M4 移动
+## M4 移动（本机播放 = 硬性需求）
+
+> **决策（2026-07-10 用户拍板）**：移动端必须支持本机播放——手机自己出声，且锁屏/后台继续播。
+> webview 的 `<audio>` 进后台即被系统挂起，此路不通——移动本机播放**必须走原生音频层**。
+> 「遥控器模式」只允许作为开发过程中的临时过渡，**不是交付形态**。
+
+### 架构：可替换音频后端（配合 01 章决策 E）
+
+main.js 本机播放引擎抽出「音频后端」接口，两个实现：
+
+| 后端 | 平台 | 实现 |
+|---|---|---|
+| HTMLAudioBackend | 浏览器 / 桌面 Tauri | 现有 `<audio>` 逻辑原样（含 prime 手势解锁） |
+| NativeAudioBackend | iOS / Android | 自研 Tauri 移动插件（下述） |
+
+引擎其余编排（跟随 playback.state 换源、3s local-report 回写、ended 推进队列、seek/播放暂停/音量）
+**一行不改**——换的只是执行者。服务端也零改动：原生播放器直接流式拉同一个 streamUrl（音频代理地址）。
+
+### tauri-plugin-hmusic-audio（自研移动插件，M4 主工程量）
+
+JS ↔ 原生命令面：
+
+| 命令 | 参数 | 说明 |
+|---|---|---|
+| `load` | `{url, title, artist, coverUrl?, durationMs?, positionMs?, autoplay}` | 换源 + 喂锁屏元数据 |
+| `play` / `pause` / `stop` | — | |
+| `seek` | `{positionMs}` | |
+| `position` | → `{positionMs, durationMs, playing}` | JS 每 1s 轮询（复用现有 localTick 节奏） |
+
+事件（原生 → JS）：
+- `audio:ended` → JS 调 `POST /playback/local-report {ended:true}` 推进队列（链路不变）
+- `audio:error` → toast 音源失效提示
+- `media:play|pause|next|previous` → 锁屏/耳机按键，与桌面媒体键**同一事件名**，boot.js 一套监听通吃
+
+原生实现：
+- **iOS（Swift）**：AVPlayer 流播 streamUrl；`AVAudioSession` category=`.playback`（后台不断声）；
+  `MPNowPlayingInfoCenter` 喂元数据；`MPRemoteCommandCenter` 接锁屏/耳机控制。
+  Xcode 工程勾 **Background Modes → Audio**。
+- **Android（Kotlin）**：media3 **ExoPlayer** + **MediaSessionService**（前台服务 + MediaStyle 常驻通知，
+  通知即锁屏控制）。manifest 声明 `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK`。
+
+### 明文 HTTP 两个必踩坑（家庭服务器是 http://IP:8090）
+
+1. **iOS ATS**：Info.plist 加 `NSAppTransportSecurity → NSAllowsArbitraryLoads=true`，
+   否则 AVPlayer 拒载 http 流——症状是**无声也无报错**，极难排查。
+2. **Android**：application 标签加 `android:usesCleartextTraffic="true"`（或 networkSecurityConfig 放行内网段）。
+
+### 其余移动事项
 
 | 能力 | iOS | Android |
 |---|---|---|
-| 后台播放 | AVAudioSession category=playback（Xcode 工程 capability + 原生侧激活） | 前台服务 + 常驻通知 |
-| 锁屏/控制中心 | MPNowPlayingInfoCenter + RemoteCommand | MediaSession + MediaStyle 通知 |
-| 深链 | `hmusic://` scheme（后续分享/唤起用，预留） | 同左 |
-
-> 移动端本机播放的 `<audio>` 在 webview 后台会被系统暂停——**后台播放必须走原生音频层或
-> 保活 webview**，这是 M4 的核心技术攻关点，动手前先做 spike 验证（1-2 天盒内试验）。
-> 备选方案：移动端主打「遥控器模式」（控制音箱/桌面端），本机播放仅前台可用——零攻关成本，
-> 家庭场景够用。**spike 失败即回退此方案。**
+| 锁屏/控制中心 | 插件内 MPNowPlayingInfoCenter | 插件内 MediaSession 通知 |
+| 深链 | `hmusic://` scheme 预留 | 同左 |
+| 手势层 | docs/05 §3（封面滑切歌、列表左滑、下拉刷新） | 同左 |
 
 ## 安全
 
@@ -62,4 +104,5 @@ webview ↔ Rust 只走两条路：
 ## 实现状态
 - [ ] M0 项
 - [ ] 托盘 / 媒体键 / 通知 / 自启
-- [ ] 移动后台播放 spike
+- [ ] 音频后端抽象（决策 E）合入 HMusic-Server
+- [ ] tauri-plugin-hmusic-audio（iOS / Android）

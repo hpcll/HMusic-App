@@ -62,12 +62,35 @@ export function setServerBase(url) {
 `HMusic-Server/src/app.ts` 已配置 `cors { origin: true }`，`tauri://localhost` /
 `http://tauri.localhost` 的跨域请求直接放行。**服务端零改动。**
 
-### 决策 D：本机播放引擎直接复用
+### 决策 D：本机播放引擎直接复用（桌面）
 
 `main.js` 的全局 `<audio>` 引擎（手势解锁 primeLocalAudio、3s 进度回写 local-report、
 ended 推进队列）在 Tauri webview（macOS WKWebView / Windows WebView2）里原样工作。
 唯一注意点：桌面 webview 的自动播放策略比浏览器宽松（Tauri 可配
 `macOSPrivateApi`/webview 参数放开 autoplay），但**保留手势解锁逻辑不删**——移动端 webview 仍需要它。
+
+### 决策 E：本机播放引擎抽「音频后端」接口（移动本机播放的地基）
+
+**移动端本机播放是硬性需求**（手机自己出声 + 锁屏/后台继续播，2026-07-10 用户拍板），
+而 webview `<audio>` 进后台即被系统挂起——移动端必须换**原生播放器**出声。
+
+改造方式（在 HMusic-Server/web/main.js 做，网页端零行为变化）：
+
+```js
+// 把对 <audio> 的直接操作收拢成后端对象（接口）：
+audioBackend = {
+  load(url, meta, positionMs, autoplay), play(), pause(), stop(),
+  seek(ms), setVolume(0..1), positionMs(), durationMs(),
+  prime(),                     // 手势解锁；原生后端为 no-op
+  onEnded(cb), onError(cb),
+}
+// 默认实现 = 现有 HTMLAudio 逻辑；另导出 setAudioBackend(backend) 钩子。
+```
+
+- 移动端 `native/boot.js` 检测 iOS/Android → `setAudioBackend(NativeAudioBackend)`
+  （桥到自研 `tauri-plugin-hmusic-audio`，见 docs/06 M4）。
+- `syncLocalAudio` / `startLocalReporting` / ended→local-report 等**编排逻辑一行不动**，只换执行者。
+- 服务端零改动：原生播放器流式拉同一个 streamUrl（音频代理地址）。
 
 ## 2. Tauri 配置要点（src-tauri/tauri.conf.json）
 
