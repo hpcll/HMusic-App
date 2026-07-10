@@ -1,0 +1,15 @@
+# ── 前端同步产物（由 scripts/sync-web.sh 从 HMusic-Server/web 生成，不入库） ──
+# 但保留 src/native/ —— 那是客户端专属手写代码。
+/src/*
+!/src/native/
+
+# ── Tauri / Rust ──
+/src-tauri/target/
+/src-tauri/gen/
+
+# ── Node（若后续引入构建工具） ──
+node_modules/
+
+# ── 系统 ──
+.DS_Store
+*.log
