@@ -45,9 +45,13 @@
 
 - **桌面（≥860px）**：`grid-template-columns: 232px 1fr` = 左固定侧边栏 + 右内容区。
   侧边栏 `position:sticky; height:100vh`，含：品牌 / 导航（7 项）/ 底部 mini 播放状态 + 用户。
-- **窄屏（<860px）**：侧边栏隐藏 → 顶栏（`.topbar`，毛玻璃 `backdrop-filter:blur(12px)`）
-  + 固定底部导航（`.bottom-nav`，同款毛玻璃，`env(safe-area-inset-bottom)` 安全区）。
-  内容区 `padding-bottom:74px` 给底栏让位。
+- **窄屏（<860px）**：**内滚动应用壳**——壳 = 视口高（`100dvh`，旧 iOS 回退
+  `-webkit-fill-available`），flex 纵排：顶栏（`.topbar`，毛玻璃）→ 内容区
+  （`flex:1; overflow-y:auto`，唯一滚动者）→ 底部导航（**流内底栏**，
+  `env(safe-area-inset-bottom)` 安全区）。
+  > 铁律：tab 栏是应用骨架，必须永远可见。**勿用 position:fixed 悬浮实现**——
+  > 部分浏览器内核/底部工具栏会盖住或废掉 fixed 底栏（症状：滚到页尾才见 tab）。
+  > Flutter 的 `Scaffold(bottomNavigationBar:)` 天然就是这个结构，照用即可。
 - 内容区 `.view`：`padding:40px 48px 56px; max-width:880px; margin:0 auto; gap:22px`。
   窄屏 `padding:18px 16px 32px; gap:16px`。
 - **grid 子项防溢出**：`.view > * { min-width:0 }`，配合 `.track-row{min-width:0}`——否则
