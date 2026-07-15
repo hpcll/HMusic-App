@@ -1,12 +1,16 @@
+import '../../../core/models/hmusic_track.dart';
 import '../models/playlist.dart';
 
-// 歌单数据契约：列表、详情、创建、导入、删除、移除曲目、整单播放。
+// 歌单数据契约：列表、详情、创建、导入、删除、加/移除曲目、整单播放。
 abstract interface class PlaylistsRepository {
   Future<List<PlaylistSummary>> getPlaylists();
 
   Future<PlaylistDetail> getPlaylist(String id);
 
-  Future<void> createPlaylist(String name);
+  // 返回创建结果：收藏首建「我喜欢的音乐」后要立刻拿 id 加歌。
+  Future<PlaylistDetail> createPlaylist(String name);
+
+  Future<PlaylistDetail> addTrack(String playlistId, HMusicTrack track);
 
   Future<PlaylistImportResult> importPlaylist(String url);
 

@@ -12,6 +12,7 @@ class PlayerControls extends StatelessWidget {
     required this.onPrevious,
     required this.onNext,
     required this.onModeChanged,
+    required this.favorite,
     super.key,
   });
 
@@ -22,6 +23,9 @@ class PlayerControls extends StatelessWidget {
   final VoidCallback onPrevious;
   final VoidCallback onNext;
   final ValueChanged<PlayMode> onModeChanged;
+
+  // 行尾插槽：喜欢按钮，与行首模式按钮对称（spaceBetween 五等分）。
+  final Widget favorite;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +50,7 @@ class PlayerControls extends StatelessWidget {
           icon: const Icon(Icons.skip_next_rounded),
           onPressed: isBusy ? null : onNext,
         ),
-        const SizedBox(width: 48),
+        favorite,
       ],
     );
   }

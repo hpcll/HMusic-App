@@ -17,6 +17,7 @@ import '../widgets/lyric_scroll_view.dart';
 import '../widgets/lyric_strip.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_cover.dart';
+import '../widgets/player_favorite_button.dart';
 import '../widgets/player_progress.dart';
 import '../widgets/player_volume_row.dart';
 
@@ -406,6 +407,7 @@ class _ControlsSection extends ConsumerWidget {
             onPrevious: controller.skipToPrevious,
             onNext: controller.skipToNext,
             onModeChanged: controller.setPlayMode,
+            favorite: PlayerFavoriteButton(track: state.track),
           );
         },
       ),

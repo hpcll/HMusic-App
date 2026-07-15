@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import '../models/playlist.dart';
@@ -34,10 +35,22 @@ class ApiPlaylistsRepository implements PlaylistsRepository {
   }
 
   @override
-  Future<void> createPlaylist(String name) async {
-    await _apiClient.postMap(
-      '/playlists',
-      body: <String, Object?>{'name': name},
+  Future<PlaylistDetail> createPlaylist(String name) async {
+    return _unwrap(
+      await _apiClient.postMap(
+        '/playlists',
+        body: <String, Object?>{'name': name},
+      ),
+    );
+  }
+
+  @override
+  Future<PlaylistDetail> addTrack(String playlistId, HMusicTrack track) async {
+    return _unwrap(
+      await _apiClient.postMap(
+        '/playlists/$playlistId/tracks',
+        body: <String, Object?>{'track': track.toJson()},
+      ),
     );
   }
 
