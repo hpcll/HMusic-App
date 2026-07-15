@@ -18,7 +18,21 @@ class HMusicApp extends ConsumerWidget {
       theme: HMusicTheme.light(),
       darkTheme: HMusicTheme.dark(),
       themeMode: ThemeMode.system,
+      scrollBehavior: const _NoScrollbarBehavior(),
       routerConfig: router,
     );
   }
+}
+
+// 全局隐藏滚动条：桌面端默认 ScrollBehavior 会给每个可滚动区域自动包一层
+// Scrollbar，这里返回 child 本身把它关掉；滚轮/触控板/拖拽滚动不受影响。
+class _NoScrollbarBehavior extends MaterialScrollBehavior {
+  const _NoScrollbarBehavior();
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) => child;
 }

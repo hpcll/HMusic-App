@@ -19,7 +19,7 @@ class PlaylistsListView extends ConsumerWidget {
     final notifier = ref.read(playlistsViewModelProvider.notifier);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
       children: <Widget>[
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,

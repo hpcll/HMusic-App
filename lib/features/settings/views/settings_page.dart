@@ -58,7 +58,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (wide) {
       final section = state.section ?? SettingsSection.mi;
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
         children: <Widget>[
           const ViewTitle('设置'),
           const SizedBox(height: 20),
@@ -102,7 +102,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final section = state.section;
     if (section == null) {
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
         children: <Widget>[
           const ViewTitle('设置'),
           const SizedBox(height: 16),

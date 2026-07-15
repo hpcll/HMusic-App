@@ -47,7 +47,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     final state = ref.watch(statsViewModelProvider);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
       children: <Widget>[
         const ViewTitle('听歌统计'),
         const SizedBox(height: 22),

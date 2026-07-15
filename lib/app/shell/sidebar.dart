@@ -24,9 +24,11 @@ class AppSidebar extends ConsumerWidget {
         color: palette.background,
         border: Border(right: BorderSide(color: palette.line)),
       ),
-      // 顶部 48：品牌行让出 macOS 红绿灯悬浮区（fullSizeContentView 下红绿灯
-      // 叠在侧栏左上），并与内容区页头基线大致对齐，不再顶着窗口上沿。
-      padding: const EdgeInsets.fromLTRB(22, 48, 22, 18),
+      // 顶部 56：品牌行基线对齐内容区页面大标题基线——大标题顶 = 28（外壳
+      // 标题栏余量）+ 24（根页统一顶距），按 NotoSerifSC 度量反推品牌顶距 ≈ 56。
+      // 同时继续让出 macOS 红绿灯悬浮区（fullSizeContentView 下叠在侧栏左上）。
+      // 改任一根页顶距或大标题字号时需同步复核这里。
+      padding: const EdgeInsets.fromLTRB(22, 56, 22, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[

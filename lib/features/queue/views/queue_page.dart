@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/audio/models/hmusic_playback_state.dart' show PlayMode;
+import '../../../shared/widgets/view_title.dart';
 import '../models/queue_view_state.dart';
 import '../view_models/queue_view_model.dart';
 import '../widgets/queue_mode_tabs.dart';
@@ -41,9 +43,48 @@ class _QueuePageState extends ConsumerState<QueuePage> {
     final isTab =
         GoRouter.maybeOf(context) != null &&
         GoRouterState.of(context).matchedLocation == QueuePage.tabPath;
+
+    // 桌面 tab 形态：不用 AppBar，改与其余根页一致的大标题页头
+    //（顶距 24，参与侧栏品牌基线对齐），清空动作挂页头右侧。
+    if (isTab) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: <Widget>[
+                    const ViewTitle('播放队列'),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${state.items.length} 首',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.palette.muted,
+                      ),
+                    ),
+                  ],
+                ),
+                if (state.items.isNotEmpty)
+                  TextButton(
+                    onPressed: notifier.clear,
+                    child: const Text('清空'),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(child: _body(context, state, notifier)),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: !isTab,
         title: Text('播放队列 (${state.items.length})'),
         actions: <Widget>[
           if (state.items.isNotEmpty)
@@ -66,7 +107,8 @@ class _QueuePageState extends ConsumerState<QueuePage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+          // 水平 16：与页头/ListTile 默认内距同列（原 12 与两者都不齐）。
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: QueueModeTabs(
             active: state.queue?.playMode ?? PlayMode.listLoop,
             onSelect: notifier.changeMode,

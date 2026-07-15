@@ -37,7 +37,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       ref.read(searchViewModelProvider.notifier).clearNotice();
     });
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
       children: <Widget>[
         const ViewTitle('搜索'),
         const SizedBox(height: 16),
