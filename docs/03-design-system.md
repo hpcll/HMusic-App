@@ -1,8 +1,10 @@
-# 03 · 设计系统（1:1 复刻依据）
+# 03 · 设计系统（内容复刻 + 平台材质）
 
-> 读者：写 UI 的人。全部数值取自 `HMusic-Server/web/styles.css`（1201 行），逐条核对。
-> 客户端直接复用这份 CSS，本文是「为什么长这样」的说明书 + 换技术栈时的复刻清单。
+> 读者：写 UI 的人。数值源自 `HMusic-Server/web/styles.css`，Flutter 需映射为 ThemeExtension、
+> 组件约束与 golden test；不直接复用 CSS。
 > 风格自述：**feather.computer 风 —— 暖纸色底 / 墨色文字 / 细边框 / 衬线展示标题 / 克制阴影**。
+> 平台增强：内容层保持上述品牌；iOS 27 的系统 chrome 使用 Swift/SwiftUI 原生液态玻璃，
+> Android 使用 Flutter 同构玻璃材质。玻璃是导航与控制层，不替代内容设计。
 
 ## 1. 设计 token
 
@@ -28,6 +30,22 @@
 --line:#313135 --line-soft:#29292d --ink:#e6e6e9 --ink-hover:#ffffff
 --accent:#2ec4b8  --shadow/--shadow-pop 加深
 ```
+
+### 平台玻璃 token
+
+这些 token 只用于 Android/旧 iOS 回退；iOS 27 原生材质优先由系统决定折射、模糊与高光：
+
+```text
+glassTintLight:  rgba(255,255,255,.62)
+glassTintDark:   rgba(28,28,30,.58)
+glassBorder:     white/black 低透明高光边
+glassShadow:     0 8px 28px rgba(0,0,0,.10)
+glassBlurHigh:   24-32
+glassBlurMedium: 16-20
+glassBlurOff:    0（性能/降低透明度回退）
+```
+
+玻璃 tint 必须保持中性，禁止把品牌青绿铺成整块玻璃。青绿仍只表达正在播放、成功和当前项。
 
 > **青绿 --accent 的铁律**（全站仅 5 处用它）：只表达「正在发生的事」——在播状态点、
 > 队列当前行、扫码成功、toast 成功、榜单播放次数计数。**从不用于装饰或静态强调**。
@@ -56,6 +74,19 @@
   窄屏 `padding:18px 16px 32px; gap:16px`。
 - **grid 子项防溢出**：`.view > * { min-width:0 }`，配合 `.track-row{min-width:0}`——否则
   超长歌名（nowrap）会撑宽整页，破坏 `text-overflow:ellipsis`。**移植时必须保留。**
+
+### 平台 chrome 分层
+
+| 区域 | iOS 27 | Android | 内容原则 |
+|---|---|---|---|
+| 顶栏 | Swift/SwiftUI 系统液态玻璃 | Flutter AdaptiveGlassSurface | 标题简短，不承载功能说明 |
+| 底部导航 | 原生玻璃 tab shell | Flutter 玻璃底栏 | 恒定可见，安全区内布局 |
+| mini player | 原生玻璃控制条 | Flutter 玻璃控制条 | 封面、题/歌手、播放与下一曲 |
+| 播放主控/音量浮层 | 原生材质优先 | Flutter 玻璃面板 | 控件尺寸固定，不因状态位移 |
+| 模态/菜单 | 原生玻璃或系统 sheet | Flutter 玻璃 overlay | 表单主体可保持不透明以保证可读性 |
+| 歌单卡、曲目行、统计图 | 不使用玻璃 | 不使用玻璃 | 延续暖纸/墨色内容风格 |
+
+禁止“每张卡片都 BackdropFilter”。背景层不足时玻璃没有信息价值，只会降低文字对比并增加 GPU 成本。
 
 ## 3. 核心组件规格
 
@@ -89,7 +120,7 @@
 ### 状态点 .dot（7px 圆）
 `dot-playing:accent` / `dot-paused:#c99700` / `dot-idle/stopped:muted` / `dot-error:danger`
 
-### 模态框（Teleport 到 body）
+### 模态框（Flutter Dialog/Overlay）
 `.modal-overlay` 全屏 `rgba(0,0,0,.42)` + `blur(2px)`，flex 居中，点遮罩关闭。
 `.modal-card` max-width420 radius10 shadow-pop，head(标题+✕) / body(滚动) / foot(右对齐按钮)。
 
@@ -112,17 +143,33 @@
 | track-actions 显隐 | opacity | .12s ease |
 | toast | 无动画，纯出现/消失 | — |
 
+平台玻璃额外动效：
+
+| 场景 | iOS 27 | Android |
+|---|---|---|
+| tab 切换 | 使用系统材质选择态与连续形变 | 180-240ms 高光/透明度过渡 |
+| mini player 显隐 | 系统 spring/玻璃容器尺寸变化 | 220ms easeOut，固定底栏位置 |
+| 按压 | 系统液态反馈 | 100-140ms scale 0.97 + 高光变化 |
+| 滚动经过 chrome | 系统自动采样背景 | 动态模糊仅高画质开启 |
+
+不手工模仿未知的 iOS 折射曲线；有系统 API 就用系统 API，没有就回退到稳定材质。
+
 **歌词滚动**：当前行 `scrollIntoView({behavior:"smooth", block:"center"})`。
 歌词栏上下渐隐 `mask-image: linear-gradient(transparent,#000 12%,#000 88%,transparent)`（纸卷感）。
 
-## 5. 复刻取舍（换技术栈时才需要；Tauri 复用 CSS 则跳过）
+## 5. Flutter 复刻优先级
 
-若某天在非 web 技术栈复刻：
 - 优先级 = token（色/圆角/字体）> track-row 原子 > 按钮族 > 布局骨架 > 动效
-- 深浅色用系统 `prefers-color-scheme`，两套 token 全量给出
+- 深浅色用 Flutter `ThemeMode.system`，两套 token 全量映射为 ThemeExtension
 - 衬线展示标题是灵魂，别用无衬线糊弄
 - 青绿的「仅点缀」纪律是这套设计的克制感来源，最易被破坏，重点守住
+- 用 golden test 固定手机/平板/桌面关键宽度，和 Server web 截图并排验收
+- iOS 27 使用真实系统材质截图验收，golden test 只覆盖 Flutter 内容与回退壳
+- Android 至少验证高画质、普通画质、无模糊三档，文字对比和布局必须一致
 
 ## 实现状态
 - [x] token/组件/动效 全量记录（源：web/styles.css）
-- [ ] Tauri 复用验证（深浅色、衬线字体在 WKWebView/WebView2 的可用性）
+- [ ] Flutter ThemeExtension 与字体资产落盘
+- [ ] 深浅色 golden test
+- [ ] iOS 27 Swift/SwiftUI 液态玻璃 shell 视觉 spike
+- [ ] Android AdaptiveGlassSurface 三档降级 spike

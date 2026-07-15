@@ -1,35 +1,41 @@
-# HMusic Desktop
+# HMusic App
 
-HMusic 的官方跨平台客户端 —— **Tauri 2.x 壳 + 复用 [HMusic-Server](../HMusic-Server) 的 web/ 前端**。
-一套代码出 macOS / Windows / Linux / iOS / Android，视觉与网页端 1:1。
+HMusic 是 NAS/家庭服务器个人音乐库的官方跨平台客户端，面向 Android、iOS、macOS、Windows 与 Linux，
+连接 [HMusic-Server](../HMusic-Server) 提供搜索、歌单、榜单、音箱遥控与本机播放。
 
-## 快速开始
+视觉采用平台自适应方案：内容层延续现有 HMusic 网页的暖纸、墨色和衬线风格；iOS 27
+由 Swift/SwiftUI 提供原生液态玻璃导航与控制层，Android 用 Flutter 实现接近且可降级的玻璃效果。
 
-```bash
-# 前置：Rust + Node；HMusic-Server 仓库在同级目录
-bash scripts/sync-web.sh   # 从 ../HMusic-Server/web 同步前端
-cargo tauri dev            # 开发窗口
-cargo tauri build          # 打包当前平台
-```
+当前处于 **P0：最小纵切实现**。Flutter 工程、连接、鉴权、搜索和本机播放基础代码已经建立；
+继续实现前先以 [`docs/09-p0-audit.md`](docs/09-p0-audit.md) 和
+[`docs/12-server-compatibility.md`](docs/12-server-compatibility.md) 核对当前契约状态。
 
-首次启动 → 填服务器地址（如 `http://192.168.1.10:8090`）→ 登录 HMusic 账号。
+AI 编码代理进入仓库后必须先读 [`AGENTS.md`](AGENTS.md)，再按其中顺序读取架构、API、
+路线图和任务专项文档。Claude、Gemini、Cursor、GitHub Copilot 的仓库入口文件均指向该规则，
+避免维护多套指令。
 
-## 文档（先读这里再写代码）
+## 文档入口
 
-一切设计与实现决策都在 [`docs/`](docs/00-overview.md)：
+1. [00 总览](docs/00-overview.md) - 产品边界、技术栈与当前状态
+2. [01 架构](docs/01-architecture.md) - Flutter 分层、状态所有权和目录
+3. [02 API 契约](docs/02-server-api.md) - 服务端接口与客户端接入约束
+4. [03 设计系统](docs/03-design-system.md) - HMusic 内容风格与 iOS/Android 玻璃材质规则
+5. [04 逐屏说明](docs/04-screens.md) - 页面结构和交互
+6. [05 交互动画](docs/05-interactions-animations.md) - 动效、快捷键和手势
+7. [06 平台能力](docs/06-platform-native.md) - Flutter + Swift 平台壳、后台音频与系统配置
+8. [07 路线图](docs/07-roadmap.md) - P0-P5 验收清单
+9. [08 音频架构](docs/08-audio-plugin.md) - `audio_service` + `just_audio` 实现契约
+10. [09 P0 审计](docs/09-p0-audit.md) - Server/App 事实核对、阻塞项和开工门禁
+11. [10 工程规范](docs/10-engineering-standards.md) - MVVM、文件拆分、复用和依赖准入
+12. [11 上架合规](docs/11-release-compliance.md) - App Store/Google Play、隐私、审核和签名门禁
+13. [12 Server 兼容](docs/12-server-compatibility.md) - 契约缺口、兼容调用和重试规则
 
-1. [00 总览](docs/00-overview.md) —— 项目定位、技术选型、里程碑
-2. [01 架构](docs/01-architecture.md) —— 目录、Tauri 配置、web 同步策略、四大核心决策
-3. [02 API 契约](docs/02-server-api.md) —— 后端全量端点
-4. [03 设计系统](docs/03-design-system.md) —— token/组件/动效（1:1 复刻依据）
-5. [04 逐屏说明](docs/04-screens.md) —— 每屏结构、交互、调用的 API
-6. [05 交互动画](docs/05-interactions-animations.md) —— 既有语言 + 桌面/移动增强
-7. [06 原生能力](docs/06-platform-native.md) —— 托盘/媒体键/后台播放
-8. [07 路线图](docs/07-roadmap.md) —— 里程碑验收清单 + 风险登记
-9. [08 音频插件](docs/08-audio-plugin.md) —— 移动本机播放插件完整规格
+## 工程原则
 
-## 铁律
-
-- **UI 代码的事实源是 HMusic-Server/web**，本仓库只写 `src/native/`（渐进增强层）与 Rust 壳。
-- 改 UI → 去 Server 仓库改 → `sync-web.sh` 同步回来。禁止直接改同步产物。
-- 文档先行：决策变更先改 docs 再改代码。
+- HMusic-Server 的 TypeScript 路由与共享 schema 是 API 事实源，文档不能替代运行契约。
+- HMusic-Server/web 是产品行为和视觉参考，不再复制或嵌入客户端。
+- Flutter 原生重写 UI；服务端是队列与语义播放状态的事实源，本机播放器是实时进度的事实源。
+- 主架构冻结为 Feature-first MVVM；View、ViewModel、Repository 单向依赖，禁止巨型文件和万能层。
+- 优先复用标准能力、现有代码和成熟依赖，不重复实现通用基础设施。
+- 移动端后台播放是交付硬需求，不接受 WebView `<audio>` 或“仅遥控器”作为终态。
+- 决策先更新文档，里程碑完成后回填状态。

@@ -1,0 +1,42 @@
+name: hmusic
+description: "HMusic client for self-hosted personal music libraries."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  audio_service: ^0.18.19
+  audio_session: ^0.2.4
+  dio: ^5.10.0
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.3.2
+  flutter_secure_storage: ^10.3.1
+  go_router: ^17.2.3
+  json_annotation: ^4.9.0
+  just_audio: ^0.10.6
+  qr_flutter: ^4.1.0
+  shared_preferences: ^2.5.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.15
+  json_serializable: ^6.9.5
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: NotoSerifSC
+      fonts:
+        - asset: assets/fonts/NotoSerifSC-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/NotoSerifSC-SemiBold.ttf
+          weight: 600

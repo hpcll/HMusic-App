@@ -1,0 +1,7 @@
+---
+description: HMusic App repository entry rules
+alwaysApply: true
+---
+
+Before any work, read `AGENTS.md` completely and follow it as the authoritative repository instruction file.
+Use the task-specific document routing defined there. Do not restore Tauri or implement outside the current P0 scope.

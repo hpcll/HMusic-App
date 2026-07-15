@@ -1,0 +1,189 @@
+import 'package:flutter/material.dart';
+
+import 'hmusic_palette.dart';
+
+// 墨色刊物风主题:直接映射 docs/03 设计 token,不用 fromSeed——
+// 种子色会把品牌青绿铺满全站组件,违反「青绿只表达正在发生的事」铁律。
+// 主操作一律墨黑(暗色下转象牙白),青绿只由业务代码显式取 palette.accent。
+abstract final class HMusicTheme {
+  static const String serifFamily = 'NotoSerifSC';
+
+  static ThemeData light() => _build(Brightness.light, HMusicPalette.light);
+
+  static ThemeData dark() => _build(Brightness.dark, HMusicPalette.dark);
+
+  static ThemeData _build(Brightness brightness, HMusicPalette p) {
+    final ink = brightness == Brightness.light
+        ? p.textStrong
+        : const Color(0xFFE6E6E9);
+    final onInk = brightness == Brightness.light
+        ? p.background
+        : const Color(0xFF131315);
+
+    final colorScheme = ColorScheme(
+      brightness: brightness,
+      primary: ink,
+      onPrimary: onInk,
+      secondary: p.accent,
+      onSecondary: Colors.white,
+      surface: p.panel,
+      onSurface: p.text,
+      surfaceContainerHighest: p.panelSecondary,
+      onSurfaceVariant: p.muted,
+      outline: p.line,
+      outlineVariant: p.line,
+      error: p.danger,
+      onError: Colors.white,
+    );
+
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: p.background,
+      splashFactory: InkSparkle.splashFactory,
+      fontFamilyFallback: const <String>[
+        'Inter',
+        'PingFang SC',
+        'Hiragino Sans GB',
+        'Microsoft YaHei',
+      ],
+      extensions: <ThemeExtension<dynamic>>[p],
+    );
+
+    final sans = base.textTheme.apply(
+      bodyColor: p.text,
+      displayColor: p.textStrong,
+    );
+    // 衬线只给展示层(字标/页面大标题/播放页曲名),正文保持无衬线。
+    TextStyle serif(TextStyle style, double size, [FontWeight? w]) =>
+        style.copyWith(
+          fontFamily: serifFamily,
+          fontSize: size,
+          fontWeight: w ?? FontWeight.w600,
+          color: p.textStrong,
+          height: 1.25,
+        );
+    final textTheme = sans.copyWith(
+      displayLarge: serif(sans.displayLarge!, 44),
+      displayMedium: serif(sans.displayMedium!, 36),
+      displaySmall: serif(sans.displaySmall!, 30),
+      headlineLarge: serif(sans.headlineLarge!, 28),
+      headlineMedium: serif(sans.headlineMedium!, 24),
+      headlineSmall: serif(sans.headlineSmall!, 21),
+      titleLarge: sans.titleLarge!.copyWith(
+        fontWeight: FontWeight.w600,
+        color: p.textStrong,
+      ),
+    );
+
+    final hairline = BorderSide(color: p.line);
+    OutlineInputBorder inputBorder(Color color) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(7),
+      borderSide: BorderSide(color: color),
+    );
+
+    return base.copyWith(
+      textTheme: textTheme,
+      appBarTheme: AppBarTheme(
+        backgroundColor: p.background,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        foregroundColor: p.textStrong,
+        titleTextStyle: sans.titleMedium?.copyWith(color: p.muted),
+        iconTheme: IconThemeData(color: p.textStrong, size: 22),
+      ),
+      cardTheme: CardThemeData(
+        color: p.panel,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: hairline,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: ink,
+          foregroundColor: onInk,
+          // 只约束最小高度。千万不能用 Size.fromHeight——它的宽是 infinity，
+          // 按钮一旦放进 Row/Wrap 等不限宽父级就 RenderBox not laid out。
+          // 整行大按钮由调用处的 stretch Column 或局部 styleFrom 负责。
+          minimumSize: const Size(64, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+          textStyle: const TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: p.text,
+          side: hairline,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: p.mutedStrong,
+          textStyle: const TextStyle(fontSize: 13.5),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: p.panel,
+        hintStyle: TextStyle(color: p.muted, fontSize: 14),
+        labelStyle: TextStyle(color: p.muted, fontSize: 13),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 11,
+        ),
+        border: inputBorder(p.line),
+        enabledBorder: inputBorder(p.line),
+        focusedBorder: inputBorder(p.textStrong),
+      ),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: ink,
+        inactiveTrackColor: p.line,
+        thumbColor: ink,
+        overlayColor: ink.withValues(alpha: 0.08),
+        trackHeight: 3,
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 13),
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: p.panel,
+        selectedColor: ink,
+        checkmarkColor: onInk,
+        labelStyle: TextStyle(color: p.text, fontSize: 13),
+        secondaryLabelStyle: TextStyle(color: onInk, fontSize: 13),
+        side: hairline,
+        shape: const StadiumBorder(),
+        showCheckmark: false,
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: ink),
+      dividerTheme: DividerThemeData(color: p.lineSoft, thickness: 1),
+      iconTheme: IconThemeData(color: p.textStrong),
+      listTileTheme: ListTileThemeData(
+        iconColor: p.mutedStrong,
+        textColor: p.text,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: brightness == Brightness.light
+            ? p.textStrong
+            : p.panelSecondary,
+        contentTextStyle: TextStyle(
+          color: onInk == p.background ? p.background : p.textStrong,
+          fontSize: 13.5,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+      ),
+    );
+  }
+}

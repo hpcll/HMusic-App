@@ -3,7 +3,8 @@
 > 读者：写数据层的人。基址 `{SERVER}/api/v1`（`{SERVER}` = 用户填的 `http://IP:8090`）。
 > 除标注「公开」外，全部需 `Authorization: Bearer <token>`。
 > 错误统一格式：`{ error: { code, message, details } }`；HTTP 401 一律视为登录失效清 token。
-> 来源：`HMusic-Server/src/app.ts` 路由表 + 各 `*.routes.ts` 的 Zod schema（本文逐条核对过）。
+> 来源：`HMusic-Server/src/app.ts` 路由表 + 各 `*.routes.ts` 的 Zod schema（2026-07-12 复核）。
+> 审计基线：HMusic-Server main + 当前工作树（queueIndex/真探测/切设备同步/下载缓存/策略配置生效）。
 
 ## 0. 通用数据模型（src/shared/contracts.ts）
 
@@ -28,7 +29,7 @@ HMusicPlaybackState {
   playMode: "list_loop"|"single_loop"|"shuffle"|"sequence"|"single_once";
   queueIndex: number; queueLength: number;
   seekEnabled: boolean;    // 当前设备是否支持进度跳转
-  streamUrl?: string;      // 仅「本机播放」虚拟设备：<audio> 直连的音频代理地址
+  streamUrl?: string;      // 仅「本机播放」虚拟设备：原生播放器直连的签名音频代理地址
   updatedAt: number;
 }
 
@@ -37,9 +38,19 @@ HMusicDevice { id; name; type?; isOnline; ip?; isDefault; capabilities{6 个 sup
 HMusicSource { id; name; type:"manual"|"lx_js"; enabled; priority; config{defaultQuality}; health{status,message?,checkedAt?}; updatedAt }
 HMusicPlaylistDetail { id;name;description?;trackCount;createdAt;updatedAt; items:{id,playlistId,track,position,addedAt}[] }
 HMusicLyric { trackId; source; lrc; lines:{timeMs,text}[]; translatedLines:{timeMs,text}[]; updatedAt }
+DownloadRecord { id;trackKey;source;title;artist;album?;coverUrl?;track;quality?;
+  status:"pending"|"downloading"|"done"|"failed";error?;byteSize;createdAt;updatedAt }
 ```
 
-## 1. Auth `/auth`
+## 1. System `/system`（公开）
+
+| GET | `/system/info` | → `{name,version,apiVersion,mode,publicBaseUrl,capabilities}`；连接页优先用它探活 |
+| GET | `/system/test-tone.wav` | 公开 WAV，支持 Range；主要供 Server 诊断 |
+
+`publicBaseUrl` 是 Server 对外生成音频 URL 的配置值，不等于客户端实际连接地址，禁止据此覆盖
+用户填写的 server base。
+
+## 2. Auth `/auth`
 
 | 方法 | 路径 | 认证 | 入参 | 出参 |
 |---|---|---|---|---|
@@ -50,26 +61,31 @@ HMusicLyric { trackId; source; lrc; lines:{timeMs,text}[]; translatedLines:{time
 
 登录流程：`status.initialized=false` → 走 setup（首次创建管理员）；否则走 login。
 
-## 2. Search `/search`
+## 3. Search `/search`
 
 | GET | `/search?q=<kw>&source?=&page?=1&limit?=20(max50)` | → `HMusicSearchResult{query,source?,page,limit,total,tracks[]}` |
 
-## 3. Playback `/playback`
+## 4. Playback `/playback`
 
 | 方法 | 路径 | 入参 | 说明 |
 |---|---|---|---|
 | GET | `/state` | — | → HMusicPlaybackState |
-| GET | `/events` | — | SSE：`event: playback.state\ndata: <state>`（一次性推当前态，可用于唤醒刷新） |
-| POST | `/play` | `{track? \| clientTrack? \| url?, deviceId?, quality?, durationMs?, positionMs?}` | 三选一来源 |
+| GET | `/events` | — | 当前只发送一帧后断开，不是持续 SSE；P0 禁止依赖 |
+| POST | `/play` | `{track? \| clientTrack? \| url?, deviceId?, quality?, durationMs?, positionMs?, queueIndex?}` | 三选一来源；队列点播必带 `queueIndex` 精确定位（同名歌可能出现多次） |
 | POST | `/test-tone` | `{deviceId?}` | 播 3 秒内置测试音 |
 | POST | `/pause`·`/resume`·`/stop`·`/next`·`/previous` | — | → 新 state |
-| POST | `/seek` | `{positionMs}` | 本机播放需前端另调 localSeek |
+| POST | `/seek` | `{positionMs}` | 本机播放还需让 `AudioHandler` seek |
 | POST | `/volume` | `{volume 0-100}` | |
 | POST | `/mode` | `{playMode}` | |
 | POST | `/speak` | `{text(1-200), deviceId?}` | TTS 播报 |
-| POST | `/local-report` | `{state?, positionMs?, durationMs?, ended?}` | **本机播放专用**：<audio> 回写进度；`ended:true` 时服务端推进队列并回新 state |
+| POST | `/local-report` | `{state?, positionMs?, durationMs?, ended?}` | **本机播放专用**：原生播放器回写；`ended:true` 时服务端推进队列并返回新 state |
 
-## 4. Queue `/queue`
+> **S-P0-01 已修复**：`/playback/play` 的 strict schema 已声明 `queueIndex`（含重复歌曲
+> index 0/1 回归测试）。客户端队列点播一步发送 `{track, queueIndex}` 即可，禁止再走
+> 「先 `/queue/current` 再 play」两步——那会留下"指针改了但没播成"的半成功窗口。
+> 仅在对接未修复的旧 Server 时按 12 的兼容矩阵降级。
+
+## 5. Queue `/queue`
 
 | GET | `/` | → HMusicQueue |
 | PUT | `/` | `{tracks[]? \| clientTracks[]?, currentIndex?, playMode?}` 整体替换 |
@@ -80,11 +96,11 @@ HMusicLyric { trackId; source; lrc; lines:{timeMs,text}[]; translatedLines:{time
 
 > 注：无「删单曲」接口。删除 = 前端过滤后用 `PUT /` 整体替换（见 queue.js removeAt）。
 
-## 5. Playlists `/playlists`
+## 6. Playlists `/playlists`
 
 | GET | `/` | → `{playlists: HMusicPlaylistSummary[]}` |
 | POST | `/` | `{name(1-80), description?}` → `{playlist}` |
-| POST | `/import` | `{url}` → `{playlist, imported, skipped{duplicate,emptyTitle,truncated}}` 导入 QQ/酷我/网易云 分享链接，≤500 首 |
+| POST | `/import` | `{url,name?}` → `{playlist, platform, platformName, imported, totalCount, skipped{duplicate,emptyTitle,truncated}}` 导入 QQ/酷我/网易云分享链接，≤500 首 |
 | GET | `/:id` | → `{playlist: HMusicPlaylistDetail}` |
 | PATCH | `/:id` | `{name?, description?}` |
 | DELETE | `/:id` | — |
@@ -94,7 +110,7 @@ HMusicLyric { trackId; source; lrc; lines:{timeMs,text}[]; translatedLines:{time
 
 「我喜欢的音乐」= 名为该字符串的普通歌单，首次收藏时自动创建（见 player.js）。
 
-## 6. Charts `/charts`
+## 7. Charts `/charts`
 
 | GET | `/` | → `{charts: {id,name,description,kind}[]}` kind: family\|netease\|qq\|apple |
 | GET | `/:id` | → `{...summary, updatedAt, entries: ChartEntry[]}` |
@@ -105,7 +121,7 @@ ChartEntry: `{rank,title,artist,album?,coverUrl?,playCount?,track?}`。
 `apple-cn,apple-us,apple-jp,apple-kr,apple-tw,apple-hk`。
 family/wy-*/qq-* 的 entry 带 track（点了直接播）；apple-* 无 track（前端搜索匹配）。
 
-## 7. Stats `/stats`
+## 8. Stats `/stats`
 
 | GET | `/stats` | → `{stats:{overview,last30d,topArtists[],topTracks[],topAlbums[],sourceDist[],dailyTrend[],hourDist[]}}` |
 
@@ -113,22 +129,25 @@ family/wy-*/qq-* 的 entry 带 track（点了直接播）；apple-* 无 track（
 - topTracks 每项带 `track`（可点播）；dailyTrend 近 30 天补零 `{date:"MM-DD",count}`；hourDist 24 段 `{hour,count}`
 - sourceDist `{source,label,count,percent}`
 
-## 8. Tracks / Lyrics `/tracks`
+## 9. Tracks / Lyrics `/tracks`
 
 | POST | `/tracks/resolve` | `{track? \| clientTrack?, quality?}` → HMusicResolvedTrack{track,url,quality,expiresAt?} |
 | POST | `/tracks/lyrics` | `{track? \| clientTrack?}` → HMusicLyric |
 | GET | `/tracks/:id/lyrics` | → HMusicLyric |
 
-## 9. Devices `/devices`
+## 10. Devices `/devices`
 
 | GET | `/` | → `{devices: HMusicDevice[]}` |
 | POST | `/refresh` | 从小米账号刷新 → `{deviceCount}` |
-| POST | `/:id/select` | 设默认 |
-| POST | `/:id/probe` | 探测能力 |
+| POST | `/:id/select` | 设默认 → `{selectedDeviceId, playback}`；同时把播放目标切到该设备（旧设备在播则暂停，状态转为新设备上的 paused，下次播放/续播按新设备重新解析） |
+| POST | `/:id/probe` | 探测能力 → capabilities；小米已登录且非本机设备时先发真实 ubus 状态查询，会话过期/离线当场报错，不谎报正常 |
 
-## 10. Mi 小米账号 `/mi`
+`POST /devices/mock` 是开发契约，不进入客户端 UI。
+
+## 11. Mi 小米账号 `/mi`
 
 | GET | `/status` | → `{loggedIn, accountMasked?, ...}` |
+| POST | `/login` | `{account,password,captchaCode?,webCredentials?}` 兼容直登通道 |
 | POST | `/qr/start` | → `{qrId, loginUrl, expiresAt}`（前端本地渲染二维码） |
 | GET | `/qr/:id/status` | → `{status: pending\|success\|failed\|expired, message?}` 每 2s 轮询 |
 | POST | `/verification/start` | `{account, password, captchaCode?}` → 登录成功`{loggedIn,deviceCount}` 或需短信`{verificationId,maskedPhone,smsStatus,expiresAt}` |
@@ -140,16 +159,18 @@ family/wy-*/qq-* 的 entry 带 track（点了直接播）；apple-* 无 track（
 
 smsStatus: `recent`(最近发过) / `limited`(限频，建议扫码) / 其他(已发送)。
 
-## 11. Config `/config`
+## 12. Config `/config`
 
 | GET | `/` | → `{serverName, defaultQuality, searchStrategy, resolveStrategy, extraPlayMusicModels[], manualTracks[], lxPlugins[]}` |
 | PATCH | `/` | 上述字段任意子集（manualTracks 全量替换；extraPlayMusicModels 型号大写字母数字） |
 
-- defaultQuality: `128k\|320k\|flac\|hires`
-- searchStrategy: `qqFirst\|kuwoFirst\|neteaseFirst`
-- resolveStrategy: `originalFirst\|qqFirst\|kuwoFirst\|neteaseFirst`
+- defaultQuality: `128k\|320k\|flac\|hires`——点播与下载的首选档，取不到时逐档回退
+- searchStrategy: `qqFirst\|kuwoFirst\|neteaseFirst`——聚合搜索结果的平台领先顺序
+- resolveStrategy: `originalFirst\|qqFirst\|kuwoFirst\|neteaseFirst`——选某平台优先时，
+  解析先在该平台匹配同一首歌取直链，失败回落歌曲原平台；originalFirst 只解析原平台
+- lxPlugins 条目含 `sourceUrl?`（订阅链接）；GET 读出的对象可原样 PATCH 回去
 
-## 12. Sources / LX 插件 `/sources`
+## 13. Sources / LX 插件 `/sources`
 
 | GET | `/` | → `{sources: HMusicSource[]}`（带 health） |
 | GET | `/lx-plugins` | → `{plugins: {id,name,enabled,defaultQuality,sourceUrl?}[]}` |
@@ -160,12 +181,28 @@ smsStatus: `recent`(最近发过) / `limited`(限频，建议扫码) / 其他(�
 | DELETE | `/lx-plugins/:id` | — |
 | POST | `/:id/test` | 加载测试 → `{message}` |
 
-## 13. 音频代理 `/proxy`（前端无需直接调）
+## 14. 音频代理 `/proxy`
 
-`streamUrl` 已由服务端拼好（`/api/v1/proxy/audio/<base64>`）。客户端本机播放直接把
-`getServerBase() + streamUrl的path` 塞进 `<audio>.src` 即可（见 01 章决策 B/D）。
+`streamUrl` 是服务端拼好的签名地址（`/api/v1/proxy/audio/<token>`），代理本身无需 Bearer 且透传
+Range。Flutter 必须保留返回 URL 的 path/query，并把 scheme/host/port 重绑定到当前 server base；
+默认 `publicBaseUrl=127.0.0.1`，手机直接使用原 host 会访问自己。
+
+## 15. Downloads `/downloads`
+
+| GET | `/downloads` | → `{downloads: DownloadRecord[]}`，按创建时间倒序 |
+| POST | `/downloads` | `{track? \| clientTrack?, quality?}` → `{download}`；后台下载，客户端轮询状态 |
+| DELETE | `/downloads/:id` | 删除文件和记录 → `{deletedId}` |
+
+完成的曲目播放时由 Server 自动优先命中 `/proxy/local/:token`，客户端仍消费普通 playback
+`streamUrl`，无需识别本地/上游来源。下载管理不属于 P0 最小纵切，排入 P2。
 
 ## 静态前端
 
 `GET /app/` 由服务端 `@fastify/static` 伺服 `web/` 目录——**这是网页端入口，客户端不用**
-（客户端走本地 `tauri://` 加载同步来的 src/）。仅说明二者同源一份代码。
+。Flutter 原生实现只把它作为行为与视觉对照，不加载或同步其中的 JavaScript/CSS。
+
+## 上架相关 API 缺口
+
+当前 Auth 只有 setup/login/password，没有账户删除能力。由于 App 内允许首次 setup 创建管理员，
+正式上架前必须先通过 ADR 确认单管理员自托管系统的删除语义，再实现 Server API 和 App 内入口。
+不能把“退出登录”或“联系支持”当成删除账户。

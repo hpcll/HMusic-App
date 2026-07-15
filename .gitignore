@@ -1,15 +1,27 @@
-# ── 前端同步产物（由 scripts/sync-web.sh 从 HMusic-Server/web 生成，不入库） ──
-# 但保留 src/native/ —— 那是客户端专属手写代码。
-/src/*
-!/src/native/
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
 
-# ── Tauri / Rust ──
-/src-tauri/target/
-/src-tauri/gen/
+# IDE
+.idea/
+*.iml
+.vscode/
 
-# ── Node（若后续引入构建工具） ──
-node_modules/
+# Platform-generated secrets and local state
+android/.gradle/
+android/key.properties
+*.jks
+*.keystore
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+macos/Flutter/ephemeral/
 
-# ── 系统 ──
+# System / logs
 .DS_Store
 *.log
