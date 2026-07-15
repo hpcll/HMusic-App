@@ -7,14 +7,17 @@ import 'method_channel_platform_shell_bridge.dart';
 import 'platform_shell_bridge.dart';
 
 // iOS 由 Swift/SwiftUI NativeGlassShell 承载 chrome；Android/桌面用 Flutter 回退壳，
-// 不发原生 intent、不回报 inset。P0 阶段 NoOpBridge 让 PlatformShellController 的
+// 不发原生 intent、不回报 inset。NoOpBridge 让 PlatformShellController 的
 // 调用全部成为安全空操作，避免非 iOS 平台因缺通道而报错。
 class NoOpPlatformShellBridge implements PlatformShellBridge {
+  @override
+  Stream<ShellReady> get readyEvents => const Stream<ShellReady>.empty();
+
   @override
   Stream<ShellLayout> get layoutChanges => const Stream<ShellLayout>.empty();
 
   @override
-  Stream<ShellIntentType> get intents => const Stream<ShellIntentType>.empty();
+  Stream<ShellIntent> get intents => const Stream<ShellIntent>.empty();
 
   @override
   Future<void> configure({
@@ -29,6 +32,24 @@ class NoOpPlatformShellBridge implements PlatformShellBridge {
     required String title,
     required bool canGoBack,
   }) async {}
+
+  @override
+  Future<void> updateNowPlaying({
+    required String? trackId,
+    required String? title,
+    required String? artist,
+    required String? artworkUrl,
+    required bool playing,
+  }) async {}
+
+  @override
+  Future<void> updateLayout({
+    required bool showTabBar,
+    required bool showMiniPlayer,
+  }) async {}
+
+  @override
+  Future<void> updateScroll({required bool minimized}) async {}
 }
 
 // 按平台选择 chrome 桥：iOS 走 MethodChannel 到 NativeGlassShell，其余平台用空桥。

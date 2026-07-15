@@ -9,7 +9,7 @@ import UIKit
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     if let controller = window?.rootViewController as? FlutterViewController {
-      NativeGlassShellChannel.register(with: controller.binaryMessenger)
+      NativeGlassShellChannel.register(with: controller)
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

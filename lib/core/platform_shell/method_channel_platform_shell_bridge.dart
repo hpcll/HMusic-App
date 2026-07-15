@@ -18,12 +18,26 @@ class MethodChannelPlatformShellBridge implements PlatformShellBridge {
   final EventChannel _eventChannel;
 
   @override
-  Stream<ShellIntentType> get intents => _events
+  Stream<ShellReady> get readyEvents => _events
+      .where((event) => event['type'] == 'ready')
+      .map(
+        (event) => ShellReady(
+          capabilities:
+              (event['capabilities'] as List<Object?>?)
+                  ?.whereType<String>()
+                  .toList() ??
+              const <String>[],
+        ),
+      );
+
+  @override
+  Stream<ShellIntent> get intents => _events
       .where((event) => event['type'] == 'intent')
-      .map((event) => event['intent'] as String?)
-      .map(_parseIntent)
-      .where((intent) => intent != null)
-      .cast<ShellIntentType>();
+      .map(
+        (event) => (_parseIntent(event['intent'] as String?), event['value']),
+      )
+      .where((pair) => pair.$1 != null)
+      .map((pair) => ShellIntent(pair.$1!, pair.$2 as String?));
 
   @override
   Stream<ShellLayout> get layoutChanges => _events
@@ -35,13 +49,13 @@ class MethodChannelPlatformShellBridge implements PlatformShellBridge {
         ),
       );
 
-  Stream<Map<String, Object?>> get _events {
-    return _eventChannel
-        .receiveBroadcastStream()
-        .where((Object? event) => event is Map<Object?, Object?>)
-        .cast<Map<Object?, Object?>>()
-        .map((event) => Map<String, Object?>.from(event));
-  }
+  // 单例广播流：ready/layout/intent 三路订阅共享一条原生 EventChannel 订阅。
+  // 若做成 getter 每次新建流，多个 listener 会在原生侧反复 onListen 互相顶掉 sink。
+  late final Stream<Map<String, Object?>> _events = _eventChannel
+      .receiveBroadcastStream()
+      .where((Object? event) => event is Map<Object?, Object?>)
+      .cast<Map<Object?, Object?>>()
+      .map((event) => Map<String, Object?>.from(event));
 
   @override
   Future<void> configure({
@@ -71,6 +85,46 @@ class MethodChannelPlatformShellBridge implements PlatformShellBridge {
         'title': title,
         'canGoBack': canGoBack,
       },
+    );
+  }
+
+  @override
+  Future<void> updateNowPlaying({
+    required String? trackId,
+    required String? title,
+    required String? artist,
+    required String? artworkUrl,
+    required bool playing,
+  }) {
+    return _methodChannel
+        .invokeMethod<void>('shell.updateNowPlaying', <String, Object?>{
+          'trackId': trackId,
+          'title': title,
+          'artist': artist,
+          'artworkUrl': artworkUrl,
+          'playing': playing,
+        });
+  }
+
+  @override
+  Future<void> updateLayout({
+    required bool showTabBar,
+    required bool showMiniPlayer,
+  }) {
+    return _methodChannel.invokeMethod<void>(
+      'shell.updateLayout',
+      <String, Object?>{
+        'showTabBar': showTabBar,
+        'showMiniPlayer': showMiniPlayer,
+      },
+    );
+  }
+
+  @override
+  Future<void> updateScroll({required bool minimized}) {
+    return _methodChannel.invokeMethod<void>(
+      'shell.updateScroll',
+      <String, Object?>{'minimized': minimized},
     );
   }
 
