@@ -17,9 +17,10 @@ class ChartsFeaturedLead extends StatelessWidget {
     super.key,
   });
 
-  // 横滑带里的统一卡宽；高 = 封面 150 + 上下 padding 16×2。
+  // 横滑带里的统一卡宽；高 = 封面 _coverSize + 上下 padding 16×2。
   static const double width = 460;
   static const double height = 182;
+  static const double _coverSize = 150;
 
   final Chart chart;
 
@@ -48,9 +49,9 @@ class ChartsFeaturedLead extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: SizedBox(
-                  width: 150,
-                  height: 150,
-                  child: _cover(palette),
+                  width: _coverSize,
+                  height: _coverSize,
+                  child: _cover(context, palette),
                 ),
               ),
               const SizedBox(width: 18),
@@ -147,12 +148,14 @@ class ChartsFeaturedLead extends StatelessWidget {
     );
   }
 
-  Widget _cover(HMusicPalette palette) {
+  Widget _cover(BuildContext context, HMusicPalette palette) {
     final url = entries.isNotEmpty ? entries.first.coverUrl : null;
     if (url == null || url.isEmpty) return _placeholder(palette);
     return Image.network(
       url,
       fit: BoxFit.cover,
+      // 按展示尺寸解码，避免原图全尺寸解码拖垮滚动帧率（见 hmusic_cover）。
+      cacheWidth: (_coverSize * MediaQuery.devicePixelRatioOf(context)).round(),
       errorBuilder: (_, _, _) => _placeholder(palette),
       loadingBuilder: (context, child, progress) =>
           progress == null ? child : _placeholder(palette),

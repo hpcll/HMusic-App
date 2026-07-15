@@ -31,6 +31,10 @@ class PlayerCover extends StatelessWidget {
               : Image.network(
                   url,
                   fit: BoxFit.cover,
+                  // 舞台封面布局上限 420 逻辑像素（player_page 约束），窄屏
+                  // 屏宽也低于此值；按 420 解码防原图全尺寸解码。
+                  cacheWidth: (420 * MediaQuery.devicePixelRatioOf(context))
+                      .round(),
                   errorBuilder: (_, __, ___) => _fallback(scheme),
                 ),
         ),

@@ -43,6 +43,10 @@ class HMusicCover extends StatelessWidget {
           : Image.network(
               url!,
               fit: BoxFit.cover,
+              // 按展示尺寸解码：封面原图常为 1000px+ 方图，全尺寸解码会在
+              // 滚动进入视口时打满主线程并挤爆图片缓存（滑动掉帧的主因）。
+              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
               errorBuilder: (_, _, _) => fallback,
               loadingBuilder: (context, child, progress) =>
                   progress == null ? child : fallback,
