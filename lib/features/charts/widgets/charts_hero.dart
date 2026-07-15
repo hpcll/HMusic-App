@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/hmusic_palette.dart';
 import '../models/chart.dart';
 
-// 窄屏主推轮播，结构借鉴 Apple Music「广播」页 Hero：横滑大卡 + 两侧露边（peek）暗示可滑动。
+// 窄屏主推轮播，结构借鉴 Apple Music「广播」页 Hero：横滑大卡左对齐页面 16 基线
+//（与页头、分组卡带同列），右侧露出邻卡边缘（peek）暗示可滑动。
 // 窄屏卡横比接近方图，1:1 封面全幅铺底裁切损失小；桌面宽屏不用本组件
 // （横条会把方图拉糊），改用 charts_featured_lead 的头条卡形态。
 // 视觉守 HMusic 纪律：底部墨色 scrim 兜底白字对比，青绿不出现在此处。
@@ -37,8 +38,8 @@ class _ChartsHeroCarouselState extends State<ChartsHeroCarousel> {
   @override
   void initState() {
     super.initState();
-    // viewportFraction < 1 → 当前卡居中，两侧露出邻卡边缘（peek）。
-    _controller = PageController(viewportFraction: 0.86);
+    // viewportFraction < 1 + padEnds false → 当前卡左对齐，右侧露出邻卡边缘（peek）。
+    _controller = PageController(viewportFraction: 0.9);
     _controller.addListener(_onScroll);
   }
 
@@ -65,11 +66,17 @@ class _ChartsHeroCarouselState extends State<ChartsHeroCarousel> {
           height: 190,
           child: PageView.builder(
             controller: _controller,
+            // padEnds false：卡片贴页面左基线而非居中，修掉与下方卡带的错位。
+            padEnds: false,
             itemCount: widget.featured.length,
             itemBuilder: (context, i) {
               final chart = widget.featured[i];
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
+                // 左 16 对齐全页基线并兼作卡间距；末卡补右 16，滑到底时贴回栅格。
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: i == widget.featured.length - 1 ? 16 : 0,
+                ),
                 child: _HeroCard(
                   chart: chart,
                   cover: widget.covers[chart.id],
@@ -115,7 +122,7 @@ class _HeroCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: <Widget>[
-              _cover(),
+              _cover(context),
               // 底部墨色 scrim：托住白字对比（补 Apple 原版短板）。
               const DecoratedBox(
                 decoration: BoxDecoration(
@@ -165,12 +172,17 @@ class _HeroCard extends StatelessWidget {
     );
   }
 
-  Widget _cover() {
+  Widget _cover(BuildContext context) {
     final url = cover;
     if (url == null || url.isEmpty) return _placeholder;
     return Image.network(
       url,
       fit: BoxFit.cover,
+      // 卡宽 ≈ 0.9 屏宽，按整屏宽解码作上限，避免原图全尺寸解码掉帧。
+      cacheWidth:
+          (MediaQuery.sizeOf(context).width *
+                  MediaQuery.devicePixelRatioOf(context))
+              .round(),
       errorBuilder: (_, _, _) => _placeholder,
       loadingBuilder: (context, child, progress) =>
           progress == null ? child : _placeholder,
