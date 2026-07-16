@@ -39,10 +39,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     return ListView(
       // 水平只留 4：结果行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
       // 封面左缘与页头/输入框同压 16 基线；头部块自行补 12。
-      // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度。
+      // 顶/底累加环境 padding：玻璃顶栏与悬浮 mini/dock 之下让位，
+      // 内容仍可滚到玻璃后面（scroll-under）。
       padding: EdgeInsets.fromLTRB(
         4,
-        24,
+        24 + MediaQuery.paddingOf(context).top,
         4,
         32 + MediaQuery.paddingOf(context).bottom,
       ),

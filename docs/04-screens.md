@@ -9,7 +9,11 @@
   受保护页未登录跳 login，无 server base 跳 connection。
 - **桌面外壳**：`Sidebar`（品牌 + 7 导航 + 用户名/退出）+ `content`（底部悬浮 mini 玻璃控制条，
   见 03；web 侧边栏内的 mini 播放态不复刻——桌面 mini 承载控制，不只指示）。
+  mini 悬浮在内容之上，让位走 MediaQuery padding 注入（顶部 28 标题栏基线 +
+  底部 mini 包络高度），内容从玻璃下滚过；macOS 窗体垫窗后毛玻璃，侧栏半透明透出壁纸。
 - **窄屏外壳**：`MobileTopBar`（品牌 + 退出）+ `content` + `MobileNav`（底部 7 图标）。
+  顶栏/底栏为全宽玻璃条（extendBody/extendBodyBehindAppBar），高度由 Scaffold
+  注入 body 的 MediaQuery padding，各页 paddingOf.top/bottom 让位。
 - **iOS 27 窄屏 chrome**：顶栏、底部导航、mini player 由 Swift/SwiftUI NativeGlassShell 覆盖在
   Flutter 内容层之上；动态高度和安全区回报给 Flutter。旧 iOS 使用系统 material 回退。
 - **Android 窄屏 chrome**：结构与 iOS 一致，由 Flutter AdaptiveGlassShell 渲染；根据性能档位关闭

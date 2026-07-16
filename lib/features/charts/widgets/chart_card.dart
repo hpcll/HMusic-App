@@ -58,7 +58,9 @@ class ChartCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           // 固定预览区高度：Top3 不足 3 首或走描述回退时卡片仍等高，网格对齐（对齐 web min-height）。
-          SizedBox(height: 76, child: _preview(context)),
+          // 78 = 3 行 × (文本行高 + 6 竖向内距) 的包络，Android 字体度量比桌面高零点几像素，
+          // 76 会精确溢出 0.563px（黄黑警告条），留 2px 余量。
+          SizedBox(height: 78, child: _preview(context)),
           const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerRight,

@@ -6,12 +6,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/audio/hmusic_audio_handler.dart';
+import '../../../core/platform_shell/widgets/adaptive_glass_surface.dart';
 import '../../../shared/widgets/hmusic_cover.dart';
 import '../view_models/player_view_model.dart';
 import '../views/player_page.dart';
 
 class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({super.key});
+
+  // 桌面壳注入内容区底部的让位高度：外边距 12 + 行内容 ~58 + 进度线 2 的
+  // 包络，配合页面自身的 32 底距，列表末行不会停在玻璃下面。
+  static const double desktopInset = 76;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,16 +40,23 @@ class _MiniPlayerBody extends ConsumerWidget {
       stream: audioHandler.mediaItem,
       builder: (context, itemSnapshot) {
         final item = itemSnapshot.data;
-        if (item == null) return const SizedBox.shrink();
-        return StreamBuilder<PlaybackState>(
-          stream: audioHandler.playbackState,
-          builder: (context, stateSnapshot) {
-            return _MiniPlayerCard(
-              item: item,
-              playbackState: stateSnapshot.data,
-              controller: ref.read(playerViewModelProvider),
-            );
-          },
+        // docs/03 mini 显隐动效：出现/消失 220ms easeOut 高度过渡，不硬切。
+        return AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: item == null
+              ? const SizedBox(width: double.infinity)
+              : StreamBuilder<PlaybackState>(
+                  stream: audioHandler.playbackState,
+                  builder: (context, stateSnapshot) {
+                    return _MiniPlayerCard(
+                      item: item,
+                      playbackState: stateSnapshot.data,
+                      controller: ref.read(playerViewModelProvider),
+                    );
+                  },
+                ),
         );
       },
     );
@@ -64,68 +76,52 @@ class _MiniPlayerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final duration = item.duration ?? Duration.zero;
-    final position = _safePosition(playbackState?.updatePosition, duration);
     final isPlaying = playbackState?.playing ?? false;
-    final progress = duration > Duration.zero
-        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
-        : 0.0;
 
     // 外壳负责安全区与堆叠位置；mini 只保留自身左右留白与小幅上下间距。
-    // 对齐 docs/03「mini player：封面、题/歌手、播放与下一曲」的玻璃控制条形态。
+    // 对齐 docs/03「mini player：封面、题/歌手、播放与下一曲」的玻璃控制条形态：
+    // 内容从玻璃下滚过，off 档（高对比/减动效）自动退回不透明面板。
+    // 不显示进度：进度与 seek 都归完整播放页，mini 只承载识别与启停。
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-      child: Material(
-        color: theme.colorScheme.surface.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(18),
-        elevation: 6,
-        shadowColor: Colors.black.withValues(alpha: 0.12),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => _openPlayer(context),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-                child: Row(
-                  children: <Widget>[
-                    _Cover(url: item.artUri?.toString()),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _TrackText(title: item.title, artist: item.artist),
-                    ),
-                    IconButton(
-                      tooltip: isPlaying ? '暂停' : '播放',
-                      icon: Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                      ),
-                      iconSize: 30,
-                      onPressed: isPlaying ? controller.pause : controller.play,
-                    ),
-                    IconButton(
-                      tooltip: '下一首',
-                      icon: const Icon(Icons.skip_next_rounded),
-                      iconSize: 26,
-                      onPressed: controller.skipToNext,
-                    ),
-                  ],
-                ),
-              ),
-              // 底部细进度条：只读指示（拖拽 seek 留在全屏播放页），
-              // 与 web mini 控制条同构——mini 不承载精确 seek 交互。
-              if (duration > Duration.zero)
-                LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 2,
-                  backgroundColor: theme.colorScheme.outlineVariant.withValues(
-                    alpha: 0.4,
+      child: AdaptiveGlassSurface(
+        quality: resolveGlassQuality(context),
+        padding: EdgeInsets.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        child: Material(
+          type: MaterialType.transparency,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _openPlayer(context),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+              child: Row(
+                children: <Widget>[
+                  _Cover(url: item.artUri?.toString()),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _TrackText(title: item.title, artist: item.artist),
                   ),
-                ),
-            ],
+                  IconButton(
+                    tooltip: isPlaying ? '暂停' : '播放',
+                    icon: Icon(
+                      isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                    ),
+                    iconSize: 30,
+                    onPressed: isPlaying ? controller.pause : controller.play,
+                  ),
+                  IconButton(
+                    tooltip: '下一首',
+                    icon: const Icon(Icons.skip_next_rounded),
+                    iconSize: 26,
+                    onPressed: controller.skipToNext,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -141,13 +137,6 @@ class _MiniPlayerCard extends StatelessWidget {
     } else {
       unawaited(context.push(PlayerPage.path));
     }
-  }
-
-  Duration _safePosition(Duration? value, Duration duration) {
-    final position = value ?? Duration.zero;
-    if (position < Duration.zero) return Duration.zero;
-    if (duration > Duration.zero && position > duration) return duration;
-    return position;
   }
 }
 

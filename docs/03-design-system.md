@@ -88,6 +88,11 @@ glassBlurOff:    0（性能/降低透明度回退）
 
 禁止“每张卡片都 BackdropFilter”。背景层不足时玻璃没有信息价值，只会降低文字对比并增加 GPU 成本。
 
+桌面端：三桌面平台的 chrome（mini player、窄窗顶栏/底栏）同用 Flutter
+`AdaptiveGlassSurface`（blur + 提饱和 + 顶缘高光）；macOS 窗体另垫窗后毛玻璃
+（`NSVisualEffectView.sidebar`），侧栏半透明透出壁纸；Windows/Linux 无窗后采样能力，
+侧栏保持不透明暖纸。高对比/减动效环境下玻璃统一降级为不透明面板（off 档）。
+
 ## 3. 核心组件规格
 
 ### 卡片 .card

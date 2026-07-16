@@ -173,6 +173,16 @@ abstract final class HMusicTheme {
         iconColor: p.mutedStrong,
         textColor: p.text,
       ),
+      // docs/03 模态卡：panel 底 / radius 10 / hairline，表单主体保持不透明；
+      // 遮罩的 blur(2px) 由 showHMusicDialog 负责。
+      dialogTheme: DialogThemeData(
+        backgroundColor: p.panel,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: hairline,
+        ),
+      ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: brightness == Brightness.light
             ? p.textStrong

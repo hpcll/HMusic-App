@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/platform_shell/widgets/adaptive_glass_surface.dart';
 import '../theme/hmusic_palette.dart';
 
 // 导航项定义：icon + label + 对应 shell branch index（7 分支顺序对齐 web 侧栏）。
@@ -35,6 +36,7 @@ const List<NavDestinationSpec> kNavDestinations = <NavDestinationSpec>[
 
 // 窄屏底部导航，对齐 web .bottom-nav / .nav-item：
 // 流内底栏（非 fixed）+ 顶部细边 + 安全区内边距；active 字→text-strong，图标 21px、标签 10.5px。
+// 全宽玻璃条形态（外壳 extendBody，内容从底栏下滚过）。
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({required this.shell, super.key});
 
@@ -43,11 +45,12 @@ class AppBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.background,
-        border: Border(top: BorderSide(color: palette.line)),
-      ),
+    return AdaptiveGlassSurface(
+      quality: resolveGlassQuality(context),
+      padding: EdgeInsets.zero,
+      borderRadius: BorderRadius.zero,
+      border: Border(top: BorderSide(color: palette.line)),
+      shadow: false,
       child: SafeArea(
         top: false,
         child: Padding(

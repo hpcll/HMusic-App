@@ -54,9 +54,9 @@ class ChartsWall extends ConsumerWidget {
     final wide = MediaQuery.sizeOf(context).width >= 860;
 
     return ListView(
-      // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度（Flutter 壳下为 0）。
+      // 顶/底累加环境 padding：玻璃顶栏与悬浮 mini/dock 之下让位（scroll-under）。
       padding: EdgeInsets.only(
-        top: 24,
+        top: 24 + MediaQuery.paddingOf(context).top,
         bottom: 32 + MediaQuery.paddingOf(context).bottom,
       ),
       children: <Widget>[

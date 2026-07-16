@@ -19,10 +19,17 @@ class AppSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
+    // macOS 窗后毛玻璃（MainFlutterWindow 垫 NSVisualEffectView）：侧栏改半透明
+    // tint 让壁纸透出，像系统设置 App 的侧栏；Windows/Linux 无窗后采样能力，
+    // 保持不透明暖纸（KISS，不引 flutter_acrylic）。
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final macGlassWindow = Theme.of(context).platform == TargetPlatform.macOS;
     return Container(
       width: 232,
       decoration: BoxDecoration(
-        color: palette.background,
+        color: macGlassWindow
+            ? palette.background.withValues(alpha: dark ? 0.55 : 0.60)
+            : palette.background,
         border: Border(right: BorderSide(color: palette.line)),
       ),
       // 顶部 56：品牌行基线对齐内容区页面大标题基线——大标题顶 = 28（外壳

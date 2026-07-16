@@ -51,7 +51,12 @@ class _QueuePageState extends ConsumerState<QueuePage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              24 + MediaQuery.paddingOf(context).top,
+              16,
+              0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
@@ -136,7 +141,11 @@ class _QueuePageState extends ConsumerState<QueuePage> {
       return const Center(child: Text('队列是空的，去搜索里加几首歌吧'));
     }
     return ListView.separated(
-      padding: const EdgeInsets.only(bottom: 12),
+      // 底部让位：桌面悬浮 mini 之下仍可滚到最后一行（窄屏 push 形态在
+      // SafeArea 内，环境 padding 为 0，只剩基础 12）。
+      padding: EdgeInsets.only(
+        bottom: 12 + MediaQuery.paddingOf(context).bottom,
+      ),
       itemCount: state.items.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {

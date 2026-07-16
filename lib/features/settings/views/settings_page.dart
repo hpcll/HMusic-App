@@ -59,7 +59,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (wide) {
       final section = state.section ?? SettingsSection.mi;
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          24 + MediaQuery.paddingOf(context).top,
+          16,
+          32 + MediaQuery.paddingOf(context).bottom,
+        ),
         children: <Widget>[
           const ViewTitle('设置'),
           const SizedBox(height: 20),
@@ -103,10 +108,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final section = state.section;
     if (section == null) {
       return ListView(
-        // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度（Flutter 壳下为 0）。
+        // 顶/底累加环境 padding：玻璃顶栏与悬浮 mini/dock 之下让位（scroll-under）。
         padding: EdgeInsets.fromLTRB(
           16,
-          24,
+          24 + MediaQuery.paddingOf(context).top,
           16,
           32 + MediaQuery.paddingOf(context).bottom,
         ),
@@ -120,7 +125,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return ListView(
       padding: EdgeInsets.fromLTRB(
         16,
-        8,
+        8 + MediaQuery.paddingOf(context).top,
         16,
         32 + MediaQuery.paddingOf(context).bottom,
       ),

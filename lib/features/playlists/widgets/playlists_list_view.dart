@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/widgets/hmusic_dialog.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/playlists_view_state.dart';
 import '../view_models/playlists_view_model.dart';
@@ -22,7 +23,7 @@ class PlaylistsListView extends ConsumerWidget {
       // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度（Flutter 壳下为 0）。
       padding: EdgeInsets.fromLTRB(
         16,
-        24,
+        24 + MediaQuery.paddingOf(context).top,
         16,
         32 + MediaQuery.paddingOf(context).bottom,
       ),
@@ -120,7 +121,7 @@ class PlaylistsListView extends ConsumerWidget {
     BuildContext context,
     PlaylistsViewModel notifier,
   ) async {
-    final name = await showDialog<String>(
+    final name = await showHMusicDialog<String>(
       context: context,
       builder: (_) => const PlaylistInputDialog(
         title: '创建歌单',
@@ -135,7 +136,7 @@ class PlaylistsListView extends ConsumerWidget {
     BuildContext context,
     PlaylistsViewModel notifier,
   ) async {
-    final url = await showDialog<String>(
+    final url = await showHMusicDialog<String>(
       context: context,
       builder: (_) => const PlaylistInputDialog(
         title: '导入歌单',

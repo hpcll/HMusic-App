@@ -32,7 +32,7 @@ class ChartDetailView extends ConsumerWidget {
       // 让出 chrome 高度（Flutter 壳下为 0）。
       padding: EdgeInsets.fromLTRB(
         4,
-        12,
+        12 + MediaQuery.paddingOf(context).top,
         4,
         32 + MediaQuery.paddingOf(context).bottom,
       ),

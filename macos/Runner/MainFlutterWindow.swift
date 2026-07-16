@@ -1,12 +1,58 @@
 import Cocoa
 import FlutterMacOS
 
+private final class PassthroughVisualEffectView: NSVisualEffectView {
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
+  }
+}
+
+private final class FlutterGlassContainerViewController: NSViewController {
+  init(flutterViewController: FlutterViewController) {
+    self.flutterViewController = flutterViewController
+    super.init(nibName: nil, bundle: nil)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  private let flutterViewController: FlutterViewController
+
+  override func loadView() {
+    let containerView = NSView()
+    let glassView = PassthroughVisualEffectView(frame: containerView.bounds)
+    glassView.autoresizingMask = [.width, .height]
+    glassView.material = .sidebar
+    glassView.blendingMode = .behindWindow
+    glassView.state = .followsWindowActiveState
+    containerView.addSubview(glassView)
+
+    addChild(flutterViewController)
+    let flutterView = flutterViewController.view
+    flutterView.frame = containerView.bounds
+    flutterView.autoresizingMask = [.width, .height]
+    containerView.addSubview(flutterView, positioned: .above, relativeTo: glassView)
+    view = containerView
+  }
+}
+
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
+    let containerViewController = FlutterGlassContainerViewController(
+      flutterViewController: flutterViewController
+    )
     let windowFrame = self.frame
-    self.contentViewController = flutterViewController
+    self.contentViewController = containerViewController
     self.setFrame(windowFrame, display: true)
+
+    // 毛玻璃与 FlutterView 位于受支持的内容容器内；玻璃层不参与命中测试。
+    self.isOpaque = false
+    self.backgroundColor = .clear
+    flutterViewController.backgroundColor = .clear
+    self.ignoresMouseEvents = false
 
     // 桌面端锁定最小内容尺寸：宽度须 > 860px 断点（app_shell.dart），否则会塌成窄屏竖版 UI。
     // 取 900×600，比断点多留 40px 余量，避免在边界值反复抖动切换布局。
@@ -22,7 +68,8 @@ class MainFlutterWindow: NSWindow {
     self.titleVisibility = .hidden
     self.titlebarAppearsTransparent = true
     self.styleMask.insert(.fullSizeContentView)
-    self.isMovableByWindowBackground = true
+    // 内容区域必须优先把鼠标事件交给 Flutter；窗口拖动保留给标题栏区域。
+    self.isMovableByWindowBackground = false
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/platform_shell/widgets/adaptive_glass_surface.dart';
 import '../../core/providers/infrastructure_providers.dart';
 import '../../core/session/session_providers.dart';
 import '../../shared/widgets/brand_mark.dart';
 import '../theme/hmusic_palette.dart';
 
 // 窄屏顶栏，对齐 web .topbar：品牌（衬线 HMusic）+ 退出登录。
+// 全宽玻璃条形态（外壳 extendBodyBehindAppBar，内容从顶栏下滚过）。
 // 退出 = 清 token + 会话失效，由 app_router 的 redirect 统一回登录页。
 class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
   const AppTopBar({super.key});
@@ -17,8 +19,12 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
-    return DecoratedBox(
-      decoration: BoxDecoration(color: palette.background),
+    return AdaptiveGlassSurface(
+      quality: resolveGlassQuality(context),
+      padding: EdgeInsets.zero,
+      borderRadius: BorderRadius.zero,
+      border: Border(bottom: BorderSide(color: palette.line)),
+      shadow: false,
       child: SafeArea(
         bottom: false,
         child: SizedBox(

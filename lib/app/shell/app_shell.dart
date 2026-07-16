@@ -5,14 +5,15 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/player/widgets/mini_player.dart';
 import '../app_providers.dart';
+import '../theme/hmusic_palette.dart';
 import 'bottom_nav.dart';
 import 'sidebar.dart';
 import 'top_bar.dart';
 
 // 自适应导航外壳：承载 7 个 StatefulShellRoute 分支，统一提供 chrome + mini player。
 // 断点 860px（与 web 一致）：
-//   窄屏 → 顶栏 + 内容 + 底部（mini 叠在 5-tab 底栏之上）。
-//   宽屏 → 左侧栏 232 + 内容（mini 贴内容底部；侧栏 side-now 精修留后）。
+//   窄屏 → 玻璃顶栏 + 内容 + 底部（mini 叠在 5-tab 玻璃底栏之上，内容从下滚过）。
+//   宽屏 → 左侧栏 232 + 内容（mini 悬浮内容底部，让位走 MediaQuery 注入）。
 // iOS 26+ 原生玻璃壳 ready 后接管窄屏 dock + mini：Flutter 隐藏自绘 chrome，
 // 内容底部让出原生回报的 inset；原生不可用/低版本走既有 Flutter 壳，行为不变。
 class AppShell extends ConsumerWidget {
@@ -25,27 +26,54 @@ class AppShell extends ConsumerWidget {
     final isDesktop = MediaQuery.sizeOf(context).width >= 860;
     // 正在播放分支（branch 0）本身就是完整播放视图，mini player 冗余，隐藏。
     final onPlayerTab = navigationShell.currentIndex == 0;
+    final miniActive = ref.watch(miniPlayerActiveProvider).value ?? false;
 
     if (isDesktop) {
+      final media = MediaQuery.of(context);
+      final showMini = !onPlayerTab;
+      final bottomInset = showMini && miniActive
+          ? MiniPlayer.desktopInset
+          : 0.0;
+      // macOS 窗体是窗后毛玻璃（MainFlutterWindow 垫 NSVisualEffectView），
+      // 外壳不铺底色让半透明侧栏透出壁纸；内容区自己铺回不透明暖纸。
+      final macGlassWindow = Theme.of(context).platform == TargetPlatform.macOS;
       return Scaffold(
-        body: SafeArea(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              AppSidebar(shell: navigationShell),
-              Expanded(
-                child: Column(
+        backgroundColor: macGlassWindow ? Colors.transparent : null,
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            AppSidebar(shell: navigationShell),
+            Expanded(
+              child: ColoredBox(
+                color: context.palette.background,
+                child: Stack(
                   children: <Widget>[
-                    // 桌面隐藏了系统标题栏（fullSizeContentView），内容会顶死窗口上沿。
-                    // 留出标题栏高度的顶部余量，让页面大标题从这条基线往下排，不贴边。
-                    const SizedBox(height: 28),
-                    Expanded(child: navigationShell),
-                    if (!onPlayerTab) const MiniPlayer(),
+                    // 让位走 MediaQuery padding 注入而非留白，内容可滚到窗口
+                    // 上沿/mini 之下（scroll-under）：顶部 28 = 隐藏系统标题栏
+                    // 的让位基线（红绿灯悬浮区），底部 = 悬浮 mini 的包络高度。
+                    Positioned.fill(
+                      child: MediaQuery(
+                        data: media.copyWith(
+                          padding: media.padding.copyWith(
+                            top: media.padding.top + 28,
+                            bottom: media.padding.bottom + bottomInset,
+                          ),
+                        ),
+                        child: navigationShell,
+                      ),
+                    ),
+                    if (showMini)
+                      const Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: MiniPlayer(),
+                      ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
@@ -67,6 +95,7 @@ class AppShell extends ConsumerWidget {
               ),
             ),
             child: Scaffold(
+              extendBodyBehindAppBar: true,
               appBar: const AppTopBar(),
               body: NotificationListener<UserScrollNotification>(
                 onNotification: (notification) {
@@ -86,7 +115,13 @@ class AppShell extends ConsumerWidget {
             ),
           );
         }
+        // extendBody / extendBodyBehindAppBar：内容延伸到玻璃顶栏与底部 chrome
+        // 之下，Scaffold 自动把两者高度注入 body 的 MediaQuery padding，页面
+        // 既有的 paddingOf.top/bottom 让位直接生效。底栏仍在 Scaffold 结构内
+        // 恒定可见，不违反 docs/03「勿用悬浮 fixed 底栏」铁律。
         return Scaffold(
+          extendBody: true,
+          extendBodyBehindAppBar: true,
           appBar: const AppTopBar(),
           body: navigationShell,
           bottomNavigationBar: Column(

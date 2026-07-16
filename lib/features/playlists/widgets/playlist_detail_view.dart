@@ -29,7 +29,7 @@ class PlaylistDetailView extends ConsumerWidget {
       // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度。
       padding: EdgeInsets.fromLTRB(
         4,
-        12,
+        12 + MediaQuery.paddingOf(context).top,
         4,
         32 + MediaQuery.paddingOf(context).bottom,
       ),
