@@ -4,7 +4,12 @@ import 'models/hmusic_playback_state.dart';
 abstract interface class PlaybackRepository {
   Future<HMusicPlaybackState> getState();
 
-  Future<HMusicPlaybackState> playTrack(HMusicTrack track, {int? queueIndex});
+  // positionMs：直链失效恢复时带上原进度续播（docs/08 §7），服务端缺省从 0 开播。
+  Future<HMusicPlaybackState> playTrack(
+    HMusicTrack track, {
+    int? queueIndex,
+    int? positionMs,
+  });
 
   Future<HMusicPlaybackState> pause();
 

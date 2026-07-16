@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/config/server_config_store.dart';
 import 'package:hmusic/core/network/api_client.dart';
@@ -151,4 +152,34 @@ void main() {
       expect(handlerCalls, 0);
     },
   );
+
+  test('钥匙串读 token 抛裸 PlatformException 时归一为 ApiFailure', () async {
+    // macOS 锁屏/休眠后 Keychain 拒绝静默访问（-25308）：必须包成 ApiFailure，
+    // 否则周期上报「on ApiFailure 尽力而为」被裸异常击穿（播完不接下一首）。
+    final dio = _ThrowingDio(() => StateError('should not be called'));
+    final client = ApiClient(
+      dio: dio,
+      serverConfigStore: configStore,
+      tokenStore: _ThrowingTokenStore(),
+    );
+
+    await expectLater(
+      client.getMap('/queue'),
+      throwsA(
+        isA<ApiFailure>().having((f) => f.kind, 'kind', ApiFailureKind.unknown),
+      ),
+    );
+  });
+}
+
+class _ThrowingTokenStore implements TokenStore {
+  @override
+  Future<String?> read() async =>
+      throw PlatformException(code: '-25308', message: '钥匙串已锁定');
+
+  @override
+  Future<void> write(String token) async {}
+
+  @override
+  Future<void> clear() async {}
 }

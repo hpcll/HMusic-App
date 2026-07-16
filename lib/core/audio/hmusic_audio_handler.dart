@@ -70,6 +70,10 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
   Timer? _reportTimer;
   bool _reportInFlight = false;
   bool _handlingEnded = false;
+  // 直链失效恢复去抖（docs/08 §7）：同一曲目 60s 内最多自动重解析一次，
+  // 防坏源「解析成功→加载失败→再解析」死循环。
+  String? _recoverKey;
+  DateTime? _recoverAt;
 
   // 服务端权威播放状态（封面/曲目/队列指针/模式/设备）。播放页订阅它渲染，
   // 本机实时进度另取 just_audio 的 position，不用这里每 3 秒的回写值反算。
@@ -180,11 +184,65 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
     final streamUrl = state.streamUrl;
     if (streamUrl != null && streamUrl.isNotEmpty) {
       final uri = await _streamUrlRebaser.rebase(streamUrl);
-      if (_loadedUri != uri) await _loadTrack(uri, track, state.positionMs);
+      if (_loadedUri != uri) {
+        try {
+          await _loadTrack(uri, track, state.positionMs);
+        } on PlayerException {
+          // 直链失效恢复（docs/08 §7）：服务端快照/缓存里的 streamUrl 可能已过
+          // CDN 时效（历史记录直接点播放是典型场景，AVFoundation 报 -11849）。
+          // 原曲带当前进度重新解析一次；同曲 60s 内不二次自救，仍失败则冒泡。
+          final recovered = await _tryRecoverStaleUrl(track, state);
+          if (!recovered) rethrow;
+          return; // 恢复路径已递归走完 _applyServerState（含 autoplay）。
+        }
+      }
     }
     if (autoplay && _loadedUri != null) await _player.play();
     _startReporting();
     _publishPlaybackState();
+  }
+
+  // 原曲重解析续播。成功返回 true（新状态已应用），不可救返回 false。
+  Future<bool> _tryRecoverStaleUrl(
+    HMusicTrack track,
+    server.HMusicPlaybackState state,
+  ) async {
+    final key = '${track.source}:${track.sourceTrackId}';
+    final now = DateTime.now();
+    if (_recoverKey == key &&
+        _recoverAt != null &&
+        now.difference(_recoverAt!) < const Duration(seconds: 60)) {
+      return false;
+    }
+    _recoverKey = key;
+    _recoverAt = now;
+    // 剥掉 track 里烤存的旧直链再发：服务端 resolveTrack 见 track.url 非空会
+    // 短路原样返回（那是给手动直链曲目的通道），带着过期 url 去重解析等于
+    // 让服务端把死链再发一遍。去掉 url 才走真正的插件解析。
+    final resolvable = HMusicTrack(
+      id: track.id,
+      source: track.source,
+      sourceTrackId: track.sourceTrackId,
+      title: track.title,
+      artist: track.artist,
+      album: track.album,
+      durationMs: track.durationMs,
+      coverUrl: track.coverUrl,
+      qualities: track.qualities,
+      raw: track.raw, // 插件解析要用（songmid 等平台参数）。
+    );
+    final server.HMusicPlaybackState fresh;
+    try {
+      fresh = await _repository.playTrack(
+        resolvable,
+        queueIndex: state.queueIndex >= 0 ? state.queueIndex : null,
+        positionMs: state.positionMs,
+      );
+    } on ApiFailure {
+      return false; // 重解析也失败（音源死了）：交回原始加载错误。
+    }
+    await _applyServerState(fresh, autoplay: true);
+    return true;
   }
 
   Future<void> _loadTrack(Uri uri, HMusicTrack track, int positionMs) async {
@@ -240,12 +298,19 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
         autoplay: next.state == server.PlaybackStatus.playing,
       );
     } catch (_) {
-      final latest = await _repository.getState();
-      if (latest.track?.id != _serverState?.track?.id) {
-        await _applyServerState(
-          latest,
-          autoplay: latest.state == server.PlaybackStatus.playing,
-        );
+      // ended 是非幂等推进命令只发一次（docs/08 §6），失败改按 state 归并。
+      // 归并自身也可能失败（断网/凭据暂不可用）——_handleEnded 是
+      // fire-and-forget，异常必须就地消化，否则成未捕获错误且队列卡死。
+      try {
+        final latest = await _repository.getState();
+        if (latest.track?.id != _serverState?.track?.id) {
+          await _applyServerState(
+            latest,
+            autoplay: latest.state == server.PlaybackStatus.playing,
+          );
+        }
+      } catch (_) {
+        // 保持现状：等周期上报恢复或用户手动下一首时自然归并。
       }
     } finally {
       _handlingEnded = false;

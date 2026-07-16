@@ -31,7 +31,11 @@ class ApiPlaybackRepository implements PlaybackRepository {
       _postOrGet('/playback/pause', post: true);
 
   @override
-  Future<HMusicPlaybackState> playTrack(HMusicTrack track, {int? queueIndex}) {
+  Future<HMusicPlaybackState> playTrack(
+    HMusicTrack track, {
+    int? queueIndex,
+    int? positionMs,
+  }) {
     return _postOrGet(
       '/playback/play',
       post: true,
@@ -40,6 +44,8 @@ class ApiPlaybackRepository implements PlaybackRepository {
         'deviceId': localDeviceId,
         // 队列点播必带：同名歌曲可能出现多次，靠它精确定位第几项。
         if (queueIndex != null) 'queueIndex': queueIndex,
+        // 失效恢复续播用：服务端缺省 positionMs=0。
+        if (positionMs != null) 'positionMs': positionMs,
       },
     );
   }

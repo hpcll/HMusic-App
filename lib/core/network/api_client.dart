@@ -87,23 +87,26 @@ class ApiClient {
     Map<String, Object?>? body,
     required bool authenticated,
   }) async {
-    final base = serverBase ?? await _serverConfigStore.read();
-    if (base == null) {
-      throw const ApiFailure(
-        kind: ApiFailureKind.invalidConfiguration,
-        message: '尚未配置 HMusic Server',
-      );
-    }
-
-    final headers = <String, Object?>{};
-    if (authenticated) {
-      final token = await _tokenStore.read();
-      if (token != null && token.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
-      }
-    }
-
+    // 存储读取（server base / token）也必须在 try 内：钥匙串锁定等底层
+    // PlatformException 要归一成 ApiFailure，否则「on ApiFailure 尽力而为」
+    // 的调用方（周期上报、ended 推进）会被裸异常击穿。
     try {
+      final base = serverBase ?? await _serverConfigStore.read();
+      if (base == null) {
+        throw const ApiFailure(
+          kind: ApiFailureKind.invalidConfiguration,
+          message: '尚未配置 HMusic Server',
+        );
+      }
+
+      final headers = <String, Object?>{};
+      if (authenticated) {
+        final token = await _tokenStore.read();
+        if (token != null && token.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $token';
+        }
+      }
+
       final response = await _dio.requestUri<Object?>(
         _buildUri(base, path, query),
         data: body,
