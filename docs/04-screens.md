@@ -7,7 +7,8 @@
 
 - **路由**：go_router 定义 `player search queue playlists charts stats settings` + `login/connection/lyrics`；
   受保护页未登录跳 login，无 server base 跳 connection。
-- **桌面外壳**：`Sidebar`（品牌 + 7 导航 + mini 播放态 + 用户名/退出）+ `content`。
+- **桌面外壳**：`Sidebar`（品牌 + 7 导航 + 用户名/退出）+ `content`（底部悬浮 mini 玻璃控制条，
+  见 03；web 侧边栏内的 mini 播放态不复刻——桌面 mini 承载控制，不只指示）。
 - **窄屏外壳**：`MobileTopBar`（品牌 + 退出）+ `content` + `MobileNav`（底部 7 图标）。
 - **iOS 27 窄屏 chrome**：顶栏、底部导航、mini player 由 Swift/SwiftUI NativeGlassShell 覆盖在
   Flutter 内容层之上；动态高度和安全区回报给 Flutter。旧 iOS 使用系统 material 回退。
