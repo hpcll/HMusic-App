@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/widgets/back_link.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/settings_section.dart';
 import '../view_models/config_view_model.dart';
@@ -210,7 +211,7 @@ class _SectionHead extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: <Widget>[
-        TextButton(onPressed: onBack, child: const Text('‹ 设置')),
+        BackLink(label: '设置', onTap: onBack),
         Expanded(
           child: Center(
             child: Text(

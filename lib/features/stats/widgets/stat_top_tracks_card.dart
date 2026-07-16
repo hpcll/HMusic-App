@@ -24,12 +24,14 @@ class StatTopTracksCard extends StatelessWidget {
     final palette = context.palette;
     if (tracks.isEmpty) return const SizedBox.shrink();
     return HMusicCard(
-      padding: const EdgeInsets.fromLTRB(20, 20, 12, 12),
+      // 左 8：曲目行自带 12 内边距（ink 出血位），8+12=20 使行内排名与卡题
+      // 同压 20 基线（卡内左轨一条线）；卡题自行补 12。
+      padding: const EdgeInsets.fromLTRB(8, 20, 12, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(left: 12, right: 8),
             child: Text(
               '最常播放 Top 10',
               style: TextStyle(
@@ -79,11 +81,12 @@ class _Rank extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final top = rank <= 3;
+    // 左对齐：排名与卡题一条左轨，定宽保证 1/10 位数不同的行封面列不漂移。
     return SizedBox(
       width: 28,
       child: Text(
         '$rank',
-        textAlign: TextAlign.center,
+        textAlign: TextAlign.left,
         style: top
             ? TextStyle(
                 fontFamily: 'NotoSerifSC',

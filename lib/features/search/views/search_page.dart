@@ -37,28 +37,38 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       ref.read(searchViewModelProvider.notifier).clearNotice();
     });
     return ListView(
-      // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度（Flutter 壳下为 0）。
+      // 水平只留 4：结果行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
+      // 封面左缘与页头/输入框同压 16 基线；头部块自行补 12。
+      // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度。
       padding: EdgeInsets.fromLTRB(
-        16,
+        4,
         24,
-        16,
+        4,
         32 + MediaQuery.paddingOf(context).bottom,
       ),
       children: <Widget>[
-        const ViewTitle('搜索'),
-        const SizedBox(height: 16),
-        SearchInput(
-          controller: _searchController,
-          isSearching: state.isSearching,
-          onSearch: _search,
-        ),
-        if (state.errorMessage != null) ...<Widget>[
-          const SizedBox(height: 16),
-          Text(
-            state.errorMessage!,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              const ViewTitle('搜索'),
+              const SizedBox(height: 16),
+              SearchInput(
+                controller: _searchController,
+                isSearching: state.isSearching,
+                onSearch: _search,
+              ),
+              if (state.errorMessage != null) ...<Widget>[
+                const SizedBox(height: 16),
+                Text(
+                  state.errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
         if (state.isSearching) ...<Widget>[
           const SizedBox(height: 36),
           const Center(child: CircularProgressIndicator()),

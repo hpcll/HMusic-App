@@ -29,7 +29,7 @@ enum GlassShellMetrics {
   static let dockHeight: CGFloat = 66
   static let miniHeight: CGFloat = 60
   static let gap: CGFloat = 8
-  static let horizontalPadding: CGFloat = 10
+  static let horizontalPadding: CGFloat = 16
   // 内容与 chrome 顶缘之间的呼吸距，计入回报给 Flutter 的 inset。
   static let contentClearance: CGFloat = 8
 

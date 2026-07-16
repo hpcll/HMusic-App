@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/widgets/back_link.dart';
 import '../../../shared/widgets/hmusic_icon_button.dart';
 import '../../../shared/widgets/hmusic_track_row.dart';
 import '../../../shared/widgets/view_title.dart';
@@ -23,39 +24,46 @@ class PlaylistDetailView extends ConsumerWidget {
     final items = detail.items;
 
     return ListView(
-      // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度（Flutter 壳下为 0）。
+      // 水平只留 4：曲目行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
+      // 序号左缘与页头/标题同压 16 基线；头部文字块自行补 12。
+      // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度。
       padding: EdgeInsets.fromLTRB(
-        16,
+        4,
         12,
-        16,
+        4,
         32 + MediaQuery.paddingOf(context).bottom,
       ),
       children: <Widget>[
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: <Widget>[
-            TextButton(
-              onPressed: notifier.backToList,
-              child: const Text('‹ 返回'),
-            ),
-            OutlinedButton(
-              onPressed: items.isEmpty || state.busy
-                  ? null
-                  : () => notifier.playAll(detail.id),
-              child: const Text('播放全部'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ViewTitle(detail.name),
-        if (detail.description != null &&
-            detail.description!.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 8),
-          Text(
-            detail.description!,
-            style: TextStyle(fontSize: 13.5, color: palette.muted),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  BackLink(label: '返回', onTap: notifier.backToList),
+                  OutlinedButton(
+                    onPressed: items.isEmpty || state.busy
+                        ? null
+                        : () => notifier.playAll(detail.id),
+                    child: const Text('播放全部'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ViewTitle(detail.name),
+              if (detail.description != null &&
+                  detail.description!.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 8),
+                Text(
+                  detail.description!,
+                  style: TextStyle(fontSize: 13.5, color: palette.muted),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
         const SizedBox(height: 16),
         if (items.isEmpty)
           Padding(
@@ -84,11 +92,12 @@ class PlaylistDetailView extends ConsumerWidget {
   ) {
     final palette = context.palette;
     return HMusicTrackRow(
+      // 序号左对齐压 16 基线（与返回/歌单名一条左轨），定宽保证封面列不漂移。
       leading: SizedBox(
         width: 28,
         child: Text(
           '${index + 1}',
-          textAlign: TextAlign.center,
+          textAlign: TextAlign.left,
           style: TextStyle(fontSize: 12.5, color: palette.muted),
         ),
       ),

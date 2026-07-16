@@ -96,8 +96,11 @@ final class GlassShellHostController {
 
   private func handleOverlayIntent(type: String, value: String?) {
     if type == "expand" {
-      // 收缩态点 pill：本地展开即可，不需要 Dart 参与。
+      // 收缩态点 pill：本地立即展开保证跟手，同时回传 expandDock 让 Dart
+      // 复位滚动去重基线——否则 Dart 仍认为「已收缩」，下一次下滑被去重
+      // 拦截，dock 永远收不回去。
       state.minimized = false
+      onIntent("expandDock", nil)
       return
     }
     onIntent(type, value)

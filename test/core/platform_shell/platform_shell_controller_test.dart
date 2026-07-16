@@ -263,4 +263,39 @@ void main() {
     controller.reportScroll(minimized: false);
     expect(bridge.scrollReports, <bool>[true, false]);
   });
+
+  test(
+    'expandDock intent resets scroll baseline so next minimize fires',
+    () async {
+      bridge.readyController.add(
+        const ShellReady(capabilities: <String>['bottomBar', 'miniPlayer']),
+      );
+      await pumpEventQueue();
+
+      controller.reportScroll(minimized: true);
+      // 原生 pill 被点开：本地已展开，Dart 只复位基线（不额外过桥）。
+      controller.handleIntent(const ShellIntent(ShellIntentType.expandDock));
+      controller.reportScroll(minimized: true);
+      expect(bridge.scrollReports, <bool>[true, true]);
+    },
+  );
+
+  testWidgets('switching tab re-expands a minimized dock', (tester) async {
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    bridge.readyController.add(
+      const ShellReady(capabilities: <String>['bottomBar', 'miniPlayer']),
+    );
+    // testWidgets 在 FakeAsync 域内：pumpEventQueue 的 Future.delayed 永不触发，
+    // 用 pump 刷微任务队列送达 broadcast 流事件。
+    await tester.pump();
+
+    controller.reportScroll(minimized: true);
+    router.go(SettingsPage.path);
+    await tester.pumpAndSettle();
+    // 换 tab 自动补发 minimized:false，dock 展开且基线复位。
+    expect(bridge.scrollReports, <bool>[true, false]);
+
+    controller.reportScroll(minimized: true);
+    expect(bridge.scrollReports, <bool>[true, false, true]);
+  });
 }

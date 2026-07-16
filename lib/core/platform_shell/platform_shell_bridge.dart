@@ -6,6 +6,9 @@ enum ShellIntentType {
   next,
   seek,
   dismiss,
+  // 原生收缩态 pill 被点开：Swift 本地立即展开，同时回传此 intent
+  // 让 Dart 复位滚动去重状态，否则下一次下滑上报会被去重拦截。
+  expandDock,
 }
 
 // 原生回传的语义 intent；selectTab 用 value 携带目标 tab id（charts/search/...）。

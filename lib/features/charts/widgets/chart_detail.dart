@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/widgets/back_link.dart';
 import '../../../shared/widgets/hmusic_icon_button.dart';
 import '../../../shared/widgets/hmusic_track_row.dart';
 import '../../../shared/widgets/view_title.dart';
@@ -25,35 +26,48 @@ class ChartDetailView extends ConsumerWidget {
     final entries = detail?.entries ?? const <ChartEntry>[];
 
     return ListView(
-      // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度（Flutter 壳下为 0）。
+      // 水平只留 4：曲目行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
+      // 排名数字左缘与页头/标题同压 16 基线（红线验收：返回/榜名/排名一条线）。
+      // 头部文字块自行补 12。底部累加环境 padding：iOS 26+ 原生 dock 悬浮时
+      // 让出 chrome 高度（Flutter 壳下为 0）。
       padding: EdgeInsets.fromLTRB(
-        16,
+        4,
         12,
-        16,
+        4,
         32 + MediaQuery.paddingOf(context).bottom,
       ),
       children: <Widget>[
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: <Widget>[
-            TextButton(onPressed: notifier.back, child: const Text('‹ 返回')),
-            if (detail?.hasPlayableEntries ?? false)
-              OutlinedButton(
-                onPressed: state.actingRank == 0 ? notifier.playAll : null,
-                child: const Text('播放全部'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  BackLink(label: '返回', onTap: notifier.back),
+                  if (detail?.hasPlayableEntries ?? false)
+                    OutlinedButton(
+                      onPressed: state.actingRank == 0
+                          ? notifier.playAll
+                          : null,
+                      child: const Text('播放全部'),
+                    ),
+                ],
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ViewTitle(active.name),
-        if (active.description != null &&
-            active.description!.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 8),
-          Text(
-            active.description!,
-            style: TextStyle(fontSize: 13.5, color: palette.muted),
+              const SizedBox(height: 8),
+              ViewTitle(active.name),
+              if (active.description != null &&
+                  active.description!.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 8),
+                Text(
+                  active.description!,
+                  style: TextStyle(fontSize: 13.5, color: palette.muted),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
         const SizedBox(height: 16),
         if (state.detailLoading)
           const Padding(
@@ -104,6 +118,8 @@ class ChartDetailView extends ConsumerWidget {
 }
 
 // 榜单排名：前 3 名衬线加深墨（.chart-rank.top），其余弱化数字。
+// 左对齐：数字左缘全部压在页面 16 基线上（与返回/榜名一条左轨），
+// 固定宽度保证 1/10/100 位数不同的行封面列不漂移。
 class _ChartRank extends StatelessWidget {
   const _ChartRank({required this.rank});
 
@@ -117,7 +133,7 @@ class _ChartRank extends StatelessWidget {
       width: 28,
       child: Text(
         '$rank',
-        textAlign: TextAlign.center,
+        textAlign: TextAlign.left,
         style: top
             ? TextStyle(
                 fontFamily: 'NotoSerifSC',

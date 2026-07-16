@@ -26,10 +26,12 @@ class QueueTrackTile extends StatelessWidget {
     final accent = theme.colorScheme.primary;
     final track = item.track;
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      // 16 对齐页头基线：外层 ListView 无水平 padding，序号/音符左缘直接压线。
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       leading: SizedBox(
         width: 28,
-        child: Center(
+        child: Align(
+          alignment: Alignment.centerLeft,
           child: isCurrent
               ? Icon(Icons.music_note, size: 18, color: accent)
               : Text('${index + 1}', style: theme.textTheme.bodySmall),

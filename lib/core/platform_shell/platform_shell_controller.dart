@@ -166,6 +166,7 @@ class PlatformShellController extends ChangeNotifier {
     final isTab = tabId != null;
     final navigation = (tabId ?? '', title, _router.canPop());
     if (navigation != _sentNavigation) {
+      final tabChanged = navigation.$1 != _sentNavigation?.$1;
       _sentNavigation = navigation;
       unawaited(
         _bridge.updateNavigation(
@@ -174,6 +175,11 @@ class PlatformShellController extends ChangeNotifier {
           canGoBack: navigation.$3,
         ),
       );
+      // 换 tab 后 dock 回到展开态并复位去重基线：新页面的滚动从头计。
+      if (tabChanged && _scrollMinimized) {
+        _scrollMinimized = false;
+        unawaited(_bridge.updateScroll(minimized: false));
+      }
     }
     final layout = (isTab, isTab);
     if (layout != _sentLayout) {
@@ -220,6 +226,9 @@ class PlatformShellController extends ChangeNotifier {
         unawaited(_playerViewModel.skipToPrevious());
       case ShellIntentType.next:
         unawaited(_playerViewModel.skipToNext());
+      case ShellIntentType.expandDock:
+        // 原生已本地展开；仅复位去重基线，让下一次下滑能再收缩。
+        _scrollMinimized = false;
       case ShellIntentType.seek:
       case ShellIntentType.dismiss:
         break;
