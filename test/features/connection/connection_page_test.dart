@@ -5,6 +5,7 @@ import 'package:hmusic/features/connection/data/api_connection_repository.dart';
 import 'package:hmusic/features/connection/data/connection_repository.dart';
 import 'package:hmusic/features/connection/models/connection_result.dart';
 import 'package:hmusic/features/connection/views/connection_page.dart';
+import 'package:hmusic/shared/widgets/brand_mark.dart';
 
 class _FakeConnectionRepository implements ConnectionRepository {
   @override
@@ -32,7 +33,8 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('HMusic'), findsOneWidget);
+    // 品牌位是完整字标图（字形含 H + Music），页面不再有 "HMusic" 文本。
+    expect(find.byType(BrandWordmark), findsOneWidget);
     expect(find.text('连接服务器'), findsOneWidget);
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller?.text, 'http://192.168.1.10:8090');

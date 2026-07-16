@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/widgets/brand_mark.dart';
 import '../../auth/views/auth_page.dart';
 import '../view_models/connection_view_model.dart';
 import '../widgets/server_address_form.dart';
@@ -56,26 +57,24 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                // 居中构图：品牌块（图标 + 衬线字标 + 副标题）与表单块拉开大段距离，
+                // 居中构图：品牌块（完整字标 + 副标题）与表单块拉开大段距离，
                 // 分组呼吸感是这页的关键——间距均匀就会「挤成一坨」。
-                Icon(
-                  Icons.graphic_eq_rounded,
-                  size: 40,
-                  color: palette.textStrong,
-                ),
+                // 字标本身含 H（字形双竖笔）+ Music 连读，不再另写 "HMusic"。
+                const BrandWordmark(size: 56),
                 const SizedBox(height: 20),
+                // 副标题是品牌 slogan：一句轻轻的搭话，不解释产品、不重复品牌名。
+                // 衬线 + 加宽字距 = 扉页题句的声调；mutedStrong 保证可读但不抢字标。
                 Text(
-                  'HMusic',
+                  '今天想听点什么',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.displayMedium,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '连接运行在 NAS 或家庭服务器上的 HMusic Server',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(color: palette.mutedStrong),
+                  style: TextStyle(
+                    fontFamily: 'NotoSerifSC',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                    letterSpacing: 3,
+                    color: palette.mutedStrong,
+                  ),
                 ),
                 const SizedBox(height: 52),
                 ConstrainedBox(

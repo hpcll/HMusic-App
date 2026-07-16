@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/providers/infrastructure_providers.dart';
 import '../../core/session/session_providers.dart';
+import '../../shared/widgets/brand_mark.dart';
 import '../theme/hmusic_palette.dart';
 import 'bottom_nav.dart' show kSidebarDestinations;
 
@@ -36,11 +37,7 @@ class AppSidebar extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(10, 0, 10, 26),
             child: Row(
               children: <Widget>[
-                Icon(
-                  Icons.graphic_eq_rounded,
-                  size: 24,
-                  color: palette.textStrong,
-                ),
+                const BrandMark(size: 24),
                 const SizedBox(width: 10),
                 Text(
                   'HMusic',

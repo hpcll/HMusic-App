@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/widgets/brand_mark.dart';
 import '../../charts/views/charts_page.dart';
 import '../../connection/views/connection_page.dart';
 import '../models/auth_view_state.dart';
@@ -60,24 +61,23 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 // 与连接页同款居中构图：品牌块与表单块拉开大段距离，两页读作一个家族。
-                Icon(
-                  Icons.graphic_eq_rounded,
-                  size: 40,
-                  color: palette.textStrong,
-                ),
+                // 完整字标（字形含 H + Music 连读），不再另写 "HMusic" 文字——
+                // 图形与文字各报一遍 H 是之前「不协调」的病根。
+                const BrandWordmark(size: 56),
                 const SizedBox(height: 20),
                 Text(
-                  'HMusic',
+                  // 常态用品牌 slogan（与连接页同一句同一声调，两页读作一个家族）；
+                  // 首次建号是关键指令，保留说明文案。
+                  state.initialized ? '今天想听点什么' : '首次使用，请创建管理员账号',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.displayMedium,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  state.initialized ? '登录你的 HMusic Server' : '首次使用，请创建管理员账号',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(color: palette.mutedStrong),
+                  style: TextStyle(
+                    fontFamily: 'NotoSerifSC',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                    letterSpacing: 3,
+                    color: palette.mutedStrong,
+                  ),
                 ),
                 const SizedBox(height: 52),
                 ConstrainedBox(

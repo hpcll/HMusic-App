@@ -33,6 +33,13 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  assets:
+    # 品牌音符（透明底青绿字形，与 web favicon 同图形）；SVG 为源，PNG 打包。
+    - assets/icon/brand-mark.png
+    # 完整字标（原字标几何，字母换墨色；亮/暗主题各一张）。
+    - assets/icon/brand-wordmark-light.png
+    - assets/icon/brand-wordmark-dark.png
+
   fonts:
     - family: NotoSerifSC
       fonts:

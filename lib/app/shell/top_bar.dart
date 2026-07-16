@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/infrastructure_providers.dart';
 import '../../core/session/session_providers.dart';
+import '../../shared/widgets/brand_mark.dart';
 import '../theme/hmusic_palette.dart';
 
 // 窄屏顶栏，对齐 web .topbar：品牌（衬线 HMusic）+ 退出登录。
@@ -23,17 +24,14 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
         child: SizedBox(
           height: 52,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            // 16 对齐全页内容基线（页头/列表/dock 同列），品牌不再独自缩进 18。
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    Icon(
-                      Icons.graphic_eq_rounded,
-                      size: 20,
-                      color: palette.textStrong,
-                    ),
+                    const BrandMark(size: 20),
                     const SizedBox(width: 9),
                     Text(
                       'HMusic',
