@@ -68,7 +68,8 @@ abstract interface class PlatformShellBridge {
     required bool showMiniPlayer,
   });
 
-  // 内容垂直滚动方向 → 原生 dock 收缩/展开（对齐 Apple Music 滚动收纳行为）。
+  // 内容垂直滚动 → 原生 chrome 收缩/展开：向下滚收缩、滚回顶部展开
+  //（对齐 Apple Music 滚动收纳行为）。
   // 原生 ScrollView 看不见 Flutter 滚动，必须由 Dart 上报。
   Future<void> updateScroll({required bool minimized});
 }

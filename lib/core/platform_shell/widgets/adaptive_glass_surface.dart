@@ -30,6 +30,7 @@ class AdaptiveGlassSurface extends StatelessWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(10)),
     this.border,
     this.shadow = true,
+    this.bottomFade = false,
     super.key,
   });
 
@@ -43,6 +44,11 @@ class AdaptiveGlassSurface extends StatelessWidget {
 
   // 悬浮卡投影；贴边条形态关掉。
   final bool shadow;
+
+  // 全宽条底缘渐隐（顶栏用）：tint 在底部约 1/5 高度内渐隐到透明，抹掉
+  // 玻璃区下缘的硬切——chrome 不画常驻分隔线（对齐 dock/mini 无边框胶囊
+  // 语言）。off 档忽略：实底面板要保持完整可读边界，分隔交还调用方 hairline。
+  final bool bottomFade;
 
   // 饱和度 1.25 的颜色矩阵（Rec.709 亮度权重）：模糊采样后轻微提饱和。
   static const List<double> _saturate = <double>[
@@ -75,11 +81,23 @@ class AdaptiveGlassSurface extends StatelessWidget {
     final showHighlight =
         quality != GlassQuality.off && borderRadius != BorderRadius.zero;
     final highlight = Colors.white.withValues(alpha: dark ? 0.10 : 0.35);
+    final fade = bottomFade && quality != GlassQuality.off;
+    final baseColor = quality == GlassQuality.off
+        ? Theme.of(context).colorScheme.surface
+        : tint;
     final surface = DecoratedBox(
       decoration: BoxDecoration(
-        color: quality == GlassQuality.off
-            ? Theme.of(context).colorScheme.surface
-            : tint,
+        color: fade ? null : baseColor,
+        // 渐隐 tint：上 80% 全浓度，底部 20% 滑到全透明，玻璃与内容之间
+        // 没有亮度台阶，只剩模糊的软边界。
+        gradient: fade
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[tint, tint, tint.withValues(alpha: 0)],
+                stops: const <double>[0, 0.8, 1],
+              )
+            : null,
         borderRadius: decorationRadius,
         border:
             border ??

@@ -96,7 +96,8 @@ class AppShell extends ConsumerWidget {
           // 原生 dock/mini 悬浮在 Flutter 层之上；内容经 MediaQuery padding 让位——
           // 各页 ListView 的底部 padding 需累加 MediaQuery.paddingOf(context).bottom，
           // 玻璃下仍有内容滚动（scroll-under），列表末尾不被遮挡。
-          // 滚动方向经 controller 上报原生：向下滚 dock 收缩，向上滚展开。
+          // 滚动经 controller 上报原生：向下滚收缩，滚回顶部才展开
+          //（ScrollMinimizeListener 两壳统一语义）。
           final media = MediaQuery.of(context);
           return MediaQuery(
             data: media.copyWith(

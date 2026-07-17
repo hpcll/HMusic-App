@@ -37,8 +37,9 @@ const List<NavDestinationSpec> kNavDestinations = <NavDestinationSpec>[
 
 // 窄屏悬浮玻璃 dock，形态对齐 iOS 26+ 原生壳（GlassShellOverlay）：胶囊压进
 // 安全区、悬在 home indicator 上方；展开 = 5 tab 等分胶囊条，滚动收缩 =
-// 单枚当前 tab pill 居中（点 pill 只展开，不切 tab）。图标 22px、标签 11px、
-// active 墨色/其余 muted，与 Swift DockItem 同纪律。
+// 当前 tab 的图标圆钮——高度降到与 mini 同档，跟内联 mini 并成一排
+//（点圆钮只展开，不切 tab）。图标 22px、标签 11px、active 墨色/其余 muted，
+// 与 Swift DockItem 同纪律。
 // 材质差异是唯一的平台分叉：iOS 26+ 由原生壳接管（本组件不渲染），
 // Android/iOS<26 在此用 AdaptiveGlassSurface 毛玻璃，off 档退不透明面板。
 class AppBottomNav extends StatelessWidget {
@@ -78,7 +79,8 @@ class AppBottomNav extends StatelessWidget {
               : kChromeMorphDuration,
           curve: Curves.easeOut,
           child: SizedBox(
-            height: kChromeDockHeight,
+            // 收缩圆钮降到 mini 同高，与内联 mini 排成等高一行。
+            height: minimized ? kChromeMiniHeight : kChromeDockHeight,
             child: minimized
                 ? _NavItem(
                     spec: active,
@@ -122,26 +124,32 @@ class _NavItem extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
 
-  // 收缩 pill 形态：不等分拉伸，按内容宽 + 左右 26 内边距（对齐 Swift DockItem）。
+  // 收缩圆钮形态：只留图标（标签语义交给 Semantics），不等分拉伸，
+  // 按内容宽 + 左右 26 内边距（对齐 Swift DockItem compact）。
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final color = active ? palette.textStrong : palette.muted;
-    return InkWell(
+    final content = compact
+        ? Center(widthFactor: 1, child: Icon(spec.icon, size: 22, color: color))
+        : Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Icon(spec.icon, size: 22, color: color),
+              const SizedBox(height: 3),
+              Text(spec.label, style: TextStyle(fontSize: 11, color: color)),
+            ],
+          );
+    final item = InkWell(
       onTap: onTap,
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: compact ? 26 : 0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Icon(spec.icon, size: 22, color: color),
-            const SizedBox(height: 3),
-            Text(spec.label, style: TextStyle(fontSize: 11, color: color)),
-          ],
-        ),
+        child: content,
       ),
     );
+    if (!compact) return item;
+    return Semantics(label: spec.label, button: true, child: item);
   }
 }

@@ -140,7 +140,8 @@ class PlatformShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // AppShell 的滚动监听调用：向下滚 → dock 收缩，向上滚 → 展开。
+  // AppShell 的滚动监听调用：向下滚 → chrome 收缩，滚回顶部 → 展开
+  //（触发语义见 ScrollMinimizeListener）。
   // 去重后才过桥，滚动事件高频，不能每帧发 channel 消息。
   void reportScroll({required bool minimized}) {
     if (!nativeChromeActive || minimized == _scrollMinimized) return;

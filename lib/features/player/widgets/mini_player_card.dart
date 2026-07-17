@@ -18,15 +18,15 @@ import '../views/player_page.dart';
 //   悬浮胶囊（capsule=true）：高 50 胶囊悬在 dock（66）上方（Flutter 回退壳），
 //   比 dock 矮一档、封面/字号/图标同步收小——dock 是导航主锚点，mini 只是
 //   次级播放状态条；对齐 iOS 26+ 原生 GlassMiniPlayer。左右留白由外壳统一，
-//   自身只留与 dock 的 gap；收缩态去掉题/歌手与下一曲，宽度随内容收窄
-//   （AnimatedSize）。
+//   自身只留与 dock 的 gap：竖排时在底部，收缩内联（inline）时换到右侧
+//   （与图标圆钮之间），内容不裁剪，只随剩余宽度截断题/歌手。
 class MiniPlayerCard extends StatelessWidget {
   const MiniPlayerCard({
     required this.item,
     required this.playbackState,
     required this.controller,
     this.capsule = false,
-    this.minimized = false,
+    this.inline = false,
     super.key,
   });
 
@@ -34,29 +34,25 @@ class MiniPlayerCard extends StatelessWidget {
   final PlaybackState? playbackState;
   final PlayerViewModel controller;
   final bool capsule;
-  final bool minimized;
+  final bool inline;
 
   @override
   Widget build(BuildContext context) {
     final isPlaying = playbackState?.playing ?? false;
-    final compact = capsule && minimized;
     final radius = BorderRadius.all(
       Radius.circular(capsule ? kChromeMiniHeight / 2 : 18),
     );
     final row = Row(
-      mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
       children: <Widget>[
         _Cover(url: item.artUri?.toString(), capsule: capsule),
-        if (!compact) ...<Widget>[
-          const SizedBox(width: 12),
-          Expanded(
-            child: _TrackText(
-              title: item.title,
-              artist: item.artist,
-              capsule: capsule,
-            ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _TrackText(
+            title: item.title,
+            artist: item.artist,
+            capsule: capsule,
           ),
-        ],
+        ),
         IconButton(
           tooltip: isPlaying ? '暂停' : '播放',
           icon: Icon(
@@ -65,19 +61,24 @@ class MiniPlayerCard extends StatelessWidget {
           iconSize: capsule ? 26 : 30,
           onPressed: isPlaying ? controller.pause : controller.play,
         ),
-        if (!compact)
-          IconButton(
-            tooltip: '下一首',
-            icon: const Icon(Icons.skip_next_rounded),
-            iconSize: capsule ? 22 : 26,
-            onPressed: controller.skipToNext,
-          ),
+        IconButton(
+          tooltip: '下一首',
+          icon: const Icon(Icons.skip_next_rounded),
+          iconSize: capsule ? 22 : 26,
+          onPressed: controller.skipToNext,
+        ),
       ],
     );
+    final EdgeInsets margin;
+    if (!capsule) {
+      margin = const EdgeInsets.fromLTRB(12, 6, 12, 6);
+    } else if (inline) {
+      margin = const EdgeInsets.only(right: kChromeGap);
+    } else {
+      margin = const EdgeInsets.only(bottom: kChromeGap);
+    }
     return Padding(
-      padding: capsule
-          ? const EdgeInsets.only(bottom: kChromeGap)
-          : const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      padding: margin,
       child: AdaptiveGlassSurface(
         quality: resolveGlassQuality(context),
         padding: EdgeInsets.zero,
@@ -89,17 +90,11 @@ class MiniPlayerCard extends StatelessWidget {
           child: InkWell(
             onTap: () => _openPlayer(context),
             child: capsule
-                ? AnimatedSize(
-                    duration: MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : kChromeMorphDuration,
-                    curve: Curves.easeOut,
-                    child: SizedBox(
-                      height: kChromeMiniHeight,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: row,
-                      ),
+                ? SizedBox(
+                    height: kChromeMiniHeight,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: row,
                     ),
                   )
                 : Padding(

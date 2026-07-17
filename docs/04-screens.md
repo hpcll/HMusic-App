@@ -13,7 +13,8 @@
   底部 mini 包络高度），内容从玻璃下滚过；macOS 窗体垫窗后毛玻璃，侧栏半透明透出壁纸。
 - **窄屏外壳**：`MobileTopBar`（品牌 + 退出）+ `content` + 底部悬浮玻璃 chrome
   （mini 胶囊 + 5-tab dock 胶囊，对齐 iOS 26+ 原生壳形态；压进安全区悬浮，
-  滚动收缩为单枚当前 tab pill）。顶栏为全宽玻璃条；chrome 高度由 Scaffold
+  向下滚收缩为「mini 内联 + 当前 tab 图标圆钮」一排，滚回顶部才展开）。
+  顶栏为全宽玻璃条；chrome 高度由 Scaffold
   （extendBody/extendBodyBehindAppBar）注入 body 的 MediaQuery padding，
   各页 paddingOf.top/bottom 让位。
 - **iOS 27 窄屏 chrome**：顶栏、底部导航、mini player 由 Swift/SwiftUI NativeGlassShell 覆盖在

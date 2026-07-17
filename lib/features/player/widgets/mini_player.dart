@@ -8,7 +8,7 @@ import '../view_models/player_view_model.dart';
 import 'mini_player_card.dart';
 
 class MiniPlayer extends ConsumerWidget {
-  const MiniPlayer({this.capsule = false, this.minimized = false, super.key});
+  const MiniPlayer({this.capsule = false, this.inline = false, super.key});
 
   // 桌面壳注入内容区底部的让位高度：外边距 12 + 行内容 ~58 + 进度线 2 的
   // 包络，配合页面自身的 32 底距，列表末行不会停在玻璃下面。
@@ -18,8 +18,9 @@ class MiniPlayer extends ConsumerWidget {
   // 矮一档分清主次；对齐 iOS 26+ 原生 GlassMiniPlayer。false = 桌面/宽屏玻璃卡形态。
   final bool capsule;
 
-  // 滚动收缩态（仅胶囊形态）：只留封面 + 播放/暂停，胶囊收窄居中。
-  final bool minimized;
+  // 收缩内联排布（仅胶囊形态）：chrome 收缩时 mini 与 dock 图标圆钮同排，
+  // 内容不裁剪，只把与 dock 的 gap 从底部换到右侧。
+  final bool inline;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -28,7 +29,7 @@ class MiniPlayer extends ConsumerWidget {
       data: (audioHandler) => _MiniPlayerBody(
         audioHandler: audioHandler,
         capsule: capsule,
-        minimized: minimized,
+        inline: inline,
       ),
       error: (_, _) => const SizedBox.shrink(),
       loading: () => const SizedBox.shrink(),
@@ -40,12 +41,12 @@ class _MiniPlayerBody extends ConsumerWidget {
   const _MiniPlayerBody({
     required this.audioHandler,
     required this.capsule,
-    required this.minimized,
+    required this.inline,
   });
 
   final HMusicAudioHandler audioHandler;
   final bool capsule;
-  final bool minimized;
+  final bool inline;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -68,7 +69,7 @@ class _MiniPlayerBody extends ConsumerWidget {
                       playbackState: stateSnapshot.data,
                       controller: ref.read(playerViewModelProvider),
                       capsule: capsule,
-                      minimized: minimized,
+                      inline: inline,
                     );
                   },
                 ),

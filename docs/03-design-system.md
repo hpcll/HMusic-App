@@ -70,7 +70,8 @@ glassBlurOff:    0（性能/降低透明度回退）
   > App 底部导航为**悬浮玻璃胶囊 dock**（对齐 iOS 26+ 原生液态玻璃壳形态）：
   > 胶囊压进安全区、悬在 home indicator 上方，mini player 胶囊叠在 dock 上方；
   > 仍挂 `Scaffold(bottomNavigationBar:)` 槽位，骨架恒在——tab 页内 dock 永远
-  > 可见，滚动只收缩为单枚当前 tab pill，不整体消失。
+  > 可见，不整体消失：向下滚收缩为「mini 内联 + 当前 tab 图标圆钮」等高一排，
+  > 只有滚回顶部（或点圆钮/切 tab）才展开，中途向上滚保持收缩。
 - 内容区 `.view`：`padding:40px 48px 56px; max-width:880px; margin:0 auto; gap:22px`。
   窄屏 `padding:18px 16px 32px; gap:16px`。
 - **grid 子项防溢出**：`.view > * { min-width:0 }`，配合 `.track-row{min-width:0}`——否则
@@ -80,9 +81,9 @@ glassBlurOff:    0（性能/降低透明度回退）
 
 | 区域 | iOS 26+ | Android / iOS<26 | 内容原则 |
 |---|---|---|---|
-| 顶栏 | Swift/SwiftUI 系统液态玻璃 | Flutter AdaptiveGlassSurface | 标题简短，不承载功能说明 |
-| 底部导航 | 原生液态玻璃悬浮 dock | Flutter 毛玻璃悬浮 dock（同形态） | 高 66，导航主锚点；胶囊压安全区悬浮，滚动收缩为单 pill |
-| mini player | 原生玻璃胶囊（dock 上方） | Flutter 毛玻璃胶囊（同形态） | 高 50、封面 32——比 dock 矮一档的次级状态条；封面、题/歌手、播放与下一曲 |
+| 顶栏 | Swift/SwiftUI 系统液态玻璃 | Flutter AdaptiveGlassSurface | 标题简短，不承载功能说明；底缘不画 hairline（web .topbar 的 border-bottom 不搬），tint 底部 20% 渐隐收边，off 档退实底并保留底线分界 |
+| 底部导航 | 原生液态玻璃悬浮 dock | Flutter 毛玻璃悬浮 dock（同形态） | 高 66，导航主锚点；胶囊压安全区悬浮，滚动收缩为图标圆钮（高 50，与内联 mini 等高一排） |
+| mini player | 原生玻璃胶囊（dock 上方） | Flutter 毛玻璃胶囊（同形态） | 高 50、封面 32——比 dock 矮一档的次级状态条；封面、题/歌手、播放与下一曲，收缩时内联到圆钮左侧、内容不裁剪 |
 | 播放主控/音量浮层 | 原生材质优先 | Flutter 玻璃面板 | 控件尺寸固定，不因状态位移 |
 | 模态/菜单 | 原生玻璃或系统 sheet | Flutter 玻璃 overlay | 表单主体可保持不透明以保证可读性 |
 | 歌单卡、曲目行、统计图 | 不使用玻璃 | 不使用玻璃 | 延续暖纸/墨色内容风格 |

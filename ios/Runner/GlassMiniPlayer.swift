@@ -1,6 +1,7 @@
 import SwiftUI
 
-// mini player 玻璃胶囊：封面 + 题/歌手 + 播放/下一曲，悬浮在 dock 上方。
+// mini player 玻璃胶囊：封面 + 题/歌手 + 播放/下一曲，悬浮在 dock 上方；
+// chrome 收缩时整条内联到图标圆钮左侧，内容不裁剪，题/歌手随剩余宽度截断。
 // 点卡片本体 → openNowPlaying（Dart push 全屏播放页）；按钮回传媒体 intent。
 // 封面经 AsyncImage 拉 Dart 下发的 URL——只是展示资源，不构成业务请求；
 // scrim/文字对比守 HMusic 墨色纪律。
@@ -13,26 +14,22 @@ struct GlassMiniPlayer: View {
   var body: some View {
     HStack(spacing: 12) {
       artwork
-      if !state.minimized {
-        VStack(alignment: .leading, spacing: 2) {
-          Text(state.trackTitle)
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(Color.primary)
-            .lineLimit(1)
-          Text(state.trackArtist)
-            .font(.system(size: 12))
-            .foregroundStyle(Color.secondary)
-            .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        controls
-      } else {
-        playPauseButton
+      VStack(alignment: .leading, spacing: 2) {
+        Text(state.trackTitle)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(Color.primary)
+          .lineLimit(1)
+        Text(state.trackArtist)
+          .font(.system(size: 12))
+          .foregroundStyle(Color.secondary)
+          .lineLimit(1)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      controls
     }
     .padding(.horizontal, 12)
     .frame(height: GlassShellMetrics.miniHeight)
-    .frame(maxWidth: state.minimized ? nil : .infinity)
+    .frame(maxWidth: .infinity)
     .glassChrome(
       capsule: true,
       reduceTransparency: reduceTransparency || state.reduceTransparency

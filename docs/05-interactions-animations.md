@@ -73,8 +73,9 @@
 
 应用外壳用 `Scaffold` + `bottomNavigationBar` 槽位承载悬浮玻璃 chrome（mini 胶囊 +
 dock 胶囊，压进安全区，对齐 iOS 26+ 原生壳形态）。dock 是布局骨架：tab 页内恒在，
-向下滚动只收缩为单枚当前 tab pill（点 pill 展开，不切 tab），不整体消失；
-chrome 让位走 extendBody 注入的 MediaQuery padding，内容从玻璃下滚过。
+不整体消失——向下滚动收缩为「mini 内联 + 当前 tab 图标圆钮」等高一排（mini 内容
+不裁剪，点圆钮展开、不切 tab），只有滚回列表顶部或切 tab 才展开，中途向上滚保持
+收缩；chrome 让位走 extendBody 注入的 MediaQuery padding，内容从玻璃下滚过。
 
 | 手势 | 动作 |
 |---|---|

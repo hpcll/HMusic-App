@@ -13,7 +13,8 @@ final class GlassShellState: ObservableObject {
   @Published var trackArtist: String = ""
   @Published var artworkUrl: URL?
   @Published var playing: Bool = false
-  // 滚动收缩态：Flutter 上报向下滚动 → dock 收成单枚 pill（对齐 Apple Music 行为）。
+  // 滚动收缩态：Flutter 上报（向下滚收缩、滚回顶部展开）→ chrome 收成
+  // mini 内联 + 当前 tab 图标圆钮的一排（对齐 Apple Music 收纳行为）。
   @Published var minimized: Bool = false
   // Dart configure 下发的降级补充；系统开关另经 SwiftUI Environment 直接生效，
   // 二者取 or（docs/06 §3 回退策略 3/4）。

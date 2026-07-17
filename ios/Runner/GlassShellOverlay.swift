@@ -4,9 +4,10 @@ import SwiftUI
 // 只渲染 chrome 并回传语义 intent；不持有 token、不调 Server（docs/06 §3）。
 //
 // 形态对齐 Apple Music：mini player 胶囊悬浮在 dock 上方，chrome 压进底部
-// 安全区、悬在 home indicator 上方；向下滚动时 dock 收成单枚当前 tab pill、
-// mini 收窄，反向滚动展开。玻璃只用于这两块 chrome，内容（下层 Flutter）
-// 不玻璃化（AGENTS 铁律 9）。
+// 安全区、悬在 home indicator 上方；向下滚动时收缩为「mini 内联 + 当前 tab
+// 图标圆钮」的等高一排，只有滚回顶部（或点圆钮/切 tab）才展开——触发语义
+// 统一在 Dart ScrollMinimizeListener，此处只渲染。玻璃只用于这两块 chrome，
+// 内容（下层 Flutter）不玻璃化（AGENTS 铁律 9）。
 //
 // onChromeFrame：dock/mini 各自把实时 frame（global 坐标）上报宿主，
 // UIKit 层据此做精确 hitTest——frame 内吃事件，frame 外穿给 Flutter。
@@ -20,30 +21,22 @@ struct GlassShellOverlay: View {
 
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  // 收缩/展开时 mini 与 dock 在竖排/内联两种布局间搬家，matchedGeometryEffect
+  // 让同一块 chrome 连续形变过去，而不是删除+插入的硬切。
+  @Namespace private var chromeSpace
 
   var body: some View {
     VStack(spacing: GlassShellMetrics.gap) {
       Spacer(minLength: 0)
-      if state.showMiniPlayer && state.trackId != nil {
-        GlassMiniPlayer(
-          state: state,
-          reduceTransparency: reduceTransparency,
-          onIntent: onIntent
-        )
-        .reportChromeFrame("mini", to: onChromeFrame)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+      if state.minimized {
+        // 收缩：mini 内联占满剩余宽度、图标圆钮贴右（无 mini 时圆钮居中）。
+        HStack(spacing: GlassShellMetrics.gap) {
+          miniSlot
+          dockSlot
+        }
       } else {
-        // 退场时归零命中区，防止残留的旧 frame 挡住 Flutter。
-        Color.clear.frame(height: 0)
-          .onAppear { onChromeFrame("mini", .zero) }
-      }
-      if state.showTabBar {
-        dock
-          .reportChromeFrame("dock", to: onChromeFrame)
-          .transition(.move(edge: .bottom).combined(with: .opacity))
-      } else {
-        Color.clear.frame(height: 0)
-          .onAppear { onChromeFrame("dock", .zero) }
+        miniSlot
+        dockSlot
       }
     }
     .padding(.horizontal, GlassShellMetrics.horizontalPadding)
@@ -65,13 +58,43 @@ struct GlassShellOverlay: View {
     "\(state.minimized)-\(state.showTabBar)-\(state.showMiniPlayer)-\(state.trackId ?? "")-\(state.selectedTab)"
   }
 
-  // dock：展开 = 5 tab 等分胶囊条；收缩 = 单枚当前 tab pill 居中。
+  @ViewBuilder private var miniSlot: some View {
+    if state.showMiniPlayer && state.trackId != nil {
+      GlassMiniPlayer(
+        state: state,
+        reduceTransparency: reduceTransparency,
+        onIntent: onIntent
+      )
+      .matchedGeometryEffect(id: "mini", in: chromeSpace)
+      .reportChromeFrame("mini", to: onChromeFrame)
+      .transition(.move(edge: .bottom).combined(with: .opacity))
+    } else {
+      // 退场时归零命中区，防止残留的旧 frame 挡住 Flutter。
+      Color.clear.frame(height: 0)
+        .onAppear { onChromeFrame("mini", .zero) }
+    }
+  }
+
+  @ViewBuilder private var dockSlot: some View {
+    if state.showTabBar {
+      dock
+        .matchedGeometryEffect(id: "dock", in: chromeSpace)
+        .reportChromeFrame("dock", to: onChromeFrame)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    } else {
+      Color.clear.frame(height: 0)
+        .onAppear { onChromeFrame("dock", .zero) }
+    }
+  }
+
+  // dock：展开 = 5 tab 等分胶囊条；收缩 = 当前 tab 图标圆钮，高度降到
+  // mini 同档，与内联 mini 排成等高一行。
   private var dock: some View {
     HStack(spacing: 0) {
       if state.minimized {
         if let tab = GlassDockTab.all.first(where: { $0.id == state.selectedTab }) {
           DockItem(tab: tab, active: true, compact: true) {
-            // 收缩态点 pill 只展开，不切 tab。
+            // 收缩态点圆钮只展开，不切 tab。
             onIntent("expand", nil)
           }
         }
@@ -83,13 +106,15 @@ struct GlassShellOverlay: View {
         }
       }
     }
-    .frame(height: GlassShellMetrics.dockHeight)
+    .frame(
+      height: state.minimized
+        ? GlassShellMetrics.miniHeight : GlassShellMetrics.dockHeight
+    )
     .frame(maxWidth: state.minimized ? nil : .infinity)
     .glassChrome(
       capsule: true,
       reduceTransparency: reduceTransparency || state.reduceTransparency
     )
-    .frame(maxWidth: .infinity, alignment: .center)
   }
 }
 
@@ -108,6 +133,7 @@ extension View {
 }
 
 // 单个 dock tab：SF Symbol + 小字标签；active 用主题墨色、其余 secondary。
+// compact（收缩圆钮）只留图标，标签语义走 accessibilityLabel。
 @available(iOS 26.0, *)
 private struct DockItem: View {
   let tab: GlassDockTab
@@ -120,8 +146,10 @@ private struct DockItem: View {
       VStack(spacing: 3) {
         Image(systemName: tab.symbol)
           .font(.system(size: 22, weight: .medium))
-        Text(tab.label)
-          .font(.system(size: 11))
+        if !compact {
+          Text(tab.label)
+            .font(.system(size: 11))
+        }
       }
       // 选中态只换颜色（墨 vs 灰），图标恒为线条款——与 Flutter 底栏同纪律；
       // fill 变体视觉重量参差（chart.bar.fill 尤重），不用。

@@ -19,11 +19,18 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
+    final quality = resolveGlassQuality(context);
     return AdaptiveGlassSurface(
-      quality: resolveGlassQuality(context),
+      quality: quality,
       padding: EdgeInsets.zero,
       borderRadius: BorderRadius.zero,
-      border: Border(bottom: BorderSide(color: palette.line)),
+      // 玻璃态不画常驻底线：chrome 无硬线（对齐 dock/mini 胶囊语言），
+      // 分隔感交给 tint 底缘渐隐；web .topbar 的 border-bottom 是浏览器
+      // 惯例，App 不搬。off 档退实底面板时保留 hairline 维持高对比分界。
+      border: quality == GlassQuality.off
+          ? Border(bottom: BorderSide(color: palette.line))
+          : const Border(),
+      bottomFade: true,
       shadow: false,
       child: SafeArea(
         bottom: false,
