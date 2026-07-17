@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_playlists_repository.dart';
 import '../models/playlist.dart';
 import '../models/playlists_view_state.dart';
@@ -41,7 +43,10 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
           .getPlaylist(id);
       state = state.copyWith(detail: detail, detailLoading: false);
     } on ApiFailure catch (failure) {
-      state = state.copyWith(detailLoading: false, notice: failure.message);
+      state = state.copyWith(
+        detailLoading: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -58,9 +63,15 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
     try {
       await ref.read(playlistsRepositoryProvider).createPlaylist(trimmed);
       await _reloadKeepingBusy();
-      state = state.copyWith(busy: false, notice: '歌单已创建');
+      state = state.copyWith(
+        busy: false,
+        notice: const HMusicNotice.success('歌单已创建'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -73,9 +84,15 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
           .read(playlistsRepositoryProvider)
           .importPlaylist(trimmed);
       await _reloadKeepingBusy();
-      state = state.copyWith(busy: false, notice: _importMessage(result));
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.success(_importMessage(result)),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -85,9 +102,15 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
     try {
       await ref.read(playlistsRepositoryProvider).deletePlaylist(id);
       await _reloadKeepingBusy();
-      state = state.copyWith(busy: false, notice: '歌单已删除');
+      state = state.copyWith(
+        busy: false,
+        notice: const HMusicNotice.success('歌单已删除'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -101,21 +124,36 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
           .removeItem(detail.id, itemId);
       state = state.copyWith(busy: false, detail: updated);
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
-  // 整单播放：服务端整单灌队列并从 startIndex 开播（just_audio 无需手势解锁）。
+  // 整单播放：服务端整单灌队列并从 startIndex 开播，返回的权威状态立即喂给
+  // AudioHandler 在本机装载出声（just_audio 无需手势解锁），不等前台轮询。
   Future<void> playAll(String id, {int startIndex = 0}) async {
     if (state.busy) return;
     state = state.copyWith(busy: true, clearError: true);
     try {
-      await ref
+      final playback = await ref
           .read(playlistsRepositoryProvider)
           .playAll(id, startIndex: startIndex);
-      state = state.copyWith(busy: false, notice: '开始播放歌单');
+      final handler = await ref.read(hmusicAudioHandlerProvider.future);
+      await handler.applyRemotePlayback(playback);
+      state = state.copyWith(
+        busy: false,
+        notice: const HMusicNotice.success('开始播放歌单'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
+    } on Exception catch (error) {
+      // 本机装载失败（如直链坏源）也要如实提示，而不是谎报“开始播放”。
+      state = state.copyWith(busy: false, notice: HMusicNotice.error('$error'));
     }
   }
 

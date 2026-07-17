@@ -1,3 +1,4 @@
+import '../../../shared/models/hmusic_notice.dart';
 import 'mi_account.dart';
 
 // 小米账号子页的三个登录通道。
@@ -43,7 +44,7 @@ class MiAccountState {
   // 非空表示进入短信挑战阶段。
   final MiVerificationResult? challenge;
 
-  final String? notice;
+  final HMusicNotice? notice;
 
   bool get loggedIn => status?.loggedIn ?? false;
 
@@ -56,7 +57,7 @@ class MiAccountState {
     String? qrRemain,
     bool? busy,
     MiVerificationResult? challenge,
-    String? notice,
+    HMusicNotice? notice,
     bool clearQrSession = false,
     bool clearQrMessage = false,
     bool clearChallenge = false,

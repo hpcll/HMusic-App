@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/hmusic_track.dart';
+import '../../../shared/widgets/hmusic_toast.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../view_models/search_view_model.dart';
 import '../widgets/search_input.dart';
@@ -31,9 +32,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final state = ref.watch(searchViewModelProvider);
     ref.listen(searchViewModelProvider.select((s) => s.notice), (_, notice) {
       if (notice == null) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(notice)));
+      showHMusicToast(context, notice);
       ref.read(searchViewModelProvider.notifier).clearNotice();
     });
     return ListView(

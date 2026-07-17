@@ -1,3 +1,4 @@
+import '../../../shared/models/hmusic_notice.dart';
 import 'lx_plugin.dart';
 
 // LX 音源插件子页状态（对齐 web SourcesSection）。列表 + health + 编辑表单。
@@ -29,7 +30,7 @@ class SourcesState {
   // 正在一键更新的插件 id，防连点。
   final String updatingId;
   final LxPluginForm form;
-  final String? notice;
+  final HMusicNotice? notice;
 
   SourceHealth healthOf(String id) => health[id] ?? SourceHealth.unknown;
 
@@ -41,7 +42,7 @@ class SourcesState {
     bool? fetching,
     String? updatingId,
     LxPluginForm? form,
-    String? notice,
+    HMusicNotice? notice,
     bool clearNotice = false,
   }) {
     return SourcesState(

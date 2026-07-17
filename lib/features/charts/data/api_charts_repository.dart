@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/audio/api_playback_repository.dart';
+import '../../../core/audio/models/hmusic_playback_state.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import '../models/chart.dart';
@@ -33,10 +35,18 @@ class ApiChartsRepository implements ChartsRepository {
   }
 
   @override
-  Future<void> playAll(String id, {int? startIndex}) async {
-    await _apiClient.postMap(
+  Future<HMusicPlaybackState> playAll(String id, {int? startIndex}) async {
+    // 同歌单整单播放：显式指到本机虚拟设备，并把权威 playback 带回给调用方。
+    final payload = await _apiClient.postMap(
       '/charts/$id/play',
-      body: <String, Object?>{if (startIndex != null) 'startIndex': startIndex},
+      body: <String, Object?>{
+        if (startIndex != null) 'startIndex': startIndex,
+        'deviceId': ApiPlaybackRepository.localDeviceId,
+      },
+    );
+    final playback = payload['playback'];
+    return HMusicPlaybackState.fromJson(
+      playback is Map<String, Object?> ? playback : payload,
     );
   }
 }

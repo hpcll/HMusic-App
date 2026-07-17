@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_downloads_repository.dart';
 import '../models/download_record.dart';
 import '../models/downloads_state.dart';
@@ -30,7 +31,10 @@ class DownloadsViewModel extends Notifier<DownloadsState> {
       state = state.copyWith(items: items, loaded: true);
       _syncPolling();
     } on ApiFailure catch (failure) {
-      state = state.copyWith(loaded: true, notice: failure.message);
+      state = state.copyWith(
+        loaded: true,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -40,9 +44,9 @@ class DownloadsViewModel extends Notifier<DownloadsState> {
     try {
       await ref.read(downloadsRepositoryProvider).remove(item.id);
       await load();
-      state = state.copyWith(notice: '已删除本地文件');
+      state = state.copyWith(notice: const HMusicNotice.success('已删除本地文件'));
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
       state = state.copyWith(actingId: '');
     }
@@ -51,7 +55,7 @@ class DownloadsViewModel extends Notifier<DownloadsState> {
   Future<void> retry(DownloadRecord item) async {
     final track = item.track;
     if (track == null) {
-      state = state.copyWith(notice: '缺少曲目信息，无法重试');
+      state = state.copyWith(notice: const HMusicNotice.error('缺少曲目信息，无法重试'));
       return;
     }
     if (state.actingId.isNotEmpty) return;
@@ -59,9 +63,11 @@ class DownloadsViewModel extends Notifier<DownloadsState> {
     try {
       await ref.read(downloadsRepositoryProvider).retry(track);
       await load();
-      state = state.copyWith(notice: '重新下载：${item.title}');
+      state = state.copyWith(
+        notice: HMusicNotice.success('重新下载：${item.title}'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
       state = state.copyWith(actingId: '');
     }

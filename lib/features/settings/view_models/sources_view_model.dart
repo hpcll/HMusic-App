@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_sources_repository.dart';
 import '../models/lx_plugin.dart';
 import '../models/sources_state.dart';
@@ -30,7 +31,10 @@ class SourcesViewModel extends Notifier<SourcesState> {
         loaded: true,
       );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(loaded: true, notice: failure.message);
+      state = state.copyWith(
+        loaded: true,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -63,7 +67,7 @@ class SourcesViewModel extends Notifier<SourcesState> {
   Future<void> fetchFromUrl() async {
     final url = state.form.sourceUrl.trim();
     if (url.isEmpty) {
-      state = state.copyWith(notice: '先粘贴订阅链接');
+      state = state.copyWith(notice: const HMusicNotice.error('先粘贴订阅链接'));
       return;
     }
     if (state.fetching) return;
@@ -82,12 +86,16 @@ class SourcesViewModel extends Notifier<SourcesState> {
               : form.name,
           id: form.id.isEmpty ? _suggestId(result.name, url) : form.id,
         ),
-        notice:
-            '已拉取「${result.name ?? '未命名脚本'}」'
-            '${result.version != null ? ' v${result.version}' : ''}，确认后保存',
+        notice: HMusicNotice.success(
+          '已拉取「${result.name ?? '未命名脚本'}」'
+          '${result.version != null ? ' v${result.version}' : ''}，确认后保存',
+        ),
       );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(fetching: false, notice: failure.message);
+      state = state.copyWith(
+        fetching: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -97,7 +105,9 @@ class SourcesViewModel extends Notifier<SourcesState> {
     if (form.id.trim().isEmpty ||
         form.name.trim().isEmpty ||
         form.code.trim().isEmpty) {
-      state = state.copyWith(notice: '插件 ID、名称和代码都不能为空');
+      state = state.copyWith(
+        notice: const HMusicNotice.error('插件 ID、名称和代码都不能为空'),
+      );
       return false;
     }
     if (state.busy) return false;
@@ -117,10 +127,13 @@ class SourcesViewModel extends Notifier<SourcesState> {
           );
       state = state.copyWith(busy: false, form: const LxPluginForm());
       await load();
-      state = state.copyWith(notice: '插件已保存');
+      state = state.copyWith(notice: const HMusicNotice.success('插件已保存'));
       return true;
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
       return false;
     }
   }
@@ -140,7 +153,7 @@ class SourcesViewModel extends Notifier<SourcesState> {
       );
       await load();
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 
@@ -157,10 +170,10 @@ class SourcesViewModel extends Notifier<SourcesState> {
           enabled: plugin.enabled,
           sourceUrl: plugin.sourceUrl ?? '',
         ),
-        notice: '插件已载入下方表单，改完保存即可',
+        notice: const HMusicNotice.success('插件已载入下方表单，改完保存即可'),
       );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 
@@ -171,9 +184,11 @@ class SourcesViewModel extends Notifier<SourcesState> {
     try {
       await ref.read(sourcesRepositoryProvider).updatePlugin(plugin.id);
       await load();
-      state = state.copyWith(notice: '「${plugin.name}」已从订阅链接更新');
+      state = state.copyWith(
+        notice: HMusicNotice.success('「${plugin.name}」已从订阅链接更新'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
       state = state.copyWith(updatingId: '');
     }
@@ -185,9 +200,11 @@ class SourcesViewModel extends Notifier<SourcesState> {
           .read(sourcesRepositoryProvider)
           .testPlugin(plugin.id);
       await load();
-      state = state.copyWith(notice: message.isEmpty ? '插件加载测试通过' : message);
+      state = state.copyWith(
+        notice: HMusicNotice.success(message.isEmpty ? '插件加载测试通过' : message),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 
@@ -195,9 +212,9 @@ class SourcesViewModel extends Notifier<SourcesState> {
     try {
       await ref.read(sourcesRepositoryProvider).deletePlugin(plugin.id);
       await load();
-      state = state.copyWith(notice: '插件已删除');
+      state = state.copyWith(notice: const HMusicNotice.success('插件已删除'));
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 

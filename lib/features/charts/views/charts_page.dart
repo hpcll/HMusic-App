@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/hmusic_toast.dart';
 import '../view_models/charts_view_model.dart';
 import '../widgets/chart_detail.dart';
 import '../widgets/charts_wall.dart';
@@ -33,9 +34,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
   Widget build(BuildContext context) {
     ref.listen(chartsViewModelProvider.select((s) => s.notice), (_, notice) {
       if (notice == null) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(notice)));
+      showHMusicToast(context, notice);
       ref.read(chartsViewModelProvider.notifier).clearNotice();
     });
     final isWall = ref.watch(chartsViewModelProvider.select((s) => s.isWall));

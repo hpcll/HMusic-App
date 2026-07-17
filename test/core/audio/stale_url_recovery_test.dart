@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/audio/hmusic_audio_handler.dart';
 import 'package:hmusic/core/audio/local_volume_store.dart';
@@ -9,8 +12,9 @@ import 'package:hmusic/core/models/hmusic_track.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 
-// 直链失效恢复（docs/08 §7）：加载 -11849 → 原曲带进度重解析一次 → 续播；
-// 同曲 60s 内不二次自救。AudioPlayer 用 mocktail 假身，按 URL 决定成败。
+// 直链失效恢复（docs/08 §7）：加载 -11849/装载超时 → 原曲带进度重解析一次 →
+// 续播；同曲 60s 内不二次自救，救不回来如实收场（paused 回写 + 全局报错），
+// 绝不停留在「正在播放」假象。AudioPlayer 用 mocktail 假身，按 URL 决定成败。
 class _MockAudioPlayer extends Mock implements AudioPlayer {}
 
 class _FakeAudioSource extends Fake implements AudioSource {}
@@ -44,7 +48,7 @@ const HMusicTrack _track = HMusicTrack(
   url: 'https://ws.stream.qq.example/stale.mp3?vkey=EXPIRED',
 );
 
-HMusicPlaybackState _state({required String streamUrl, int positionMs = 0}) =>
+HMusicPlaybackState _state({String? streamUrl, int positionMs = 0}) =>
     HMusicPlaybackState(
       sessionId: 'default',
       state: PlaybackStatus.playing,
@@ -65,12 +69,16 @@ class _FakePlaybackRepository implements PlaybackRepository {
   _FakePlaybackRepository({
     required this.resumeState,
     required this.playTrackState,
-  });
+    HMusicPlaybackState? reportLocalState,
+  }) : reportLocalState = reportLocalState ?? resumeState;
 
   final HMusicPlaybackState resumeState;
   final HMusicPlaybackState playTrackState;
+  final HMusicPlaybackState reportLocalState;
   final List<({HMusicTrack track, int? queueIndex, int? positionMs})>
   playTrackCalls = <({HMusicTrack track, int? queueIndex, int? positionMs})>[];
+  final List<({String? state, int? positionMs})> reportLocalCalls =
+      <({String? state, int? positionMs})>[];
 
   @override
   Future<HMusicPlaybackState> resume() async => resumeState;
@@ -118,10 +126,16 @@ class _FakePlaybackRepository implements PlaybackRepository {
     int? positionMs,
     int? durationMs,
     bool ended = false,
-  }) async => resumeState;
+  }) async {
+    reportLocalCalls.add((state: state, positionMs: positionMs));
+    return reportLocalState;
+  }
 }
 
-_MockAudioPlayer _player({required Set<String> failQueries}) {
+_MockAudioPlayer _player({
+  required Set<String> failQueries,
+  Set<String> hangQueries = const <String>{},
+}) {
   final player = _MockAudioPlayer();
   when(
     () => player.playerStateStream,
@@ -131,6 +145,7 @@ _MockAudioPlayer _player({required Set<String> failQueries}) {
   ).thenAnswer((_) => const Stream<PlaybackEvent>.empty());
   when(() => player.setVolume(any())).thenAnswer((_) async {});
   when(() => player.play()).thenAnswer((_) async {});
+  when(() => player.pause()).thenAnswer((_) async {});
   when(() => player.processingState).thenReturn(ProcessingState.idle);
   when(() => player.playing).thenReturn(false);
   when(() => player.position).thenReturn(Duration.zero);
@@ -143,6 +158,10 @@ _MockAudioPlayer _player({required Set<String> failQueries}) {
     ),
   ).thenAnswer((invocation) async {
     final source = invocation.positionalArguments.first as UriAudioSource;
+    if (hangQueries.contains(source.uri.query)) {
+      // 上游黑洞：既不成功也不报错，永远悬着。
+      return Completer<Duration?>().future;
+    }
     if (failQueries.contains(source.uri.query)) {
       throw PlayerException(-11849, 'Operation Stopped', null);
     }
@@ -198,21 +217,86 @@ void main() {
     verify(() => player.play()).called(1);
   });
 
-  test('重解析后仍加载失败：60s 去抖不再自救，异常冒泡', () async {
+  test('重解析后仍失败：60s 去抖不再自救，如实收场并报错', () async {
     final repository = _FakePlaybackRepository(
       resumeState: _state(
         streamUrl: 'http://old.host/api/v1/proxy/audio?u=stale',
+        positionMs: 42000,
       ),
-      // 重解析给回的还是坏链 → 二次失败必须直接冒泡，不能死循环。
+      // 重解析给回的还是坏链 → 二次失败不能死循环，也不能停留在「正在播放」。
       playTrackState: _state(
         streamUrl: 'http://old.host/api/v1/proxy/audio?u=stale',
+        positionMs: 42000,
       ),
     );
     final player = _player(failQueries: <String>{'u=stale'});
     final handler = _handler(repository, player);
+    final notices = <String>[];
+    handler.playbackNoticeStream.listen(notices.add);
 
-    await expectLater(handler.play(), throwsA(isA<PlayerException>()));
+    await expectLater(handler.play(), throwsA(isA<PlaybackLoadException>()));
+
     expect(repository.playTrackCalls, hasLength(1));
     verifyNever(() => player.play());
+    // 如实收场：暂停本机 player（防周期回写继续谎报 playing）+ 回写 paused
+    // 且进度保留在目标点（稍后重试可续）+ 全局通知流报错。
+    verify(() => player.pause()).called(1);
+    expect(repository.reportLocalCalls, hasLength(1));
+    expect(repository.reportLocalCalls.single.state, 'paused');
+    expect(repository.reportLocalCalls.single.positionMs, 42000);
+    await pumpEventQueue();
+    expect(notices, hasLength(1));
+    expect(notices.single, contains('音源加载失败'));
+  });
+
+  test('resume 无直链且本机未装载：原曲重解析装载续播，不空转', () async {
+    final repository = _FakePlaybackRepository(
+      resumeState: _state(streamUrl: null, positionMs: 42000),
+      playTrackState: _state(
+        streamUrl: 'http://old.host/api/v1/proxy/audio?u=fresh',
+        positionMs: 42000,
+      ),
+    );
+    final player = _player(failQueries: const <String>{});
+    final handler = _handler(repository, player);
+
+    await handler.play();
+
+    expect(repository.playTrackCalls, hasLength(1));
+    expect(repository.playTrackCalls.single.positionMs, 42000);
+    // 必须真的装载出声，而不是旧路径对空 player 干喊 play()。
+    verify(
+      () => player.setAudioSource(
+        any(),
+        initialPosition: any(named: 'initialPosition'),
+      ),
+    ).called(1);
+    verify(() => player.play()).called(1);
+  });
+
+  test('装载黑洞 20s 超时：视同失败，重解析续播', () {
+    fakeAsync((async) {
+      final repository = _FakePlaybackRepository(
+        resumeState: _state(
+          streamUrl: 'http://old.host/api/v1/proxy/audio?u=hang',
+        ),
+        playTrackState: _state(
+          streamUrl: 'http://old.host/api/v1/proxy/audio?u=fresh',
+        ),
+      );
+      final player = _player(
+        failQueries: const <String>{},
+        hangQueries: <String>{'u=hang'},
+      );
+      final handler = _handler(repository, player);
+
+      var done = false;
+      unawaited(handler.play().then((_) => done = true));
+      async.elapse(const Duration(seconds: 21));
+
+      expect(done, isTrue);
+      expect(repository.playTrackCalls, hasLength(1));
+      verify(() => player.play()).called(1);
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_devices_repository.dart';
 import '../models/hmusic_device.dart';
 import '../models/settings_section_states.dart';
@@ -19,7 +20,10 @@ class DevicesViewModel extends Notifier<DevicesState> {
       final devices = await ref.read(devicesRepositoryProvider).getDevices();
       state = state.copyWith(devices: devices, loaded: true);
     } on ApiFailure catch (failure) {
-      state = state.copyWith(loaded: true, notice: failure.message);
+      state = state.copyWith(
+        loaded: true,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -29,9 +33,15 @@ class DevicesViewModel extends Notifier<DevicesState> {
     try {
       final count = await ref.read(devicesRepositoryProvider).refresh();
       await load();
-      state = state.copyWith(refreshing: false, notice: '已刷新，共 $count 台设备');
+      state = state.copyWith(
+        refreshing: false,
+        notice: HMusicNotice.success('已刷新，共 $count 台设备'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(refreshing: false, notice: failure.message);
+      state = state.copyWith(
+        refreshing: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -41,9 +51,11 @@ class DevicesViewModel extends Notifier<DevicesState> {
     try {
       await ref.read(devicesRepositoryProvider).select(device.id);
       await load();
-      state = state.copyWith(notice: '默认设备已切换为 ${device.name}');
+      state = state.copyWith(
+        notice: HMusicNotice.success('默认设备已切换为 ${device.name}'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
       state = state.copyWith(actingId: '');
     }
@@ -55,9 +67,11 @@ class DevicesViewModel extends Notifier<DevicesState> {
     try {
       await ref.read(devicesRepositoryProvider).probe(device.id);
       await load();
-      state = state.copyWith(notice: '${device.name} 探测完成');
+      state = state.copyWith(
+        notice: HMusicNotice.success('${device.name} 探测完成'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
       state = state.copyWith(actingId: '');
     }

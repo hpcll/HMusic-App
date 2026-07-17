@@ -4,6 +4,7 @@ import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/queue/api_queue_repository.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_search_repository.dart';
 import '../models/search_view_state.dart';
 
@@ -36,7 +37,10 @@ class SearchViewModel extends Notifier<SearchViewState> {
   Future<void> enqueue(HMusicTrack track) async {
     try {
       await ref.read(queueRepositoryProvider).addTrack(track);
-      state = state.copyWith(notice: '已加入队列：${track.title}', clearError: true);
+      state = state.copyWith(
+        notice: HMusicNotice.success('已加入队列：${track.title}'),
+        clearError: true,
+      );
     } on ApiFailure catch (failure) {
       state = state.copyWith(errorMessage: failure.message);
     }

@@ -6,6 +6,7 @@ import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/queue/api_queue_repository.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../../search/data/api_search_repository.dart';
 import '../data/api_charts_repository.dart';
 import '../models/chart.dart';
@@ -86,7 +87,7 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
       state = state.copyWith(
         clearActive: true,
         detailLoading: false,
-        notice: failure.message,
+        notice: HMusicNotice.error(failure.message),
       );
     }
   }
@@ -102,11 +103,13 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
       final track = await _resolveEntry(entry);
       final handler = await ref.read(hmusicAudioHandlerProvider.future);
       await handler.playTrack(track);
-      state = state.copyWith(notice: '正在播放：${entry.title}');
+      state = state.copyWith(
+        notice: HMusicNotice.success('正在播放：${entry.title}'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } on Exception catch (error) {
-      state = state.copyWith(notice: '$error');
+      state = state.copyWith(notice: HMusicNotice.error('$error'));
     } finally {
       state = state.copyWith(actingRank: 0);
     }
@@ -118,25 +121,37 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
     try {
       final track = await _resolveEntry(entry);
       await ref.read(queueRepositoryProvider).addTrack(track);
-      state = state.copyWith(notice: '已加入队列：${entry.title}');
+      state = state.copyWith(
+        notice: HMusicNotice.success('已加入队列：${entry.title}'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } on Exception catch (error) {
-      state = state.copyWith(notice: '$error');
+      state = state.copyWith(notice: HMusicNotice.error('$error'));
     } finally {
       state = state.copyWith(actingRank: 0);
     }
   }
 
+  // 整榜播放：服务端整榜灌队列开播，返回的权威状态立即喂给 AudioHandler
+  // 在本机装载出声，不等前台轮询。
   Future<void> playAll() async {
     final active = state.active;
     if (active == null || state.actingRank != 0) return;
     state = state.copyWith(actingRank: -1, clearError: true);
     try {
-      await ref.read(chartsRepositoryProvider).playAll(active.id);
-      state = state.copyWith(notice: '整榜播放：${active.name}');
+      final playback = await ref
+          .read(chartsRepositoryProvider)
+          .playAll(active.id);
+      final handler = await ref.read(hmusicAudioHandlerProvider.future);
+      await handler.applyRemotePlayback(playback);
+      state = state.copyWith(
+        notice: HMusicNotice.success('整榜播放：${active.name}'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
+    } on Exception catch (error) {
+      state = state.copyWith(notice: HMusicNotice.error('$error'));
     } finally {
       state = state.copyWith(actingRank: 0);
     }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/widgets/hmusic_toast.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/stats.dart';
 import '../models/stats_view_state.dart';
@@ -39,9 +40,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     final palette = context.palette;
     ref.listen(statsViewModelProvider.select((s) => s.notice), (_, notice) {
       if (notice == null) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(notice)));
+      showHMusicToast(context, notice);
       ref.read(statsViewModelProvider.notifier).clearNotice();
     });
     final state = ref.watch(statsViewModelProvider);

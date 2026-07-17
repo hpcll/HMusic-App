@@ -1,3 +1,4 @@
+import '../../../shared/models/hmusic_notice.dart';
 import 'stats.dart';
 
 enum StatsStatus { initial, loading, loaded, error }
@@ -18,14 +19,14 @@ class StatsViewState {
   // 正在点播的 Top 歌 key（title+artist），防连点。
   final String actingKey;
   final String? errorMessage;
-  final String? notice;
+  final HMusicNotice? notice;
 
   StatsViewState copyWith({
     StatsStatus? status,
     Stats? stats,
     String? actingKey,
     String? errorMessage,
-    String? notice,
+    HMusicNotice? notice,
     bool clearError = false,
     bool clearNotice = false,
   }) {

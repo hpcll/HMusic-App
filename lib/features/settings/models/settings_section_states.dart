@@ -1,4 +1,5 @@
 import '../../../core/audio/models/hmusic_playback_state.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import 'hmusic_device.dart';
 import 'server_config.dart';
 
@@ -20,14 +21,14 @@ class DevicesState {
 
   // 正在 select/probe 的设备 id，防连点。
   final String actingId;
-  final String? notice;
+  final HMusicNotice? notice;
 
   DevicesState copyWith({
     List<HMusicDevice>? devices,
     bool? loaded,
     bool? refreshing,
     String? actingId,
-    String? notice,
+    HMusicNotice? notice,
     bool clearNotice = false,
   }) {
     return DevicesState(
@@ -45,12 +46,12 @@ class ConfigFormState {
 
   final ServerConfig? config;
   final bool saving;
-  final String? notice;
+  final HMusicNotice? notice;
 
   ConfigFormState copyWith({
     ServerConfig? config,
     bool? saving,
-    String? notice,
+    HMusicNotice? notice,
     bool clearNotice = false,
   }) {
     return ConfigFormState(
@@ -68,12 +69,12 @@ class DiagState {
 
   // ''|'tone'|'tts'，对齐 web busy。
   final String busyKind;
-  final String? notice;
+  final HMusicNotice? notice;
 
   DiagState copyWith({
     HMusicPlaybackState? playback,
     String? busyKind,
-    String? notice,
+    HMusicNotice? notice,
     bool clearNotice = false,
   }) {
     return DiagState(
@@ -88,11 +89,11 @@ class SecurityState {
   const SecurityState({this.changing = false, this.notice});
 
   final bool changing;
-  final String? notice;
+  final HMusicNotice? notice;
 
   SecurityState copyWith({
     bool? changing,
-    String? notice,
+    HMusicNotice? notice,
     bool clearNotice = false,
   }) {
     return SecurityState(
@@ -113,13 +114,13 @@ class TracksState {
   final List<ManualTrack> tracks;
   final bool loaded;
   final bool busy;
-  final String? notice;
+  final HMusicNotice? notice;
 
   TracksState copyWith({
     List<ManualTrack>? tracks,
     bool? loaded,
     bool? busy,
-    String? notice,
+    HMusicNotice? notice,
     bool clearNotice = false,
   }) {
     return TracksState(

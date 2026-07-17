@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/hmusic_toast.dart';
 import '../view_models/playlists_view_model.dart';
 import '../widgets/playlist_detail_view.dart';
 import '../widgets/playlists_list_view.dart';
@@ -33,9 +34,7 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
   Widget build(BuildContext context) {
     ref.listen(playlistsViewModelProvider.select((s) => s.notice), (_, notice) {
       if (notice == null) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(notice)));
+      showHMusicToast(context, notice);
       ref.read(playlistsViewModelProvider.notifier).clearNotice();
     });
     final isList = ref.watch(

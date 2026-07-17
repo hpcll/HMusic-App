@@ -47,8 +47,8 @@ DownloadRecord { id;trackKey;source;title;artist;album?;coverUrl?;track;quality?
 | GET | `/system/info` | → `{name,version,apiVersion,mode,publicBaseUrl,capabilities}`；连接页优先用它探活 |
 | GET | `/system/test-tone.wav` | 公开 WAV，支持 Range；主要供 Server 诊断 |
 
-`publicBaseUrl` 是 Server 对外生成音频 URL 的配置值，不等于客户端实际连接地址，禁止据此覆盖
-用户填写的 server base。
+`publicBaseUrl` 是 Server 对外生成音频 URL 的实时生效值（Server 会把回环/失效 IPv4 替换为
+其当前局域网地址），不等于客户端实际连接地址，禁止据此覆盖用户填写的 server base。
 
 ## 2. Auth `/auth`
 

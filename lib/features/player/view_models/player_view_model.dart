@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/audio/models/hmusic_playback_state.dart';
+import '../../../shared/models/hmusic_notice.dart';
 
 final Provider<PlayerViewModel> playerViewModelProvider =
     Provider<PlayerViewModel>((ref) {
@@ -25,6 +26,15 @@ final StreamProvider<HMusicPlaybackState> serverPlaybackStateProvider =
         if (fetched != null) yield fetched;
       }
       yield* handler.serverStateStream;
+    });
+
+// 播放链路自身的失败通知（自动切歌撞死链、resume 无源可播等）：这些路径没有
+// 前台点播 VM 捕获，壳层 ref.listen 本 provider 统一弹错误 toast。
+// HMusicNotice 刻意无 ==，重复文案也会再次触发监听。
+final StreamProvider<HMusicNotice> playbackNoticeProvider =
+    StreamProvider<HMusicNotice>((ref) async* {
+      final handler = await ref.watch(hmusicAudioHandlerProvider.future);
+      yield* handler.playbackNoticeStream.map(HMusicNotice.error);
     });
 
 // 本机实时进度：just_audio 的 position（约每 200ms），播放页进度条平滑靠它，

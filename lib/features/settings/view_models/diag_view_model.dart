@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_settings_repository.dart';
 import '../models/settings_section_states.dart';
 
@@ -48,9 +49,11 @@ class DiagViewModel extends Notifier<DiagState> {
     try {
       await ref.read(settingsRepositoryProvider).playTestTone();
       await refreshState();
-      state = state.copyWith(notice: '测试音频已下发，注意听音箱');
+      state = state.copyWith(
+        notice: const HMusicNotice.success('测试音频已下发，注意听音箱'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
       state = state.copyWith(busyKind: '');
     }
@@ -62,9 +65,9 @@ class DiagViewModel extends Notifier<DiagState> {
     state = state.copyWith(busyKind: 'tts');
     try {
       await ref.read(settingsRepositoryProvider).speak(trimmed);
-      state = state.copyWith(notice: '播报已下发，注意听音箱');
+      state = state.copyWith(notice: const HMusicNotice.success('播报已下发，注意听音箱'));
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
       state = state.copyWith(busyKind: '');
     }

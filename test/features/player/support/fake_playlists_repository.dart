@@ -1,3 +1,4 @@
+import 'package:hmusic/core/audio/models/hmusic_playback_state.dart';
 import 'package:hmusic/core/models/hmusic_track.dart';
 import 'package:hmusic/features/playlists/data/playlists_repository.dart';
 import 'package:hmusic/features/playlists/models/playlist.dart';
@@ -74,6 +75,6 @@ class FakePlaylistsRepository implements PlaylistsRepository {
   Future<void> deletePlaylist(String id) => throw UnimplementedError();
 
   @override
-  Future<void> playAll(String id, {int startIndex = 0}) =>
+  Future<HMusicPlaybackState> playAll(String id, {int startIndex = 0}) =>
       throw UnimplementedError();
 }

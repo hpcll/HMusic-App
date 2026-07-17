@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hmusic/core/audio/models/hmusic_playback_state.dart';
 import 'package:hmusic/features/charts/data/api_charts_repository.dart';
 import 'package:hmusic/features/charts/data/charts_repository.dart';
 import 'package:hmusic/features/charts/models/chart.dart';
@@ -42,7 +43,8 @@ class _FakeChartsRepository implements ChartsRepository {
   );
 
   @override
-  Future<void> playAll(String id, {int? startIndex}) async {}
+  Future<HMusicPlaybackState> playAll(String id, {int? startIndex}) async =>
+      throw UnimplementedError();
 }
 
 // 只在 initState 触发一次 load()，对齐真实 ChartsPage 的行为——

@@ -4,7 +4,7 @@
 用法: python3 tool/generate_icons.py  (需要 brew install librsvg + pillow)
 
 源: assets/icon/hmusic-glyph.svg (品牌音符，与 web favicon 同图形)
-底色: #FCF8EF 暖纸 (取自 HMusic-Server web/assets/apple-touch-icon.png)
+底色: #FFFFFF 纯白 (产品要求图标底不带暖纸色)
 
 各平台形状规范不同, 不能一张方图缩放到底:
 - iOS: 全出血方图, 系统裁圆角; App Store 禁 alpha 通道
@@ -27,7 +27,7 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
 SVG = ROOT / "assets/icon/hmusic-glyph.svg"
-BG = (252, 248, 239, 255)  # #FCF8EF
+BG = (255, 255, 255, 255)  # #FFFFFF
 TRANSPARENT = (0, 0, 0, 0)
 
 # 字形占方形画布的高度比。0.72 对齐 web apple-touch-icon 的分量感。

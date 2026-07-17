@@ -65,11 +65,12 @@ glassBlurOff:    0（性能/降低透明度回退）
   侧边栏 `position:sticky; height:100vh`，含：品牌 / 导航（7 项）/ 底部 mini 播放状态 + 用户。
 - **窄屏（<860px）**：**内滚动应用壳**——壳 = 视口高（`100dvh`，旧 iOS 回退
   `-webkit-fill-available`），flex 纵排：顶栏（`.topbar`，毛玻璃）→ 内容区
-  （`flex:1; overflow-y:auto`，唯一滚动者）→ 底部导航（**流内底栏**，
-  `env(safe-area-inset-bottom)` 安全区）。
-  > 铁律：tab 栏是应用骨架，必须永远可见。**勿用 position:fixed 悬浮实现**——
-  > 部分浏览器内核/底部工具栏会盖住或废掉 fixed 底栏（症状：滚到页尾才见 tab）。
-  > Flutter 的 `Scaffold(bottomNavigationBar:)` 天然就是这个结构，照用即可。
+  （`flex:1; overflow-y:auto`，唯一滚动者）→ 底部导航。
+  > web 的「流内底栏、勿用 position:fixed」铁律是浏览器内核特有顾虑，App 端不适用。
+  > App 底部导航为**悬浮玻璃胶囊 dock**（对齐 iOS 26+ 原生液态玻璃壳形态）：
+  > 胶囊压进安全区、悬在 home indicator 上方，mini player 胶囊叠在 dock 上方；
+  > 仍挂 `Scaffold(bottomNavigationBar:)` 槽位，骨架恒在——tab 页内 dock 永远
+  > 可见，滚动只收缩为单枚当前 tab pill，不整体消失。
 - 内容区 `.view`：`padding:40px 48px 56px; max-width:880px; margin:0 auto; gap:22px`。
   窄屏 `padding:18px 16px 32px; gap:16px`。
 - **grid 子项防溢出**：`.view > * { min-width:0 }`，配合 `.track-row{min-width:0}`——否则
@@ -77,11 +78,11 @@ glassBlurOff:    0（性能/降低透明度回退）
 
 ### 平台 chrome 分层
 
-| 区域 | iOS 27 | Android | 内容原则 |
+| 区域 | iOS 26+ | Android / iOS<26 | 内容原则 |
 |---|---|---|---|
 | 顶栏 | Swift/SwiftUI 系统液态玻璃 | Flutter AdaptiveGlassSurface | 标题简短，不承载功能说明 |
-| 底部导航 | 原生玻璃 tab shell | Flutter 玻璃底栏 | 恒定可见，安全区内布局 |
-| mini player | 原生玻璃控制条 | Flutter 玻璃控制条 | 封面、题/歌手、播放与下一曲 |
+| 底部导航 | 原生液态玻璃悬浮 dock | Flutter 毛玻璃悬浮 dock（同形态） | 高 66，导航主锚点；胶囊压安全区悬浮，滚动收缩为单 pill |
+| mini player | 原生玻璃胶囊（dock 上方） | Flutter 毛玻璃胶囊（同形态） | 高 50、封面 32——比 dock 矮一档的次级状态条；封面、题/歌手、播放与下一曲 |
 | 播放主控/音量浮层 | 原生材质优先 | Flutter 玻璃面板 | 控件尺寸固定，不因状态位移 |
 | 模态/菜单 | 原生玻璃或系统 sheet | Flutter 玻璃 overlay | 表单主体可保持不透明以保证可读性 |
 | 歌单卡、曲目行、统计图 | 不使用玻璃 | 不使用玻璃 | 延续暖纸/墨色内容风格 |
@@ -132,6 +133,9 @@ glassBlurOff:    0（性能/降低透明度回退）
 ### Toast
 `position:fixed; bottom:28px(窄屏92px); 居中; padding:10px 20px; radius-sm; shadow-pop`
 左边框 3px 表意：info→muted-2 / success→accent / error→danger(且字变红)。3.2s 自动消失。
+App 适配（web 的 28/92 按其底边 chrome 定）：底距必须避让本壳底部 chrome——桌面抬到
+悬浮 mini 包络（76）+12 并水平居中于侧栏右侧内容区；窄屏抬到悬浮玻璃 chrome 完整包络
+之上（底距 + dock 66 + gap 8 + mini 50 + 呼吸距 8，随安全区上浮）。
 
 ### 输入
 `width:100%; border:1px line; radius-sm; padding:9px 12px; font14; focus 边→text-strong`
@@ -150,10 +154,11 @@ glassBlurOff:    0（性能/降低透明度回退）
 
 平台玻璃额外动效：
 
-| 场景 | iOS 27 | Android |
+| 场景 | iOS 26+ | Android / iOS<26 |
 |---|---|---|
 | tab 切换 | 使用系统材质选择态与连续形变 | 180-240ms 高光/透明度过渡 |
-| mini player 显隐 | 系统 spring/玻璃容器尺寸变化 | 220ms easeOut，固定底栏位置 |
+| mini player 显隐 | 系统 spring/玻璃容器尺寸变化 | 220ms easeOut 高度过渡 |
+| dock/mini 滚动收缩、展开 | 系统 spring（response .42 / damping .86） | 220ms easeOut 尺寸变化（AnimatedSize） |
 | 按压 | 系统液态反馈 | 100-140ms scale 0.97 + 高光变化 |
 | 滚动经过 chrome | 系统自动采样背景 | 动态模糊仅高画质开启 |
 
@@ -161,6 +166,8 @@ glassBlurOff:    0（性能/降低透明度回退）
 
 **歌词滚动**：当前行 `scrollIntoView({behavior:"smooth", block:"center"})`。
 歌词栏上下渐隐 `mask-image: linear-gradient(transparent,#000 12%,#000 88%,transparent)`（纸卷感）。
+App 适配：按真实渲染几何（ensureVisible）把当前行钉在视口 0.4 锚点（中线略偏上）；
+列表首尾留白随视口等比（顶 40%、底 60%），第一句和最后一句也停在同一锚点，不被边界顶走。
 
 ## 5. Flutter 复刻优先级
 

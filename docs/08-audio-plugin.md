@@ -81,7 +81,8 @@ Uri rebaseStreamUrl(Uri serverBase, String streamUrl) {
 1. Player 到 completed，防重入标记当前 track key。
 2. `POST /playback/local-report {ended:true}`。
 3. 若返回下一曲 playing + streamUrl，立即加载并播放。
-4. 队列尽头或请求失败则停止，发布 idle/error；同一 completed 事件最多上报一次。
+4. 队列尽头正常收尾（stopped）；下一曲装载失败走 §7 恢复链，恢复失败按 §7
+   如实收场，禁止停留在「正在播放」假象。同一 completed 事件最多上报一次。
 
 ## 6. 周期回写
 
@@ -110,8 +111,18 @@ Player 网络错误且仍有当前 track 时：
 2. 调 `/playback/play {track, deviceId:"local-browser", positionMs}` 重新解析。
 3. 重绑定新 URL、seek、恢复播放。
 4. 同一 track 60 秒内最多自动恢复一次，防止坏源循环。
+5. 装载黑洞防护：`setAudioSource` 20 秒未决视同加载失败，走同一恢复链
+   （坏直链可能既不成功也不报错，不限时会无声卡死在 loading）。
+6. 恢复失败的如实收场：暂停本机 player（清掉上一首残留的 playing 真值，
+   否则周期回写继续谎报）、`local-report {state:"paused"}` 回写服务端（进度
+   保留在目标点，稍后重试可续），全局通知流弹「音源加载失败」toast，并向
+   前台冒泡 `PlaybackLoadException`；语义状态不得停留在 playing。
+7. resume 响应无 streamUrl 且本机无已装载音频时（队列播完直链被清、冷启动
+   接续旧会话），原曲重解析装载，不做只翻状态不出声的 bare play()。
 
 Server 已实现暂停超 20 分钟的 resume 重解析；客户端恢复仍需保留，因为播放中途也可能失效。
+Server 音频代理对上游握手限时 15 秒（仅响应头阶段，正文流不限时），黑洞直链
+快速转 502 让客户端立刻进入恢复链，而不是无限等待。
 
 ## 8. 队列与播放模式
 

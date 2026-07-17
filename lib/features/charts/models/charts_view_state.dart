@@ -1,3 +1,4 @@
+import '../../../shared/models/hmusic_notice.dart';
 import 'chart.dart';
 
 enum ChartsStatus { initial, loading, loaded, error }
@@ -29,7 +30,7 @@ class ChartsViewState {
   // 正在操作的条目 rank，防连点；-1 表示整榜播放占位。0 = 空闲。
   final int actingRank;
   final String? errorMessage;
-  final String? notice;
+  final HMusicNotice? notice;
 
   bool get isWall => active == null;
 
@@ -42,7 +43,7 @@ class ChartsViewState {
     bool? detailLoading,
     int? actingRank,
     String? errorMessage,
-    String? notice,
+    HMusicNotice? notice,
     bool clearActive = false,
     bool clearDetail = false,
     bool clearError = false,

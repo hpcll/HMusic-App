@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_settings_repository.dart';
 import '../models/server_config.dart';
 import '../models/settings_section_states.dart';
@@ -18,7 +19,10 @@ class TracksViewModel extends Notifier<TracksState> {
       final config = await ref.read(settingsRepositoryProvider).getConfig();
       state = state.copyWith(tracks: config.manualTracks, loaded: true);
     } on ApiFailure catch (failure) {
-      state = state.copyWith(loaded: true, notice: failure.message);
+      state = state.copyWith(
+        loaded: true,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -31,7 +35,9 @@ class TracksViewModel extends Notifier<TracksState> {
     final t = title.trim();
     final u = url.trim();
     if (t.isEmpty || u.isEmpty) {
-      state = state.copyWith(notice: '标题和音频 URL 不能为空');
+      state = state.copyWith(
+        notice: const HMusicNotice.error('标题和音频 URL 不能为空'),
+      );
       return false;
     }
     if (state.busy) return false;
@@ -63,11 +69,14 @@ class TracksViewModel extends Notifier<TracksState> {
       state = state.copyWith(
         tracks: config.manualTracks,
         busy: false,
-        notice: successNotice,
+        notice: HMusicNotice.success(successNotice),
       );
       return true;
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
       return false;
     }
   }

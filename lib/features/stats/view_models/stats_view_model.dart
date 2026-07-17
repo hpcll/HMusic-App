@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_stats_repository.dart';
 import '../models/stats.dart';
 import '../models/stats_view_state.dart';
@@ -30,7 +31,7 @@ class StatsViewModel extends Notifier<StatsViewState> {
   Future<void> play(TrackStat item) async {
     final track = item.track;
     if (track == null) {
-      state = state.copyWith(notice: '这首缺少可播放信息');
+      state = state.copyWith(notice: const HMusicNotice.error('这首缺少可播放信息'));
       return;
     }
     if (state.actingKey.isNotEmpty) return;
@@ -38,11 +39,13 @@ class StatsViewModel extends Notifier<StatsViewState> {
     try {
       final handler = await ref.read(hmusicAudioHandlerProvider.future);
       await handler.playTrack(track);
-      state = state.copyWith(notice: '正在播放：${item.title}');
+      state = state.copyWith(
+        notice: HMusicNotice.success('正在播放：${item.title}'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } on Exception catch (error) {
-      state = state.copyWith(notice: '$error');
+      state = state.copyWith(notice: HMusicNotice.error('$error'));
     } finally {
       state = state.copyWith(actingKey: '');
     }

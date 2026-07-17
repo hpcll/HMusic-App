@@ -57,15 +57,16 @@ struct GlassMiniPlayer: View {
         artworkPlaceholder
       }
     }
-    .frame(width: 38, height: 38)
-    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    // 收小到 32：缩略图只做识别，不抢 dock 的视觉主导（与 Flutter 胶囊同尺寸）。
+    .frame(width: 32, height: 32)
+    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
   }
 
   private var artworkPlaceholder: some View {
     ZStack {
       Color(uiColor: .secondarySystemFill)
       Image(systemName: "music.note")
-        .font(.system(size: 15))
+        .font(.system(size: 13))
         .foregroundStyle(Color.secondary)
     }
   }

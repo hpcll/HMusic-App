@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
+import '../../../shared/widgets/hmusic_toast.dart';
 import '../view_models/favorites_view_model.dart';
 
 // 收藏态玫红对齐 web .ctrl-fav.active(#e0245e)；青绿纪律只属于「正在播放」，
@@ -39,9 +41,7 @@ class _PlayerFavoriteButtonState extends ConsumerState<PlayerFavoriteButton> {
       await ref.read(favoritesViewModelProvider.notifier).toggle(track);
     } on ApiFailure catch (failure) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      showHMusicToast(context, HMusicNotice.error(failure.message));
     }
   }
 

@@ -11,16 +11,19 @@
   见 03；web 侧边栏内的 mini 播放态不复刻——桌面 mini 承载控制，不只指示）。
   mini 悬浮在内容之上，让位走 MediaQuery padding 注入（顶部 28 标题栏基线 +
   底部 mini 包络高度），内容从玻璃下滚过；macOS 窗体垫窗后毛玻璃，侧栏半透明透出壁纸。
-- **窄屏外壳**：`MobileTopBar`（品牌 + 退出）+ `content` + `MobileNav`（底部 7 图标）。
-  顶栏/底栏为全宽玻璃条（extendBody/extendBodyBehindAppBar），高度由 Scaffold
-  注入 body 的 MediaQuery padding，各页 paddingOf.top/bottom 让位。
+- **窄屏外壳**：`MobileTopBar`（品牌 + 退出）+ `content` + 底部悬浮玻璃 chrome
+  （mini 胶囊 + 5-tab dock 胶囊，对齐 iOS 26+ 原生壳形态；压进安全区悬浮，
+  滚动收缩为单枚当前 tab pill）。顶栏为全宽玻璃条；chrome 高度由 Scaffold
+  （extendBody/extendBodyBehindAppBar）注入 body 的 MediaQuery padding，
+  各页 paddingOf.top/bottom 让位。
 - **iOS 27 窄屏 chrome**：顶栏、底部导航、mini player 由 Swift/SwiftUI NativeGlassShell 覆盖在
-  Flutter 内容层之上；动态高度和安全区回报给 Flutter。旧 iOS 使用系统 material 回退。
+  Flutter 内容层之上；动态高度和安全区回报给 Flutter。iOS<26 走与 Android 相同的
+  Flutter 毛玻璃回退壳，形态一致、仅材质不同。
 - **Android 窄屏 chrome**：结构与 iOS 一致，由 Flutter AdaptiveGlassShell 渲染；根据性能档位关闭
   动态模糊，但尺寸、交互和信息层级不得变化。
 - **全局轮询**：应用前台时由 playback provider 每 3-10 秒刷新；后台正确性由 AudioHandler 承担。
 - **应用状态**：Riverpod 分离 connection/auth/playback/queue，不创建万能 store。
-- **Toast**：ScaffoldMessenger 全局出口，默认 3.2 秒。
+- **Toast**：`showHMusicToast` 全局出口（root Overlay 直插，无动画、不挡点击，替代 SnackBar），默认 3.2 秒。
 
 ### ★ Flutter 本机播放契约
 后端把「本机播放」当虚拟设备（deviceId=`local-browser`）记账，Flutter 由全局

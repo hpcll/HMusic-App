@@ -8,7 +8,7 @@ import '../models/hmusic_lyric.dart';
 import '../view_models/lyric_view_model.dart';
 
 // 全屏歌词滚动列表（沉浸歌词页复用）：当前行衬线放大加深、上下 mask 渐隐、行点 seek、
-// 自动跟随把当前行滚到视口中部（进页即定位）。对齐 docs/04 屏 2b。
+// 自动跟随把当前行钉在视口中线略偏上（真实几何定位，进页即定位）。对齐 docs/04 屏 2b。
 class LyricScrollView extends ConsumerStatefulWidget {
   const LyricScrollView({
     required this.activeLine,
@@ -33,14 +33,27 @@ class LyricScrollView extends ConsumerStatefulWidget {
 class _LyricScrollViewState extends ConsumerState<LyricScrollView> {
   final ScrollController _controller = ScrollController();
 
-  // 每行估算高度，用于把当前行滚到视口中部（行高随字号浮动，取平均值够用）。
-  static const double _lineExtent = 52;
+  // 当前行挂这把 GlobalKey，ensureVisible 按真实渲染几何定位。此前按固定 52
+  // 估算行高（真实约 42）且漏算列表 padding，误差逐行累积，唱到中段当前行
+  // 就漂到视口顶部；真实几何对折行、字号动画也天然免疫。
+  final GlobalKey _activeKey = GlobalKey();
+
+  // 对齐系数（0 顶、1 底）：0.4 把当前行钉在视口中线略偏上，读词视线更自然。
+  static const double _alignment = 0.4;
+
+  // 粗定位估算行高：仅当目标行离视口太远、尚未被 ListView 物化（进页/seek
+  // 大跳）时先跳到附近，物化后下一帧再按真实几何校正。
+  static const double _lineExtent = 42;
+
+  // 首次拿到歌词行时立即落位（进页/异步加载完成都会走到），只做一次。
+  bool _didInitialFollow = false;
 
   @override
   void didUpdateWidget(LyricScrollView old) {
     super.didUpdateWidget(old);
     if (widget.activeLine != old.activeLine) {
-      _followActive();
+      // 等本帧子树重建完（GlobalKey 已挪到新当前行）再量几何。
+      WidgetsBinding.instance.addPostFrameCallback((_) => _followActive());
     }
   }
 
@@ -50,21 +63,32 @@ class _LyricScrollViewState extends ConsumerState<LyricScrollView> {
     super.dispose();
   }
 
-  // 当前行滚到视口中部：估算目标偏移，平滑滚动。
-  void _followActive() {
-    if (widget.activeLine < 0 || !_controller.hasClients) return;
+  // 当前行滚到视口中线略偏上。secondPass 标记校正帧，防目标行物化不出来时死循环。
+  void _followActive({bool animate = true, bool secondPass = false}) {
+    if (!mounted || widget.activeLine < 0 || !_controller.hasClients) return;
+    final lineContext = _activeKey.currentContext;
+    if (lineContext != null) {
+      unawaited(
+        Scrollable.ensureVisible(
+          lineContext,
+          alignment: _alignment,
+          duration: animate ? const Duration(milliseconds: 320) : Duration.zero,
+          curve: Curves.easeOutCubic,
+        ),
+      );
+      return;
+    }
+    if (secondPass) return;
+    // 目标行未物化：按估算跳到附近逼 ListView 把它建出来，下一帧精确校正。
     final viewport = _controller.position.viewportDimension;
-    final target =
-        (widget.activeLine * _lineExtent) - (viewport / 2) + (_lineExtent / 2);
-    final max = _controller.position.maxScrollExtent;
-    final clamped = target.clamp(0.0, max);
-    unawaited(
-      _controller.animateTo(
-        clamped,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    final rough =
+        viewport * _alignment + // 列表顶部 padding（随视口等比，见 build）
+        widget.activeLine * _lineExtent -
+        (viewport - _lineExtent) * _alignment;
+    _controller.jumpTo(rough.clamp(0.0, _controller.position.maxScrollExtent));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _followActive(animate: false, secondPass: true);
+    });
   }
 
   @override
@@ -77,9 +101,12 @@ class _LyricScrollViewState extends ConsumerState<LyricScrollView> {
       return _placeholder(palette, '歌词加载中…', '');
     }
     if (lines.isEmpty) {
-      final lrc = state.lyric?.lrc ?? '';
+      // 无行级时间戳但有整段 LRC：剥掉 [标签] 后降级整段展示（旧服务端可能
+      // 返回未解析的带标签原文，不能把 [00:00:00] 裸露给用户）。
+      final lrc = (state.lyric?.lrc ?? '')
+          .replaceAll(RegExp(r'\[[^\]]*\]'), '')
+          .trim();
       if (lrc.isNotEmpty) {
-        // 无行级时间戳但有整段 LRC：降级整段展示。
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Text(
@@ -92,31 +119,47 @@ class _LyricScrollViewState extends ConsumerState<LyricScrollView> {
       return _placeholder(palette, '暂无歌词', '纯音乐或该音源没有提供歌词');
     }
 
+    // 歌词行已就绪：下一帧直接落位（进页带缓存 / 异步拉完都在这兜住）。
+    if (!_didInitialFollow) {
+      _didInitialFollow = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _followActive(animate: false);
+      });
+    }
+
     // 上下 mask 渐隐：内容从透明→不透明→透明，聚焦中部当前行。
-    return ShaderMask(
-      shaderCallback: (rect) => const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: <Color>[
-          Colors.transparent,
-          Colors.black,
-          Colors.black,
-          Colors.transparent,
-        ],
-        stops: <double>[0.0, 0.12, 0.88, 1.0],
-      ).createShader(rect),
-      blendMode: BlendMode.dstIn,
-      child: ListView.builder(
-        controller: _controller,
-        padding: const EdgeInsets.symmetric(vertical: 120),
-        itemCount: lines.length,
-        itemBuilder: (context, i) => _LyricRow(
-          line: lines[i],
-          active: i == widget.activeLine,
-          palette: palette,
-          onTap: widget.seekEnabled
-              ? () => widget.onLineTap(lines[i].timeMs)
-              : null,
+    // 首尾 padding 随视口等比（顶 40%、底 60%），保证第一句/最后一句也能
+    // 停在中线略偏上的锚点位，而不是被列表边界顶走。
+    return LayoutBuilder(
+      builder: (context, constraints) => ShaderMask(
+        shaderCallback: (rect) => const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            Colors.transparent,
+            Colors.black,
+            Colors.black,
+            Colors.transparent,
+          ],
+          stops: <double>[0.0, 0.12, 0.88, 1.0],
+        ).createShader(rect),
+        blendMode: BlendMode.dstIn,
+        child: ListView.builder(
+          controller: _controller,
+          padding: EdgeInsets.only(
+            top: constraints.maxHeight * _alignment,
+            bottom: constraints.maxHeight * (1 - _alignment),
+          ),
+          itemCount: lines.length,
+          itemBuilder: (context, i) => _LyricRow(
+            key: i == widget.activeLine ? _activeKey : null,
+            line: lines[i],
+            active: i == widget.activeLine,
+            palette: palette,
+            onTap: widget.seekEnabled
+                ? () => widget.onLineTap(lines[i].timeMs)
+                : null,
+          ),
         ),
       ),
     );
@@ -150,6 +193,7 @@ class _LyricRow extends StatelessWidget {
     required this.active,
     required this.palette,
     this.onTap,
+    super.key,
   });
 
   final LyricLine line;

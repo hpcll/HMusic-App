@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_mi_account_repository.dart';
 import '../models/mi_account.dart';
 import '../models/mi_account_state.dart';
@@ -30,7 +31,7 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
       final status = await ref.read(miAccountRepositoryProvider).status();
       state = state.copyWith(status: status);
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 
@@ -76,7 +77,7 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
           _stopQrTimers();
           state = state.copyWith(qrStage: MiQrStage.success);
           await loadStatus();
-          state = state.copyWith(notice: '小米账号已登录');
+          state = state.copyWith(notice: const HMusicNotice.success('小米账号已登录'));
         case MiQrPollStatus.failed:
           _stopQrTimers();
           state = state.copyWith(
@@ -118,7 +119,7 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
     required String captcha,
   }) async {
     if (account.trim().isEmpty || password.isEmpty) {
-      state = state.copyWith(notice: '请填写小米账号和密码');
+      state = state.copyWith(notice: const HMusicNotice.error('请填写小米账号和密码'));
       return;
     }
     if (state.busy) return;
@@ -135,17 +136,22 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
         state = state.copyWith(busy: false, clearChallenge: true);
         await loadStatus();
         state = state.copyWith(
-          notice: '登录成功，发现 ${result.deviceCount ?? 0} 台设备',
+          notice: HMusicNotice.success(
+            '登录成功，发现 ${result.deviceCount ?? 0} 台设备',
+          ),
         );
       } else {
         state = state.copyWith(
           busy: false,
           challenge: result,
-          notice: _smsHint(result.smsStatus),
+          notice: HMusicNotice(_smsHint(result.smsStatus)),
         );
       }
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -163,9 +169,14 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
           );
       state = state.copyWith(busy: false, clearChallenge: true);
       await loadStatus();
-      state = state.copyWith(notice: '登录成功，发现 ${result.deviceCount ?? 0} 台设备');
+      state = state.copyWith(
+        notice: HMusicNotice.success('登录成功，发现 ${result.deviceCount ?? 0} 台设备'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -176,9 +187,9 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
       final smsStatus = await ref
           .read(miAccountRepositoryProvider)
           .resendVerification(challenge!.verificationId!);
-      state = state.copyWith(notice: _smsHint(smsStatus));
+      state = state.copyWith(notice: HMusicNotice(_smsHint(smsStatus)));
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 
@@ -205,7 +216,9 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
     final token = serviceToken.trim();
     final uid = userId.trim();
     if (url.isEmpty && !(token.isNotEmpty && uid.isNotEmpty)) {
-      state = state.copyWith(notice: '请填写 STS 地址，或 serviceToken + userId');
+      state = state.copyWith(
+        notice: const HMusicNotice.error('请填写 STS 地址，或 serviceToken + userId'),
+      );
       return;
     }
     if (state.busy) return;
@@ -220,9 +233,14 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
           );
       state = state.copyWith(busy: false);
       await loadStatus();
-      state = state.copyWith(notice: '导入成功，发现 ${result.deviceCount ?? 0} 台设备');
+      state = state.copyWith(
+        notice: HMusicNotice.success('导入成功，发现 ${result.deviceCount ?? 0} 台设备'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(busy: false, notice: failure.message);
+      state = state.copyWith(
+        busy: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 
@@ -230,9 +248,9 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
     try {
       await ref.read(miAccountRepositoryProvider).logout();
       await loadStatus();
-      state = state.copyWith(notice: '已退出小米账号');
+      state = state.copyWith(notice: const HMusicNotice.success('已退出小米账号'));
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 

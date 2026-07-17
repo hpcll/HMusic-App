@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hmusic/core/audio/models/hmusic_playback_state.dart';
 import 'package:hmusic/core/models/hmusic_track.dart';
 import 'package:hmusic/core/network/api_client.dart';
 import 'package:hmusic/features/playlists/data/api_playlists_repository.dart';
@@ -106,5 +107,49 @@ void main() {
 
     verify(() => apiClient.deleteMap('/playlists/fav/tracks/item-1')).called(1);
     expect(detail.items, isEmpty);
+  });
+
+  test('playAll 指定本机设备并返回权威 playback', () async {
+    when(
+      () => apiClient.postMap('/playlists/fav/play', body: any(named: 'body')),
+    ).thenAnswer(
+      (_) async => <String, Object?>{
+        'queue': <String, Object?>{},
+        'playback': <String, Object?>{
+          'sessionId': 's1',
+          'deviceId': 'local-browser',
+          'state': 'playing',
+          'track': _track.toJson(),
+          'positionMs': 0,
+          'durationMs': 254000,
+          'volume': 1,
+          'playMode': 'list_loop',
+          'queueIndex': 2,
+          'queueLength': 12,
+          'seekEnabled': true,
+          'streamUrl': 'http://origin.example/stream/1.mp3',
+          'updatedAt': 1700000000000,
+        },
+      },
+    );
+
+    final playback = await repository.playAll('fav', startIndex: 2);
+
+    final body =
+        verify(
+              () => apiClient.postMap(
+                '/playlists/fav/play',
+                body: captureAny(named: 'body'),
+              ),
+            ).captured.single
+            as Map<String, Object?>;
+    // 不带 deviceId 时服务端会播到默认设备，本机静音——契约必须锁死。
+    expect(body, <String, Object?>{
+      'startIndex': 2,
+      'deviceId': 'local-browser',
+    });
+    expect(playback.deviceId, 'local-browser');
+    expect(playback.state, PlaybackStatus.playing);
+    expect(playback.track?.title, '晴天');
   });
 }

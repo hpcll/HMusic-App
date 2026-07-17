@@ -1,3 +1,4 @@
+import '../../../core/audio/models/hmusic_playback_state.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../models/playlist.dart';
 
@@ -18,5 +19,6 @@ abstract interface class PlaylistsRepository {
 
   Future<PlaylistDetail> removeItem(String playlistId, String itemId);
 
-  Future<void> playAll(String id, {int startIndex = 0});
+  // 返回服务端开播后的权威播放状态，调用方喂给 AudioHandler 本机出声。
+  Future<HMusicPlaybackState> playAll(String id, {int startIndex = 0});
 }

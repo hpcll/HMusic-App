@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_settings_repository.dart';
 import '../models/settings_section_states.dart';
 
@@ -20,7 +21,7 @@ class SecurityViewModel extends Notifier<SecurityState> {
   }) async {
     if (state.changing) return false;
     if (newPassword.length < 8) {
-      state = state.copyWith(notice: '新密码至少 8 个字符');
+      state = state.copyWith(notice: const HMusicNotice.error('新密码至少 8 个字符'));
       return false;
     }
     state = state.copyWith(changing: true);
@@ -31,10 +32,16 @@ class SecurityViewModel extends Notifier<SecurityState> {
             currentPassword: currentPassword,
             newPassword: newPassword,
           );
-      state = state.copyWith(changing: false, notice: '密码已修改');
+      state = state.copyWith(
+        changing: false,
+        notice: const HMusicNotice.success('密码已修改'),
+      );
       return true;
     } on ApiFailure catch (failure) {
-      state = state.copyWith(changing: false, notice: failure.message);
+      state = state.copyWith(
+        changing: false,
+        notice: HMusicNotice.error(failure.message),
+      );
       return false;
     }
   }

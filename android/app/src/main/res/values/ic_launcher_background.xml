@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 图标底 = HMusic 暖纸色（web apple-touch-icon 同源）。 -->
-    <color name="ic_launcher_background">#FCF8EF</color>
+    <!-- 图标底 = 纯白（与 tool/generate_icons.py BG 一致）。 -->
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>

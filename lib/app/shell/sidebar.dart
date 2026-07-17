@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/providers/infrastructure_providers.dart';
 import '../../core/session/session_providers.dart';
+import '../../shared/layout/shell_metrics.dart';
 import '../../shared/widgets/brand_mark.dart';
 import '../theme/hmusic_palette.dart';
 import 'bottom_nav.dart' show kSidebarDestinations;
@@ -25,7 +26,7 @@ class AppSidebar extends ConsumerWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final macGlassWindow = Theme.of(context).platform == TargetPlatform.macOS;
     return Container(
-      width: 232,
+      width: kSidebarWidth,
       decoration: BoxDecoration(
         color: macGlassWindow
             ? palette.background.withValues(alpha: dark ? 0.55 : 0.60)

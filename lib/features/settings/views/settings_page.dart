@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../../../shared/widgets/back_link.dart';
+import '../../../shared/widgets/hmusic_toast.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/settings_section.dart';
 import '../view_models/config_view_model.dart';
@@ -154,14 +156,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  // 五个子页 VM 的 notice 统一在页面级转 SnackBar（子页无各自 Scaffold）。
+  // 五个子页 VM 的 notice 统一在页面级转 toast（子页无各自 Scaffold）。
   // flutter_riverpod 3.x 未导出 ProviderListenable 类型，无法抽公共参数，逐个内联。
   void _listenNotices() {
-    void show(String? message, void Function() clearNotice) {
-      if (message == null) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(message)));
+    void show(HMusicNotice? notice, void Function() clearNotice) {
+      if (notice == null) return;
+      showHMusicToast(context, notice);
       clearNotice();
     }
 

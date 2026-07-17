@@ -33,7 +33,7 @@
 | 页面切换 | 120ms opacity，不做大位移 |
 | 封面换曲 | 250ms cross-fade |
 | 播放主键按下 | scale 0.95，120ms |
-| 歌词当前行 | 250ms 颜色/字号；滚动居中 |
+| 歌词当前行 | 250ms 颜色/字号；滚动锚定视口 0.4（中线略偏上，首末句同锚点） |
 | 染色歌词条 | Ticker 逐帧计算 fill，不使用低频 Timer 或补间回扫 |
 | Toast | 简单出现/消失，不弹跳 |
 
@@ -71,8 +71,10 @@
 
 ## 6. 移动增强（P3）
 
-应用外壳使用 `Scaffold` + `bottomNavigationBar` + `SafeArea`。底栏是布局骨架，必须恒可见，
-禁止以悬浮 overlay 模拟。
+应用外壳用 `Scaffold` + `bottomNavigationBar` 槽位承载悬浮玻璃 chrome（mini 胶囊 +
+dock 胶囊，压进安全区，对齐 iOS 26+ 原生壳形态）。dock 是布局骨架：tab 页内恒在，
+向下滚动只收缩为单枚当前 tab pill（点 pill 展开，不切 tab），不整体消失；
+chrome 让位走 extendBody 注入的 MediaQuery padding，内容从玻璃下滚过。
 
 | 手势 | 动作 |
 |---|---|

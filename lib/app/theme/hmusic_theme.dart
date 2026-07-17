@@ -183,17 +183,7 @@ abstract final class HMusicTheme {
           side: hairline,
         ),
       ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: brightness == Brightness.light
-            ? p.textStrong
-            : p.panelSecondary,
-        contentTextStyle: TextStyle(
-          color: onInk == p.background ? p.background : p.textStrong,
-          fontSize: 13.5,
-        ),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-      ),
+      // 轻量提示不用 SnackBar：全站统一走 showHMusicToast（docs/03 Toast 规格）。
     );
   }
 }

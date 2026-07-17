@@ -27,7 +27,9 @@ final class GlassShellState: ObservableObject {
 // 保证 Flutter 让位高度与实际渲染严格一致。
 enum GlassShellMetrics {
   static let dockHeight: CGFloat = 66
-  static let miniHeight: CGFloat = 60
+  // mini 比 dock 矮一档：dock 是导航主锚点，mini 是次级播放状态条
+  // （与 Dart kChromeMiniHeight 严格同步）。
+  static let miniHeight: CGFloat = 50
   static let gap: CGFloat = 8
   static let horizontalPadding: CGFloat = 16
   // 内容与 chrome 顶缘之间的呼吸距，计入回报给 Flutter 的 inset。

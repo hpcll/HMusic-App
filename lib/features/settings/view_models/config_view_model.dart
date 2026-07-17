@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_settings_repository.dart';
 import '../models/settings_section_states.dart';
 
@@ -18,7 +19,7 @@ class ConfigViewModel extends Notifier<ConfigFormState> {
       final config = await ref.read(settingsRepositoryProvider).getConfig();
       state = state.copyWith(config: config);
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: failure.message);
+      state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 
@@ -42,9 +43,16 @@ class ConfigViewModel extends Notifier<ConfigFormState> {
             resolveStrategy: resolveStrategy,
             extraPlayMusicModels: parseModels(extraModelsText),
           );
-      state = state.copyWith(config: next, saving: false, notice: '配置已保存');
+      state = state.copyWith(
+        config: next,
+        saving: false,
+        notice: const HMusicNotice.success('配置已保存'),
+      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(saving: false, notice: failure.message);
+      state = state.copyWith(
+        saving: false,
+        notice: HMusicNotice.error(failure.message),
+      );
     }
   }
 

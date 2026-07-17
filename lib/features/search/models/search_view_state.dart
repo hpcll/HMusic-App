@@ -1,4 +1,5 @@
 import '../../../core/models/hmusic_track.dart';
+import '../../../shared/models/hmusic_notice.dart';
 
 enum SearchStatus { idle, searching, loaded }
 
@@ -19,7 +20,7 @@ class SearchViewState {
   final String? errorMessage;
 
   // 一次性成功提示（如"已加入队列"），页面展示后调 clearNotice 消费掉。
-  final String? notice;
+  final HMusicNotice? notice;
 
   bool get isSearching => status == SearchStatus.searching;
   bool get hasSearched => status == SearchStatus.loaded;
@@ -30,7 +31,7 @@ class SearchViewState {
     List<HMusicTrack>? tracks,
     String? playingTrackId,
     String? errorMessage,
-    String? notice,
+    HMusicNotice? notice,
     bool clearError = false,
     bool clearPlayingTrack = false,
     bool clearNotice = false,

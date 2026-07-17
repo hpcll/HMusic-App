@@ -1,3 +1,4 @@
+import '../../../shared/models/hmusic_notice.dart';
 import 'playlist.dart';
 
 enum PlaylistsStatus { initial, loading, loaded, error }
@@ -24,7 +25,7 @@ class PlaylistsViewState {
   // 创建/导入/删除等写操作进行中，防连点。
   final bool busy;
   final String? errorMessage;
-  final String? notice;
+  final HMusicNotice? notice;
 
   bool get isList => detail == null;
 
@@ -35,7 +36,7 @@ class PlaylistsViewState {
     bool? detailLoading,
     bool? busy,
     String? errorMessage,
-    String? notice,
+    HMusicNotice? notice,
     bool clearDetail = false,
     bool clearError = false,
     bool clearNotice = false,
