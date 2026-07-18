@@ -9,6 +9,7 @@ environment:
 dependencies:
   audio_service: ^0.18.19
   audio_session: ^0.2.4
+  bonsoir: ^6.0.1
   dio: ^5.10.0
   flutter:
     sdk: flutter

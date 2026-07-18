@@ -31,6 +31,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_hmusic._tcp</string>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>HMusic 需要连接你在 NAS 或家庭服务器上运行的 HMusic Server。</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

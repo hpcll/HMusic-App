@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/session/session_providers.dart';
 import '../data/api_connection_repository.dart';
+import '../data/lan_server_scanner.dart';
 import '../models/connection_view_state.dart';
 
 final NotifierProvider<ConnectionViewModel, ConnectionViewState>
@@ -20,6 +21,27 @@ class ConnectionViewModel extends Notifier<ConnectionViewState> {
         .read(connectionRepositoryProvider)
         .loadSavedAddress();
     if (address != null) state = state.copyWith(suggestedAddress: address);
+  }
+
+  // 局域网自动发现：连接页开屏即调，结果逐台追加。扫描失败静默收尾——
+  // errorMessage 留给「连接」动作本身，扫不到只是回到手输路径。
+  Future<void> discover() async {
+    if (state.discovering) return;
+    state = state.copyWith(
+      discovering: true,
+      discovered: const <DiscoveredServer>[],
+    );
+    try {
+      await for (final server in ref.read(lanServerScannerProvider).scan()) {
+        state = state.copyWith(
+          discovered: <DiscoveredServer>[...state.discovered, server],
+        );
+      }
+    } catch (_) {
+      // 无网卡/权限拒绝等一律安静回落手输。
+    } finally {
+      state = state.copyWith(discovering: false, discoverCompleted: true);
+    }
   }
 
   Future<bool> connect(String input) async {

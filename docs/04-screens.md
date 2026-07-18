@@ -48,6 +48,17 @@
 - **交互**：输入校验（用户名≥3、密码≥8）→ 提交 `POST /auth/setup|login` → setToken → refreshAuth → 跳 player。回车提交。
 - **★ 客户端增量**：首屏若无 serverBase，先渲染「连接服务器」表单（输 `http://IP:8090`，
   `/system/info` 探活和 API 版本校验通过，再请求 `/auth/status`）。
+- **★ 局域网自动发现**：连接页开屏即发现，两级候选源 + 统一 `/system/info` 身份确认
+  （独立短超时 ApiClient，先确认先显示，按 base 去重）：
+  1. **mDNS 订阅**（主路径）：Server 自广播 `_hmusic._tcp`（bonsoir 订阅，iOS/macOS 需
+     Info.plist 声明 `NSBonjourServices`），秒级、支持任意端口；
+  2. **HTTP 扫段**（兜底）：mDNS 静默 2s 才启动，按 /24 并发探默认端口 8090——路由器禁
+     mDNS、Linux 无 Avahi 等场景仍可用（此路径仅默认端口）。
+  **发现优先的信息层级**：「附近的服务器」卡片紧随品牌区、点选即连（主路径）；手动
+  表单默认折叠成 ghost 链接，仅「扫过且一无所获」时自动展开（`discoverCompleted`
+  区分尚未扫过/扫完没找到，首帧不闪表单）；连接错误统一显示在两区之间。「重新扫描」
+  常驻。设置菜单有「更换服务器」入口回本页（换网不重启）。未认证探测撞上陌生设备的
+  401 不清 token（ApiClient 只在带凭据请求收到 401 时才失效会话）。
 
 ## 屏 2 · 正在播放 player.js（桌面双栏，1023px 转单列）
 

@@ -114,7 +114,7 @@ class ApiClient {
       );
       return _asMap(response.data);
     } on DioException catch (error) {
-      throw await _mapDioFailure(error);
+      throw await _mapDioFailure(error, authenticated: authenticated);
     } on ApiFailure {
       rethrow;
     } catch (error) {
@@ -147,7 +147,10 @@ class ApiClient {
     );
   }
 
-  Future<ApiFailure> _mapDioFailure(DioException error) async {
+  Future<ApiFailure> _mapDioFailure(
+    DioException error, {
+    required bool authenticated,
+  }) async {
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.sendTimeout ||
         error.type == DioExceptionType.receiveTimeout) {
@@ -169,11 +172,15 @@ class ApiClient {
     final code = nestedError?['code'] as String?;
     final message = nestedError?['message'] as String?;
     if (statusCode == 401) {
-      await _tokenStore.clear();
-      final handler = _onUnauthorized;
-      if (handler != null) {
-        // SessionController 内部去重，这里重复触发也安全。
-        await handler();
+      // 只有带凭据的请求收到 401 才意味着「本会话失效」。未认证探测
+      //（连接页探活、局域网扫描）撞上陌生设备的 401 不能清 token 登出。
+      if (authenticated) {
+        await _tokenStore.clear();
+        final handler = _onUnauthorized;
+        if (handler != null) {
+          // SessionController 内部去重，这里重复触发也安全。
+          await handler();
+        }
       }
       return ApiFailure(
         kind: ApiFailureKind.unauthorized,
