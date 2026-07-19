@@ -12,6 +12,7 @@ import 'local_volume_store.dart';
 import 'models/hmusic_playback_state.dart' as server;
 import 'playback_projection.dart';
 import 'playback_repository.dart';
+import 'remote_state_poller.dart';
 import 'shared_preferences_local_volume_store.dart';
 import 'stream_url_rebaser.dart';
 
@@ -59,18 +60,23 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
        _streamUrlRebaser = streamUrlRebaser,
        _localVolumeStore = localVolumeStore,
        _player = player ?? AudioPlayer() {
+    _remotePoller = RemoteStatePoller(
+      repository: playbackRepository,
+      onState: _onRemoteState,
+    );
     _playerStateSubscription = _player.playerStateStream.listen(_onPlayerState);
     _playbackEventSubscription = _player.playbackEventStream.listen(
       (_) => _publishPlaybackState(),
     );
   }
 
-  static const String localDeviceId = 'local-browser';
+  static const String localDeviceId = server.HMusicPlaybackState.localDeviceId;
 
   final PlaybackRepository _repository;
   final StreamUrlRebaser _streamUrlRebaser;
   final LocalVolumeStore _localVolumeStore;
   final AudioPlayer _player;
+  late final RemoteStatePoller _remotePoller;
 
   late final StreamSubscription<PlayerState> _playerStateSubscription;
   late final StreamSubscription<PlaybackEvent> _playbackEventSubscription;
@@ -105,7 +111,10 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
   // 只取状态用于展示，不 autoplay、不加载音频。
   Future<void> ensureServerState() async {
     if (_serverState != null) return;
-    _setServerState(await _repository.getState());
+    final state = await _repository.getState();
+    _setServerState(state);
+    // 冷启动接续音箱播放：mediaItem 立即跟进，mini player 不用等首轮轮询。
+    if (!state.isLocalDevice) _syncRemoteMediaItem(state);
   }
 
   AudioPlayer get player => _player;
@@ -116,24 +125,31 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   // 歌单/整榜等组合播放命令的权威响应直接落地：目标是本机设备时立即装载
-  // 出声，不等前台轮询；目标是远端设备时按既有逻辑停本机。只该在服务端刚
-  // 执行完「开播」类命令后调用，所以 autoplay 恒真，与 playTrack 一致。
-  Future<void> applyRemotePlayback(server.HMusicPlaybackState state) {
-    return _applyServerState(state, autoplay: true);
+  // 出声，不等前台轮询；目标是远端设备时按既有逻辑停本机。autoplay 默认真
+  //（播放命令场景），设备切换等纯状态同步场景传 false（只停旧设备、不开播）。
+  Future<void> applyRemotePlayback(
+    server.HMusicPlaybackState state, {
+    bool autoplay = true,
+  }) {
+    return _applyServerState(state, autoplay: autoplay);
   }
 
   @override
   Future<void> play() async {
     final state = await _repository.resume();
+    if (!state.isLocalDevice) {
+      // 远端设备（音箱）resume：服务端已向设备下发 play，本机 player 绝不能
+      // 跟着拉起——stop 后音源还挂着，play() 会再出声，和音箱双端同响。
+      await _applyServerState(state, autoplay: false);
+      return;
+    }
     final streamUrl = state.streamUrl;
     if (streamUrl != null && streamUrl.isNotEmpty) {
       await _applyServerState(state, autoplay: true);
       return;
     }
     final track = state.track;
-    if (track != null &&
-        state.deviceId == localDeviceId &&
-        _loadedUri == null) {
+    if (track != null && _loadedUri == null) {
       // 会话有当前曲但响应无直链、本机也从没装载过（队列播完直链被清、冷启动
       // 接续旧会话等）：bare play() 只会空转——UI 翻成「播放中」却永远无声。
       // 原曲重解析装载出声，救不动按装载失败如实收场。
@@ -149,15 +165,18 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> pause() async {
     await _player.pause();
-    _setServerState(await _repository.pause());
+    await _applyOrSet(await _repository.pause());
     await _reportCurrentState();
     _publishPlaybackState();
   }
 
   @override
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
-    _setServerState(await _repository.seek(position.inMilliseconds));
+    // 远端目标只发服务端 seek（指令由服务端转发到设备）；本机才动 player。
+    if (_serverState?.isLocalDevice ?? false) {
+      await _player.seek(position);
+    }
+    await _applyOrSet(await _repository.seek(position.inMilliseconds));
     _publishPlaybackState();
   }
 
@@ -172,7 +191,7 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Future<void> setPlayMode(server.PlayMode mode) async {
-    _setServerState(await _repository.setPlayMode(mode));
+    await _applyOrSet(await _repository.setPlayMode(mode));
     _publishPlaybackState();
   }
 
@@ -193,8 +212,22 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
     await _localVolumeStore.write(normalized);
   }
 
+  // 远端设备（音箱）音量：0-100 经服务端 /playback/volume 下发设备指令。
+  // 与 setLocalVolume 严格分流（docs/12 §4）：本机偏好绝不推给音箱。
+  Future<void> setDeviceVolume(int volume) async {
+    await _applyOrSet(await _repository.setVolume(volume));
+    _publishPlaybackState();
+  }
+
+  // 前台播控失败的统一出口：播放页/mini player 的按钮回调都是 fire-and-forget，
+  // PlayerViewModel 兜住 ApiFailure 后经此走全局通知流（壳层统一 toast）。
+  void reportNotice(String message) {
+    if (!_noticeController.isClosed) _noticeController.add(message);
+  }
+
   Future<void> disposeHandler() async {
     _reportTimer?.cancel();
+    _remotePoller.stop();
     await _playerStateSubscription.cancel();
     await _playbackEventSubscription.cancel();
     await _serverStateController.close();
@@ -204,7 +237,42 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
 
   void _setServerState(server.HMusicPlaybackState state) {
     _serverState = state;
+    // 目标为远端即开状态轮询（服务端靠被读驱动音箱回读与自动连播），回本机即停。
+    _remotePoller.sync(state);
     if (!_serverStateController.isClosed) _serverStateController.add(state);
+  }
+
+  // 命令/回写响应统一落地：目标仍是本机只记状态；发现目标已被其它端切走
+  //（如 Web 把播放切到音箱）立即走 _applyServerState 停本机——否则手机继续
+  // 响、音箱又开播，双端同响复现。
+  Future<void> _applyOrSet(server.HMusicPlaybackState state) async {
+    if (state.isLocalDevice) {
+      _setServerState(state);
+    } else {
+      await _applyServerState(state, autoplay: false);
+    }
+  }
+
+  // 远端在播曲目照发 mediaItem：mini player/锁屏显示音箱曲目，媒体键仍走
+  // 本 handler → 服务端 → 设备，正是遥控语义。按 id 去抖，轮询不反复重发。
+  void _syncRemoteMediaItem(server.HMusicPlaybackState state) {
+    final track = state.track;
+    if (track == null) return;
+    final item = mediaItemForTrack(track);
+    if (mediaItem.valueOrNull?.id != item.id) mediaItem.add(item);
+  }
+
+  // 轮询回来的远端状态只做展示落地：不碰本机 player、不开周期回写。轮询窗口
+  // 内目标可能被其它端切回 local-browser——那是 web 端的本机（docs/12 C-08），
+  // 抢着装载/回写会互相清账；本机接管只由用户在本 App 的明确操作触发。
+  void _onRemoteState(server.HMusicPlaybackState state) {
+    // 竞态守卫：更早发出、更晚返回的轮询快照比当前状态旧（服务端每次变更都
+    // 刷 updatedAt），直接丢弃，避免命令响应刚落地又被旧快照闪回。
+    final current = _serverState;
+    if (current != null && state.updatedAt < current.updatedAt) return;
+    _syncRemoteMediaItem(state);
+    _setServerState(state);
+    _publishPlaybackState();
   }
 
   Future<void> _applyServerState(
@@ -213,9 +281,13 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
   }) async {
     _setServerState(state);
     final track = state.track;
-    if (state.deviceId != localDeviceId || track == null) {
+    if (!state.isLocalDevice || track == null) {
+      // 远端设备接管（或无曲目）：本机静默，周期回写只属于本机播放一并停掉。
+      _reportTimer?.cancel();
+      _reportTimer = null;
       await _player.stop();
       _loadedUri = null;
+      _syncRemoteMediaItem(state);
       _publishPlaybackState();
       return;
     }
@@ -242,6 +314,12 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
           return;
         }
       }
+    } else {
+      // playAll 等组合命令的服务端响应可能不含 streamUrl（只灌队列、不预解析
+      // 直链）——必须客户端主动解析，否则 autoplay 下 _loadedUri=null 导致静默
+      // 失败，或有旧 _loadedUri 但 player 已 stopped 导致 play() 空转。
+      await _recoverOrFail(track, state);
+      return; // 恢复路径已递归走完 _applyServerState（含 autoplay）。
     }
     if (autoplay && _loadedUri != null) await _player.play();
     _startReporting();
@@ -312,6 +390,9 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
         resolvable,
         queueIndex: state.queueIndex >= 0 ? state.queueIndex : null,
         positionMs: state.positionMs,
+        // 直链恢复只发生在本机装载失败的分支，显式钉住本机：缺省交给服务端
+        // resolve 默认设备的话，默认设备是音箱时会把本机续播劫持到音箱上。
+        deviceId: localDeviceId,
       );
     } on ApiFailure {
       return false; // 重解析也失败（音源死了）：交回原始加载错误。
@@ -342,7 +423,9 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
     if (_reportInFlight || _serverState?.deviceId != localDeviceId) return;
     _reportInFlight = true;
     try {
-      _setServerState(
+      // 响应经 _applyOrSet：其它端把目标切走时（响应 deviceId 已非本机）
+      // 必须立即停本机，这是双端同响的最后一条复现路径。
+      await _applyOrSet(
         await _repository.reportLocal(
           state: _player.playing ? 'playing' : 'paused',
           positionMs: _player.position.inMilliseconds,

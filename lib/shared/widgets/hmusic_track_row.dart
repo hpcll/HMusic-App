@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/hmusic_palette.dart';
+import '../../app/theme/hmusic_radii.dart';
 import 'hmusic_cover.dart';
 
 // 全站曲目行原子，对齐 web .track-row：
@@ -66,7 +67,7 @@ class HMusicTrackRow extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(7),
+          borderRadius: BorderRadius.circular(HMusicRadii.small),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

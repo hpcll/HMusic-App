@@ -75,8 +75,18 @@ class _FakePlaybackRepository implements PlaybackRepository {
   final HMusicPlaybackState resumeState;
   final HMusicPlaybackState playTrackState;
   final HMusicPlaybackState reportLocalState;
-  final List<({HMusicTrack track, int? queueIndex, int? positionMs})>
-  playTrackCalls = <({HMusicTrack track, int? queueIndex, int? positionMs})>[];
+  final List<
+    ({HMusicTrack track, int? queueIndex, int? positionMs, String? deviceId})
+  >
+  playTrackCalls =
+      <
+        ({
+          HMusicTrack track,
+          int? queueIndex,
+          int? positionMs,
+          String? deviceId,
+        })
+      >[];
   final List<({String? state, int? positionMs})> reportLocalCalls =
       <({String? state, int? positionMs})>[];
 
@@ -88,11 +98,13 @@ class _FakePlaybackRepository implements PlaybackRepository {
     HMusicTrack track, {
     int? queueIndex,
     int? positionMs,
+    String? deviceId,
   }) async {
     playTrackCalls.add((
       track: track,
       queueIndex: queueIndex,
       positionMs: positionMs,
+      deviceId: deviceId,
     ));
     return playTrackState;
   }
@@ -102,6 +114,10 @@ class _FakePlaybackRepository implements PlaybackRepository {
 
   @override
   Future<HMusicPlaybackState> pause() => throw UnimplementedError();
+
+  @override
+  Future<HMusicPlaybackState> setVolume(int volume) =>
+      throw UnimplementedError();
 
   @override
   Future<HMusicPlaybackState> next() => throw UnimplementedError();
@@ -214,6 +230,9 @@ void main() {
     // 见 track.url 非空直接短路返回死链，恢复变成原地打转。
     expect(call.track.url, isNull);
     expect(call.track.sourceTrackId, '1');
+    // 恢复只发生在本机装载失败分支，必须显式钉住本机：缺省会 resolve 到
+    // 默认设备，默认是音箱时本机续播被劫持到音箱上。
+    expect(call.deviceId, 'local-browser');
     verify(() => player.play()).called(1);
   });
 

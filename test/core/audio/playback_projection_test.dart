@@ -16,10 +16,14 @@ const HMusicTrack _track = HMusicTrack(
   coverUrl: 'https://example.com/cover.jpg',
 );
 
-HMusicPlaybackState _state() => HMusicPlaybackState(
+HMusicPlaybackState _state({
+  String? deviceId = 'local-browser',
+  PlaybackStatus state = PlaybackStatus.playing,
+  int positionMs = 1000,
+}) => HMusicPlaybackState(
   sessionId: 'default',
-  state: PlaybackStatus.playing,
-  positionMs: 1000,
+  state: state,
+  positionMs: positionMs,
   durationMs: 269000,
   volume: 60,
   playMode: PlayMode.listLoop,
@@ -27,7 +31,7 @@ HMusicPlaybackState _state() => HMusicPlaybackState(
   queueLength: 10,
   seekEnabled: true,
   updatedAt: 0,
-  deviceId: 'local-browser',
+  deviceId: deviceId,
 );
 
 void main() {
@@ -106,6 +110,45 @@ void main() {
         serverState: null,
       );
       expect(projected.queueIndex, isNull);
+    });
+
+    // 远端设备（音箱）：本机 player 恒 stopped，playing/position 必须取服务端
+    // 权威状态，否则遥控模式按钮永远显示「已暂停 0:00」。
+    test('远端在播：playing/position 取服务端，不看本机 player', () {
+      final projected = playbackStateProjection(
+        player: _FakeAudioPlayer(), // playing=false, position=0
+        serverState: _state(deviceId: 'speaker-1', positionMs: 123000),
+      );
+      expect(projected.playing, isTrue);
+      expect(projected.updatePosition, const Duration(milliseconds: 123000));
+      expect(projected.processingState, AudioProcessingState.ready);
+      expect(projected.speed, 1.0);
+      expect(projected.queueIndex, 3);
+    });
+
+    test('远端暂停：speed 0，锁屏进度不在两次轮询间自行外推', () {
+      final projected = playbackStateProjection(
+        player: _FakeAudioPlayer(),
+        serverState: _state(
+          deviceId: 'speaker-1',
+          state: PlaybackStatus.paused,
+        ),
+      );
+      expect(projected.playing, isFalse);
+      expect(projected.speed, 0.0);
+      expect(projected.processingState, AudioProcessingState.ready);
+    });
+
+    test('远端停止：processingState 收敛 idle', () {
+      final projected = playbackStateProjection(
+        player: _FakeAudioPlayer(),
+        serverState: _state(
+          deviceId: 'speaker-1',
+          state: PlaybackStatus.stopped,
+        ),
+      );
+      expect(projected.playing, isFalse);
+      expect(projected.processingState, AudioProcessingState.idle);
     });
   });
 }

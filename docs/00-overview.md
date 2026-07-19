@@ -20,7 +20,7 @@ Web 页面继续由 HMusic-Server 独立维护；Flutter 客户端以其产品�
 但不复制 JavaScript/CSS，也不嵌套 WebView。
 
 视觉架构采用“内容品牌层 + 平台 chrome 层”：Flutter 内容区保留 HMusic 的暖纸、墨色、衬线
-和克制青绿；iOS 27 的顶栏、底栏、mini player 与控制面板由 Swift/SwiftUI 使用系统液态玻璃
+和克制青绿；iOS 27 的底栏、mini player 与控制面板由 Swift/SwiftUI 使用系统液态玻璃
 能力实现；Android 由 Flutter 提供同构玻璃材质，并按设备性能与无障碍设置降级。
 
 ## 2. 为什么改为 Flutter

@@ -17,16 +17,15 @@ import '../views/player_page.dart';
 //   桌面/宽屏（capsule=false）：圆角 18 玻璃卡，自带 12/6 外边距。
 //   悬浮胶囊（capsule=true）：高 50 胶囊悬在 dock（66）上方（Flutter 回退壳），
 //   比 dock 矮一档、封面/字号/图标同步收小——dock 是导航主锚点，mini 只是
-//   次级播放状态条；对齐 iOS 26+ 原生 GlassMiniPlayer。左右留白由外壳统一，
-//   自身只留与 dock 的 gap：竖排时在底部，收缩内联（inline）时换到右侧
-//   （与图标圆钮之间），内容不裁剪，只随剩余宽度截断题/歌手。
+//   次级播放状态条；对齐 iOS 26+ 原生 GlassMiniPlayer。自身无外边距：留白、
+//   与 dock 的 gap、收纳飞行轨迹全由外壳几何插值统一，内容不裁剪，只随
+//   剩余宽度截断题/歌手。
 class MiniPlayerCard extends StatelessWidget {
   const MiniPlayerCard({
     required this.item,
     required this.playbackState,
     required this.controller,
     this.capsule = false,
-    this.inline = false,
     super.key,
   });
 
@@ -34,7 +33,6 @@ class MiniPlayerCard extends StatelessWidget {
   final PlaybackState? playbackState;
   final PlayerViewModel controller;
   final bool capsule;
-  final bool inline;
 
   @override
   Widget build(BuildContext context) {
@@ -69,14 +67,9 @@ class MiniPlayerCard extends StatelessWidget {
         ),
       ],
     );
-    final EdgeInsets margin;
-    if (!capsule) {
-      margin = const EdgeInsets.fromLTRB(12, 6, 12, 6);
-    } else if (inline) {
-      margin = const EdgeInsets.only(right: kChromeGap);
-    } else {
-      margin = const EdgeInsets.only(bottom: kChromeGap);
-    }
+    final margin = capsule
+        ? EdgeInsets.zero
+        : const EdgeInsets.fromLTRB(12, 6, 12, 6);
     return Padding(
       padding: margin,
       child: AdaptiveGlassSurface(

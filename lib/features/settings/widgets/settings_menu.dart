@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../app/theme/hmusic_radii.dart';
 import '../models/settings_section.dart';
 import '../models/settings_summary.dart';
 
@@ -119,7 +120,7 @@ class _MenuGroup extends StatelessWidget {
           color: palette.panel,
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(HMusicRadii.card),
             side: BorderSide(color: palette.line),
           ),
           child: Column(

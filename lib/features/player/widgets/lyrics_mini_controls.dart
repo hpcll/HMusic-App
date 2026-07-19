@@ -8,7 +8,7 @@ import '../view_models/player_view_model.dart';
 import 'player_progress.dart';
 
 // 沉浸歌词页底部迷你播控：进度条（可拖）+ 上一曲·播放暂停·下一曲三键。
-// 进度真相源用 just_audio 的 livePosition（本机播放不用服务端回写值，避免回跳）。
+// 进度真相源经 playbackPositionOf 分流（本机 just_audio / 远端服务端回读）。
 class LyricsMiniControls extends ConsumerWidget {
   const LyricsMiniControls({
     required this.state,
@@ -21,11 +21,7 @@ class LyricsMiniControls extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final live = ref.watch(livePositionProvider);
-    final position = live.maybeWhen(
-      data: (value) => value,
-      orElse: () => Duration(milliseconds: state.positionMs),
-    );
+    final position = playbackPositionOf(ref, state);
     final handlerAsync = ref.watch(hmusicAudioHandlerProvider);
 
     return Padding(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/session/session_providers.dart';
 import 'app_providers.dart';
 import 'theme/hmusic_theme.dart';
 
@@ -11,6 +12,9 @@ class HMusicApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // 读取平台壳控制器以建立 intent 订阅；返回值不用，仅保持 provider 存活。
     ref.watch(platformShellControllerProvider);
+    // 会话失效副作用（停本机音频）在 app 根激活。不能由 apiClient 拉起：
+    // guard 会进 audioHandler 的依赖链，其监听器反读 audioHandler 即成环。
+    ref.watch(sessionGuardProvider);
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'HMusic',

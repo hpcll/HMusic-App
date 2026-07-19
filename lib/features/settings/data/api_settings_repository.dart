@@ -84,6 +84,7 @@ class ApiSettingsRepository implements SettingsRepository {
     String? resolveStrategy,
     List<String>? extraPlayMusicModels,
     List<ManualTrack>? manualTracks,
+    bool? announceTracks,
   }) async {
     final payload = await _apiClient.patchMap(
       '/config',
@@ -96,6 +97,7 @@ class ApiSettingsRepository implements SettingsRepository {
           'extraPlayMusicModels': extraPlayMusicModels,
         if (manualTracks != null)
           'manualTracks': manualTracks.map((t) => t.toJson()).toList(),
+        if (announceTracks != null) 'announceTracks': announceTracks,
       },
     );
     return ServerConfig.fromJson(payload);

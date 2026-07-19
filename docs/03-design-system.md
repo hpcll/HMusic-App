@@ -23,6 +23,10 @@
 --font-serif: "Songti SC","Noto Serif SC",Georgia,"Times New Roman",serif
 ```
 
+> **App 端圆角分叉**（源 `HMusicRadii`）：web 的 10/7 在 App 放大为
+> `card/input:14`、`small:10`，按钮全胶囊（StadiumBorder）——移动端整体偏软的
+> 胶囊语言（对齐 dock/mini/搜索框），web 保持 10/7，这组值两侧不再互相同步。
+
 ### 深色（@media prefers-color-scheme:dark）
 ```
 --bg:#131315 --panel:#1b1b1e --panel-2:#232326
@@ -67,6 +71,10 @@ glassBlurOff:    0（性能/降低透明度回退）
   `-webkit-fill-available`），flex 纵排：顶栏（`.topbar`，毛玻璃）→ 内容区
   （`flex:1; overflow-y:auto`，唯一滚动者）→ 底部导航。
   > web 的「流内底栏、勿用 position:fixed」铁律是浏览器内核特有顾虑，App 端不适用。
+  > App 端也不设 web `.topbar` 的常驻顶栏：品牌/退出不搬（登录页与设置菜单底部
+  > 承接），顶部只留 `TopEdgeScrim` 滚动消融——状态栏区渐进模糊 + 轻提亮，
+  > 内容透过顶缘仍可见（不用不透明色带，避免「被遮挡」感），任何状态无条
+  > 无线（对齐 Apple Music）；off 档退不透明渐变。
   > App 底部导航为**悬浮玻璃胶囊 dock**（对齐 iOS 26+ 原生液态玻璃壳形态）：
   > 胶囊压进安全区、悬在 home indicator 上方，mini player 胶囊叠在 dock 上方；
   > 仍挂 `Scaffold(bottomNavigationBar:)` 槽位，骨架恒在——tab 页内 dock 永远
@@ -81,7 +89,7 @@ glassBlurOff:    0（性能/降低透明度回退）
 
 | 区域 | iOS 26+ | Android / iOS<26 | 内容原则 |
 |---|---|---|---|
-| 顶栏 | Swift/SwiftUI 系统液态玻璃 | Flutter AdaptiveGlassSurface | 标题简短，不承载功能说明；底缘不画 hairline（web .topbar 的 border-bottom 不搬），tint 底部 20% 渐隐收边，off 档退实底并保留底线分界 |
+| 顶部边缘 | 无 chrome：滚动消融（TopEdgeScrim 渐进模糊 + 轻纱帘） | 同左（shader 逐像素变径的单层 backdrop，结构零缝；非 Impeller/编译前退纯纱帘，off 档退不透明渐变） | 无常驻顶栏；品牌见登录页、退出在设置菜单底部；内容透过状态栏区仍可见，越靠顶越糊越淡，无条无线 |
 | 底部导航 | 原生液态玻璃悬浮 dock | Flutter 毛玻璃悬浮 dock（同形态） | 高 66，导航主锚点；胶囊压安全区悬浮，滚动收缩为图标圆钮（高 50，与内联 mini 等高一排） |
 | mini player | 原生玻璃胶囊（dock 上方） | Flutter 毛玻璃胶囊（同形态） | 高 50、封面 32——比 dock 矮一档的次级状态条；封面、题/歌手、播放与下一曲，收缩时内联到圆钮左侧、内容不裁剪 |
 | 播放主控/音量浮层 | 原生材质优先 | Flutter 玻璃面板 | 控件尺寸固定，不因状态位移 |
@@ -90,7 +98,7 @@ glassBlurOff:    0（性能/降低透明度回退）
 
 禁止“每张卡片都 BackdropFilter”。背景层不足时玻璃没有信息价值，只会降低文字对比并增加 GPU 成本。
 
-桌面端：三桌面平台的 chrome（mini player、窄窗顶栏/底栏）同用 Flutter
+桌面端：三桌面平台的 chrome（mini player、窄窗底部 dock）同用 Flutter
 `AdaptiveGlassSurface`（blur + 提饱和 + 顶缘高光）；macOS 窗体另垫窗后毛玻璃
 （`NSVisualEffectView.sidebar`），侧栏半透明透出壁纸；Windows/Linux 无窗后采样能力，
 侧栏保持不透明暖纸。高对比/减动效环境下玻璃统一降级为不透明面板（off 档）。
@@ -99,6 +107,7 @@ glassBlurOff:    0（性能/降低透明度回退）
 
 ### 卡片 .card
 `background:panel; border:1px line; radius:10px; padding:20px; box-shadow:--shadow; display:grid; gap:14px`
+App 适配：radius → 14（`HMusicRadii.card`，§1 圆角分叉），其余不变。
 
 ### 按钮族
 | 类 | 边框/底/字 | 悬停 |
@@ -108,6 +117,8 @@ glassBlurOff:    0（性能/降低透明度回退）
 | `.danger-btn` | 透明 / danger 字 | 边→danger |
 | `.ghost-btn` | 无边透明 / muted-2 字，小号 | 底→panel-2 |
 公共：`radius-sm; padding:9px 18px; font 13.5px/500; transition .12s; disabled opacity.5`
+App 适配：Filled/Outlined 全胶囊（StadiumBorder、padding 水平 20）——与 dock/mini/
+搜索框的胶囊语言统一；ghost/danger 文本按钮形态不变。
 
 ### 曲目行 .track-row（全站复用的列表原子）
 `flex; gap:13px; padding:10px 12px; radius-sm; border-bottom:1px line-soft; hover底→panel`
@@ -123,6 +134,8 @@ glassBlurOff:    0（性能/降低透明度回退）
 ### 导航项
 - 桌面 `.side-item`：flex，muted-2 字，hover 底→panel-2；**active：底→text-strong，字→bg（墨底反白）**
 - 窄屏 `.nav-item`：竖排 icon+label 10.5px，active 字→text-strong；图标 21px
+  App 适配（悬浮 dock）：active 项背后垫灰药丸（text-strong α 亮 .07 / 暗 .12，
+  槽内缩 5/7），切 tab 药丸从 A 槽滑到 B 槽（§4）；点按无矩形水波，反馈由药丸承担。
 
 ### 状态点 .dot（7px 圆）
 `dot-playing:accent` / `dot-paused:#c99700` / `dot-idle/stopped:muted` / `dot-error:danger`
@@ -140,6 +153,8 @@ App 适配（web 的 28/92 按其底边 chrome 定）：底距必须避让本壳
 
 ### 输入
 `width:100%; border:1px line; radius-sm; padding:9px 12px; font14; focus 边→text-strong`
+App 适配：灰底（panel-2）无描边、radius 14、padding 14/12，focus 不加描边
+（可见性由光标承担，与搜索框同纪律）——移动端软表单款，web 描边款不变。
 
 ## 4. 动效清单（全部 transition，无重动画）
 
@@ -157,9 +172,9 @@ App 适配（web 的 28/92 按其底边 chrome 定）：底距必须避让本壳
 
 | 场景 | iOS 26+ | Android / iOS<26 |
 |---|---|---|
-| tab 切换 | 使用系统材质选择态与连续形变 | 180-240ms 高光/透明度过渡 |
+| tab 切换 | 系统材质选择态 + 选中药丸 matchedGeometryEffect 从 A 滑到 B（spring .42/.86） | 260ms easeOutCubic 药丸滑动（AnimatedAlign）+ 颜色过渡 |
 | mini player 显隐 | 系统 spring/玻璃容器尺寸变化 | 220ms easeOut 高度过渡 |
-| dock/mini 滚动收缩、展开 | 系统 spring（response .42 / damping .86） | 220ms easeOut 尺寸变化（AnimatedSize） |
+| dock/mini 滚动收缩、展开 | 系统 spring（response .42 / damping .86） | 320ms easeOutCubic 几何插值：dock 向右缩短成圆钮、mini 同步下落同排（宽/高/圆角连续 + 两层交叉淡化） |
 | 按压 | 系统液态反馈 | 100-140ms scale 0.97 + 高光变化 |
 | 滚动经过 chrome | 系统自动采样背景 | 动态模糊仅高画质开启 |
 

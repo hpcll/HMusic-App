@@ -42,12 +42,8 @@ class _LyricsBody extends ConsumerWidget {
     final track = state.track;
     final controller = ref.read(playerViewModelProvider);
 
-    // 本机实时进度（just_audio position），当前行据此算，不用服务端 3s 回写值。
-    final live = ref.watch(livePositionProvider);
-    final positionMs = live.maybeWhen(
-      data: (value) => value.inMilliseconds,
-      orElse: () => state.positionMs,
-    );
+    // 进度真相源经 playbackPositionOf 分流（本机 just_audio / 远端服务端回读）。
+    final positionMs = playbackPositionOf(ref, state).inMilliseconds;
     final activeLine = ref
         .read(lyricViewModelProvider.notifier)
         .activeLineFor(positionMs);

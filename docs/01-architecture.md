@@ -10,7 +10,7 @@
 | 领域 | 选型 | 边界 |
 |---|---|---|
 | UI 内容层 | Flutter / Material 基础组件 + 自有 token | 页面、列表、歌词、图表与业务状态 |
-| iOS chrome | Swift/SwiftUI 原生桥 | iOS 27 液态玻璃顶栏、底栏、mini player、控制面板 |
+| iOS chrome | Swift/SwiftUI 原生桥 | iOS 27 液态玻璃底栏、mini player、控制面板（App 无常驻顶栏） |
 | Android chrome | Flutter AdaptiveGlassSurface | 视觉同构，支持性能与无障碍降级 |
 | 状态与依赖注入 | Riverpod | 页面只观察所需状态，不设全局万能 Store |
 | 路由 | go_router | 登录重定向、底部导航、沉浸歌词页 |
@@ -73,7 +73,7 @@ iOS 原生层只接收最小展示状态：当前 tab、标题、mini player 元
 不直接操作队列，所有意图回到 Flutter 的 Router 或 PlaybackCoordinator。
 
 桥接优先使用单一 MethodChannel + EventChannel（或等价 typed channel），禁止为每个控件建立独立通道。
-Flutter 内容必须为原生顶栏/底栏预留由 Swift 回报的动态安全区，旋转、键盘、mini player 显隐时不能遮挡。
+Flutter 内容必须为原生底部 chrome 预留由 Swift 回报的动态安全区，旋转、键盘、mini player 显隐时不能遮挡。
 
 液态玻璃不是全局皮肤：内容卡片、曲目行、歌词、统计图表继续由 Flutter 绘制并保持 HMusic 品牌；
 原生材质只承载导航、控制和临时浮层。iOS 27 API 不可用或“降低透明度”开启时必须自动回退。

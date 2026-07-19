@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../shared/models/hmusic_notice.dart';
-import '../../../shared/widgets/back_link.dart';
 import '../../../shared/widgets/hmusic_toast.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/settings_section.dart';
@@ -18,6 +17,7 @@ import '../view_models/security_view_model.dart';
 import '../view_models/settings_menu_view_model.dart';
 import '../view_models/sources_view_model.dart';
 import '../view_models/tracks_view_model.dart';
+import '../widgets/account_card.dart';
 import '../widgets/sections/config_section.dart';
 import '../widgets/sections/devices_section.dart';
 import '../widgets/sections/diag_section.dart';
@@ -26,7 +26,9 @@ import '../widgets/sections/mi_account_section.dart';
 import '../widgets/sections/security_section.dart';
 import '../widgets/sections/sources_section.dart';
 import '../widgets/sections/tracks_section.dart';
+import '../widgets/server_switch_row.dart';
 import '../widgets/settings_menu.dart';
+import '../widgets/settings_section_subpage.dart';
 
 // 设置中心，对齐 web settings.js：
 // 桌面（≥860）双栏——左菜单常驻 + 右内容，section 恒有值（空则回退第一项）；
@@ -75,10 +77,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: <Widget>[
               SizedBox(
                 width: 240,
-                child: SettingsMenu(
-                  summary: state.summary,
-                  activeSection: section,
-                  onOpen: notifier.open,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    SettingsMenu(
+                      summary: state.summary,
+                      activeSection: section,
+                      onOpen: notifier.open,
+                    ),
+                    // 桌面「更换服务器」入口挂菜单列底部（退出走侧栏，不在此重复）。
+                    const SettingsServerSwitchRow(),
+                  ],
                 ),
               ),
               const SizedBox(width: 32),
@@ -110,7 +119,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final section = state.section;
     if (section == null) {
       return ListView(
-        // 顶/底累加环境 padding：玻璃顶栏与悬浮 mini/dock 之下让位（scroll-under）。
+        // 顶/底累加环境 padding：顶部消融带与悬浮 mini/dock 之下让位（scroll-under）。
         padding: EdgeInsets.fromLTRB(
           16,
           24 + MediaQuery.paddingOf(context).top,
@@ -121,21 +130,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const ViewTitle('设置'),
           const SizedBox(height: 16),
           SettingsMenu(summary: state.summary, onOpen: notifier.open),
+          // 窄屏账户操作卡片（桌面走侧栏，不渲染）：当前服务器 + 更换服务器（次要）
+          // + 退出登录（危险操作红色 outlined）——账户区块化，信息层级清晰。
+          const SettingsAccountCard(),
         ],
       );
     }
-    return ListView(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8 + MediaQuery.paddingOf(context).top,
-        16,
-        32 + MediaQuery.paddingOf(context).bottom,
-      ),
-      children: <Widget>[
-        _SectionHead(title: section.label, onBack: () => notifier.back()),
-        const SizedBox(height: 12),
-        _sectionBody(section),
-      ],
+    return SettingsSectionSubpage(
+      title: section.label,
+      onBack: () => notifier.back(),
+      child: _sectionBody(section),
     );
   }
 
@@ -201,37 +205,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       miAccountViewModelProvider.select((s) => s.notice),
       (_, m) =>
           show(m, ref.read(miAccountViewModelProvider.notifier).clearNotice),
-    );
-  }
-}
-
-// 窄屏子页头，对齐 web .section-head：返回键 + 居中衬线标题 + 右占位平衡。
-class _SectionHead extends StatelessWidget {
-  const _SectionHead({required this.title, required this.onBack});
-
-  final String title;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        BackLink(label: '设置', onTap: onBack),
-        Expanded(
-          child: Center(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontFamily: 'NotoSerifSC',
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: context.palette.textStrong,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 64),
-      ],
     );
   }
 }

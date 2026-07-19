@@ -72,7 +72,7 @@ DownloadRecord { id;trackKey;source;title;artist;album?;coverUrl?;track;quality?
 | GET | `/state` | — | → HMusicPlaybackState |
 | GET | `/events` | — | 当前只发送一帧后断开，不是持续 SSE；P0 禁止依赖 |
 | POST | `/play` | `{track? \| clientTrack? \| url?, deviceId?, quality?, durationMs?, positionMs?, queueIndex?}` | 三选一来源；队列点播必带 `queueIndex` 精确定位（同名歌可能出现多次） |
-| POST | `/test-tone` | `{deviceId?}` | 播 3 秒内置测试音 |
+| POST | `/test-tone` | `{deviceId?}` | 播 3 秒内置测试音；与正常播放隔离（不写播放状态/不进队列），返回 `{deviceId, deviceName}`；服务端 3.5s 后补发 pause+stop 掐停设备端循环 |
 | POST | `/pause`·`/resume`·`/stop`·`/next`·`/previous` | — | → 新 state |
 | POST | `/seek` | `{positionMs}` | 本机播放还需让 `AudioHandler` seek |
 | POST | `/volume` | `{volume 0-100}` | |
@@ -161,8 +161,8 @@ smsStatus: `recent`(最近发过) / `limited`(限频，建议扫码) / 其他(�
 
 ## 12. Config `/config`
 
-| GET | `/` | → `{serverName, defaultQuality, searchStrategy, resolveStrategy, extraPlayMusicModels[], manualTracks[], lxPlugins[]}` |
-| PATCH | `/` | 上述字段任意子集（manualTracks 全量替换；extraPlayMusicModels 型号大写字母数字） |
+| GET | `/` | → `{serverName, defaultQuality, searchStrategy, resolveStrategy, extraPlayMusicModels[], manualTracks[], lxPlugins[], announceTracks}` |
+| PATCH | `/` | 上述字段任意子集（manualTracks 全量替换；extraPlayMusicModels 型号大写字母数字；announceTracks 布尔=音箱开播前播报歌名，默认 false） |
 
 - defaultQuality: `128k\|320k\|flac\|hires`——点播与下载的首选档，取不到时逐档回退
 - searchStrategy: `qqFirst\|kuwoFirst\|neteaseFirst`——聚合搜索结果的平台领先顺序

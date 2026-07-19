@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/audio/api_playback_repository.dart';
 import '../../../core/audio/models/hmusic_playback_state.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_client.dart';
@@ -79,14 +78,12 @@ class ApiPlaylistsRepository implements PlaylistsRepository {
 
   @override
   Future<HMusicPlaybackState> playAll(String id, {int startIndex = 0}) async {
-    // 必须显式指到本机虚拟设备：不带 deviceId 时服务端播到默认设备，本机
-    // AudioHandler 会因 deviceId 不匹配而忽略，出现「提示在播、实际没声」。
+    // 不带 deviceId：服务端 resolve 用户选定的默认设备（音箱选中时整单播到
+    // 音箱，遥控语义）。权威 playback 带回给调用方注入 AudioHandler，目标为
+    // 本机时由它装载出声，为远端时停本机。
     final payload = await _apiClient.postMap(
       '/playlists/$id/play',
-      body: <String, Object?>{
-        'startIndex': startIndex,
-        'deviceId': ApiPlaybackRepository.localDeviceId,
-      },
+      body: <String, Object?>{'startIndex': startIndex},
     );
     final playback = payload['playback'];
     return HMusicPlaybackState.fromJson(

@@ -100,7 +100,7 @@ class _DeviceItem extends StatelessWidget {
       color: active ? palette.panelSecondary : palette.panel,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(10),
         side: BorderSide(color: active ? palette.textStrong : palette.line),
       ),
       child: InkWell(

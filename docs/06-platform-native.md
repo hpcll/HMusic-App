@@ -52,7 +52,7 @@ P0 需要：
 
 - iOS 27 目标 SDK 可用时，Swift/SwiftUI 使用系统公开的液态玻璃材质和控件 API；具体类型名在
   工程使用的 Xcode SDK 中确认，文档不预写未经编译验证的私有或猜测 API。
-- App 根部保持 FlutterViewController；Swift/SwiftUI 以薄 overlay/hosting shell 承载顶栏、底栏、
+- App 根部保持 FlutterViewController；Swift/SwiftUI 以薄 overlay/hosting shell 承载底栏、
   mini player、播放控制面板与系统 sheet，Flutter 内容在其下方正常滚动。
 - Swift 接收：selectedTab、pageTitle、nowPlaying 摘要、playbackState、controls、theme、accessibility。
 - Swift 回传：selectTab、openNowPlaying、playPause、previous、next、seek、dismiss 等语义 intent。

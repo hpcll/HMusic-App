@@ -29,6 +29,8 @@
 | C-08 | `local-browser` 是全局虚拟设备 | P0 只允许单个活跃本机客户端；不做多端状态合并 | 后续增加 client/session identity |
 | C-09 | `/devices/:id/select` 当前工作树新增 `playback` 字段 | JSON 解码忽略未知字段；解析 selectedDeviceId 和可选 playback | 冻结新返回 DTO 并补测试 |
 | C-10 | Server DTO 可能添加字段 | 所有响应模型容忍未知字段；只对 P0 必需字段做强校验 | 契约采用向后兼容的 additive changes |
+| C-11 | `/playback/play` 缺省 `deviceId` 时 resolve 用户选定默认设备；显式传值可换目标（Server 已在 playUrl 内先掐停在播的旧远端设备） | 点歌/playAll 一律不发 `deviceId`（跟随所选设备，杜绝劫持回本机造成双端同响）；仅本机直链恢复显式传 `local-browser` | 保持语义冻结 |
+| C-12 | Server 已内置播放看门狗（2026-07-18）：远端 playing/loading 期间每 5s 自轮询设备状态并触发自然播完连播，失败指数退避至 60s；与 refresh-on-read 共用 single-flight，杜绝并发回读双触发 nextPlayback | 播放目标为远端时客户端前台每 5s 轮询 `/playback/state`（RemoteStatePoller）仅为 UI 新鲜度，回本机即停；App 退后台轮询挂起不再影响音箱连播。已知限制：遥控模式进度粒度约 5s（跟随轮询），歌词染色按段步进 | 事件流见 C-02；如需秒级遥控进度需先落地持续 SSE |
 
 ## 3. 非幂等请求与重试
 
@@ -52,13 +54,15 @@
 
 ## 4. 本机音量兼容
 
-Server 的 volume 同时承载音箱音量和本机状态，初始值为 0。Flutter 采用：
+Server 的 volume 同时承载音箱音量和本机状态，初始值为 0。Flutter 采用（已实现）：
 
 - `LocalVolumeStore` 保存当前设备上的本机音量，首次默认 1.0。
 - 本机播放以 just_audio/LocalVolumeStore 为真相源，不把全新 Server 的 0 自动应用为静音。
-- 用户拖动本机音量时立即更新播放器和本地偏好，并尽力回写 Server 0-100 供 UI 状态展示。
-- 远程音箱选择时改用 Server volume，不把手机本机偏好推给音箱。
-- 切换设备时 ViewModel 明确切换音量来源，禁止共用一个未经标记的 slider state。
+- 用户拖动本机音量时立即更新播放器和本地偏好。
+- 远程音箱选择时改用 Server volume（0-100，`POST /playback/volume`）：拖动只更新视觉，
+  松手一次提交（避免 ubus 刷屏）；非拖动时随远端轮询回读的真实音量同步。
+- 音量条按 `state.isLocalDevice` 分流并以设备 key 重建，禁止共用一个未经标记的 slider state；
+  手机本机偏好绝不推给音箱。
 
 ## 5. 地址与模型解码
 
@@ -73,7 +77,8 @@ Server 的 volume 同时承载音箱音量和本机状态，初始值为 0。Flu
 - [x] playSchema 增加 `queueIndex` 并覆盖两条重复曲目集成测试
 - [ ] 决定是否保留/实现真实 `/playback/events`，否则移除误导端点
 - [ ] 补齐并版本化 `/system/info.capabilities`
-- [ ] 明确本机音量与远程设备音量的契约
+- [x] 明确本机音量与远程设备音量的契约（本机 just_audio+偏好 / 远端 `POST /playback/volume` 0-100，客户端已按 C-11/C-12 分流实现）
+- [x] Server 侧自轮询摆脱「无人读就不连播」（C-12：playback 看门狗已实现，`startPlaybackWatchdog` 于 main.ts 启动）
 - [ ] 为 non-idempotent playback/ended 设计 commandId/idempotency key
 - [ ] 冻结 devices select 的新增 playback 返回模型
 - [ ] 修复 Fastify 6 `maxParamLength -> routerOptions` 弃用警告

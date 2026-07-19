@@ -32,8 +32,8 @@ final Provider<TokenStore> tokenStoreProvider = Provider<TokenStore>((ref) {
 // refreshListenable 统一跳登录页，避免每个 ViewModel 各自监听。
 final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
   final session = ref.watch(sessionControllerProvider);
-  // 读取 sessionGuard 确保停止本机音频的副作用被订阅。
-  ref.watch(sessionGuardProvider);
+  // sessionGuard（停本机音频副作用）由 HMusicApp 根部激活，不在这里 watch：
+  // 否则 guard 进入 audioHandler 依赖链，其监听器反读 audioHandler 会成环。
   return ApiClient(
     dio: ref.watch(dioProvider),
     serverConfigStore: ref.watch(serverConfigStoreProvider),

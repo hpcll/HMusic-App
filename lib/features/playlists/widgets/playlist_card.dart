@@ -33,7 +33,7 @@ class PlaylistCard extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               color: palette.panelSecondary,
-              borderRadius: BorderRadius.circular(7),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: palette.lineSoft),
             ),
             child: Icon(

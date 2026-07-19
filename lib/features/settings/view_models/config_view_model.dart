@@ -30,6 +30,7 @@ class ConfigViewModel extends Notifier<ConfigFormState> {
     required String searchStrategy,
     required String resolveStrategy,
     required String extraModelsText,
+    required bool announceTracks,
   }) async {
     if (state.saving) return;
     state = state.copyWith(saving: true);
@@ -42,6 +43,7 @@ class ConfigViewModel extends Notifier<ConfigFormState> {
             searchStrategy: searchStrategy,
             resolveStrategy: resolveStrategy,
             extraPlayMusicModels: parseModels(extraModelsText),
+            announceTracks: announceTracks,
           );
       state = state.copyWith(
         config: next,

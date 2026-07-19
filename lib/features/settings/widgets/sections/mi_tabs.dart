@@ -23,7 +23,7 @@ class MiTabs extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: palette.panelSecondary,
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: palette.line),
       ),
       child: Row(
@@ -39,9 +39,9 @@ class MiTabs extends StatelessWidget {
     final isActive = tab == active;
     return Material(
       color: isActive ? palette.panel : Colors.transparent,
-      borderRadius: BorderRadius.circular(5),
+      borderRadius: BorderRadius.circular(7),
       child: InkWell(
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(7),
         onTap: () => onSelect(tab),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),

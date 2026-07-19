@@ -14,6 +14,7 @@ class MiAccountState {
   const MiAccountState({
     this.status,
     this.tab = MiTab.qr,
+    this.changingAccount = false,
     this.qrStage = MiQrStage.idle,
     this.qrSession,
     this.qrMessage,
@@ -26,6 +27,10 @@ class MiAccountState {
   // ── 状态卡 ──
   final MiStatus? status;
   final MiTab tab;
+
+  // 已登录时是否展开「更换账号」面板（Server 单账号模型：再登录是替换不是新增）。
+  // loadStatus 每次成功都会收拢，登录/退出后自动回到状态卡视图。
+  final bool changingAccount;
 
   // ── 扫码通道 ──
   final MiQrStage qrStage;
@@ -48,9 +53,13 @@ class MiAccountState {
 
   bool get loggedIn => status?.loggedIn ?? false;
 
+  // 三通道登录面板是否展示：未登录始终展示；已登录仅在「更换账号」时展示。
+  bool get showLoginPanel => !loggedIn || changingAccount;
+
   MiAccountState copyWith({
     MiStatus? status,
     MiTab? tab,
+    bool? changingAccount,
     MiQrStage? qrStage,
     MiQrSession? qrSession,
     String? qrMessage,
@@ -66,6 +75,7 @@ class MiAccountState {
     return MiAccountState(
       status: status ?? this.status,
       tab: tab ?? this.tab,
+      changingAccount: changingAccount ?? this.changingAccount,
       qrStage: qrStage ?? this.qrStage,
       qrSession: clearQrSession ? null : (qrSession ?? this.qrSession),
       qrMessage: clearQrMessage ? null : (qrMessage ?? this.qrMessage),

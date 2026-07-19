@@ -23,20 +23,26 @@ class _DiagSectionViewState extends ConsumerState<DiagSectionView> {
   final TextEditingController _ttsText = TextEditingController(
     text: '你好，我是 HMusic',
   );
+  // dispose 里禁止用 ref（unmount 后 ref 抛错），notifier 在 init 时缓存到字段。
+  late final DiagViewModel _diag;
 
   @override
   void initState() {
     super.initState();
+    _diag = ref.read(diagViewModelProvider.notifier);
     unawaited(
-      Future<void>.microtask(
-        () => ref.read(diagViewModelProvider.notifier).startPolling(),
-      ),
+      Future<void>.microtask(() {
+        // microtask 落地前子页可能已销毁：dispose 的 stopPolling 先跑（空操作），
+        // 这里再启动就成了没人能停的幽灵轮询。
+        if (!mounted) return;
+        _diag.startPolling();
+      }),
     );
   }
 
   @override
   void dispose() {
-    ref.read(diagViewModelProvider.notifier).stopPolling();
+    _diag.stopPolling();
     _ttsText.dispose();
     super.dispose();
   }

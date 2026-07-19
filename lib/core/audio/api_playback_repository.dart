@@ -15,8 +15,6 @@ class ApiPlaybackRepository implements PlaybackRepository {
   const ApiPlaybackRepository({required ApiClient apiClient})
     : _apiClient = apiClient;
 
-  static const String localDeviceId = 'local-browser';
-
   final ApiClient _apiClient;
 
   @override
@@ -35,13 +33,16 @@ class ApiPlaybackRepository implements PlaybackRepository {
     HMusicTrack track, {
     int? queueIndex,
     int? positionMs,
+    String? deviceId,
   }) {
     return _postOrGet(
       '/playback/play',
       post: true,
       body: <String, Object?>{
         'track': track.toJson(),
-        'deviceId': localDeviceId,
+        // 缺省不发 deviceId：服务端 resolve 用户选定的默认设备。硬编码本机会把
+        // 已选音箱的播放目标劫持回手机（音箱不停 + 本机开播 = 双端同响）。
+        if (deviceId != null) 'deviceId': deviceId,
         // 队列点播必带：同名歌曲可能出现多次，靠它精确定位第几项。
         if (queueIndex != null) 'queueIndex': queueIndex,
         // 失效恢复续播用：服务端缺省 positionMs=0。
@@ -92,6 +93,15 @@ class ApiPlaybackRepository implements PlaybackRepository {
       '/playback/mode',
       post: true,
       body: <String, Object?>{'playMode': mode.wireName},
+    );
+  }
+
+  @override
+  Future<HMusicPlaybackState> setVolume(int volume) {
+    return _postOrGet(
+      '/playback/volume',
+      post: true,
+      body: <String, Object?>{'volume': volume.clamp(0, 100)},
     );
   }
 

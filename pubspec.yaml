@@ -36,6 +36,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  shaders:
+    # 顶部滚动消融的逐像素渐进模糊（TopEdgeScrim，Impeller 专属）。
+    - shaders/top_edge_blur.frag
+
   assets:
     # 品牌音符（透明底青绿字形，与 web favicon 同图形）；SVG 为源，PNG 打包。
     - assets/icon/brand-mark.png

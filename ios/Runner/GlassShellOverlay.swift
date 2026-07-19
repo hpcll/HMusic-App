@@ -100,7 +100,12 @@ struct GlassShellOverlay: View {
         }
       } else {
         ForEach(GlassDockTab.all, id: \.id) { tab in
-          DockItem(tab: tab, active: tab.id == state.selectedTab, compact: false) {
+          DockItem(
+            tab: tab,
+            active: tab.id == state.selectedTab,
+            compact: false,
+            namespace: chromeSpace
+          ) {
             onIntent("selectTab", tab.id)
           }
         }
@@ -132,14 +137,19 @@ extension View {
   }
 }
 
-// 单个 dock tab：SF Symbol + 小字标签；active 用主题墨色、其余 secondary。
-// compact（收缩圆钮）只留图标，标签语义走 accessibilityLabel。
+// 单个 dock tab：SF Symbol + 小字标签；active 用主题墨色、其余 secondary，
+// 展开态选中项背后垫灰药丸，切 tab 时经 matchedGeometryEffect 从 A 滑到 B
+//（对齐 Apple Music tab bar；与 Flutter 底栏 AnimatedAlign 药丸同纪律）。
+// compact（收缩圆钮）只留图标，无药丸，标签语义走 accessibilityLabel。
 @available(iOS 26.0, *)
 private struct DockItem: View {
   let tab: GlassDockTab
   let active: Bool
   let compact: Bool
+  var namespace: Namespace.ID? = nil
   let onTap: () -> Void
+
+  @Environment(\.colorScheme) private var colorScheme
 
   var body: some View {
     Button(action: onTap) {
@@ -151,16 +161,32 @@ private struct DockItem: View {
             .font(.system(size: 11))
         }
       }
-      // 选中态只换颜色（墨 vs 灰），图标恒为线条款——与 Flutter 底栏同纪律；
+      // 选中态 = 灰药丸 + 换色（墨 vs 灰），图标恒为线条款；
       // fill 变体视觉重量参差（chart.bar.fill 尤重），不用。
       .foregroundStyle(active ? Color.primary : Color.secondary)
-      .frame(maxWidth: compact ? nil : .infinity)
+      .frame(
+        maxWidth: compact ? nil : .infinity,
+        maxHeight: compact ? nil : .infinity
+      )
       .padding(.horizontal, compact ? 26 : 0)
+      .background { selectionPill }
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
     .accessibilityLabel(tab.label)
     .accessibilityAddTraits(active ? [.isSelected] : [])
+  }
+
+  // 灰药丸只做「所在位置」提示，浓度压低（暗色略提亮）不与内容抢戏；
+  // matchedGeometryEffect 挂在含内缩边距的整槽框上，滑动时内缩恒定。
+  @ViewBuilder private var selectionPill: some View {
+    if active, !compact, let namespace {
+      Capsule(style: .continuous)
+        .fill(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.07))
+        .padding(.horizontal, 5)
+        .padding(.vertical, 7)
+        .matchedGeometryEffect(id: "dockSelection", in: namespace)
+    }
   }
 }
 

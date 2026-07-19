@@ -40,6 +40,14 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
     final isList = ref.watch(
       playlistsViewModelProvider.select((s) => s.isList),
     );
-    return isList ? const PlaylistsListView() : const PlaylistDetailView();
+    // 详情是页内二级态：系统返回先收回列表（并刷新曲目数），不冒泡到壳层。
+    return PopScope(
+      canPop: isList,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        unawaited(ref.read(playlistsViewModelProvider.notifier).backToList());
+      },
+      child: isList ? const PlaylistsListView() : const PlaylistDetailView(),
+    );
   }
 }

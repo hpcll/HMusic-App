@@ -25,6 +25,7 @@ class _ConfigSectionViewState extends ConsumerState<ConfigSectionView> {
   String _quality = '320k';
   String _searchStrategy = 'qqFirst';
   String _resolveStrategy = 'originalFirst';
+  bool _announceTracks = false;
 
   @override
   void initState() {
@@ -54,6 +55,7 @@ class _ConfigSectionViewState extends ConsumerState<ConfigSectionView> {
     _quality = config.defaultQuality;
     _searchStrategy = config.searchStrategy;
     _resolveStrategy = config.resolveStrategy;
+    _announceTracks = config.announceTracks;
   }
 
   void _save() {
@@ -66,6 +68,7 @@ class _ConfigSectionViewState extends ConsumerState<ConfigSectionView> {
             searchStrategy: _searchStrategy,
             resolveStrategy: _resolveStrategy,
             extraModelsText: _extraModels.text,
+            announceTracks: _announceTracks,
           ),
     );
   }
@@ -132,6 +135,18 @@ class _ConfigSectionViewState extends ConsumerState<ConfigSectionView> {
               controller: _extraModels,
               decoration: const InputDecoration(
                 hintText: '型号逗号分隔，如 L20A, X20C',
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SettingsField(
+            label: '播放前语音播报歌名',
+            hint: '小爱音箱开播前先念「即将播放 XX」，会拖慢开播 2-4 秒。',
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Switch(
+                value: _announceTracks,
+                onChanged: (v) => setState(() => _announceTracks = v),
               ),
             ),
           ),

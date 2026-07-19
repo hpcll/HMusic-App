@@ -29,10 +29,30 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
   Future<void> loadStatus() async {
     try {
       final status = await ref.read(miAccountRepositoryProvider).status();
-      state = state.copyWith(status: status);
+      // 每次确认状态都收起「更换账号」：登录成功/退出后回到默认视图。
+      state = state.copyWith(status: status, changingAccount: false);
     } on ApiFailure catch (failure) {
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
+  }
+
+  // 已登录时翻转「更换账号」面板。Server 是单账号模型：新登录会替换当前账号。
+  // 开合都复位三通道：重开从干净扫码页开始，收起同时停掉遗留轮询。
+  void toggleChangeAccount() {
+    _resetChannels(changingAccount: !state.changingAccount);
+  }
+
+  void _resetChannels({required bool changingAccount}) {
+    _stopQrTimers();
+    state = state.copyWith(
+      changingAccount: changingAccount,
+      tab: MiTab.qr,
+      qrStage: MiQrStage.idle,
+      qrRemain: '',
+      clearQrSession: true,
+      clearQrMessage: true,
+      clearChallenge: true,
+    );
   }
 
   void switchTab(MiTab tab) {

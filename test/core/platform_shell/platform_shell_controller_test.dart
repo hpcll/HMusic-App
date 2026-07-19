@@ -101,6 +101,10 @@ class _RecordingPlayerViewModel implements PlayerViewModel {
   Future<void> skipToNext() async => calls.add('next');
 
   @override
+  Future<void> setDeviceVolume(int volume) async =>
+      calls.add('setDeviceVolume');
+
+  @override
   Future<void> skipToPrevious() async => calls.add('previous');
 
   @override

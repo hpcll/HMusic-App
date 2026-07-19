@@ -13,6 +13,7 @@ class ServerConfig {
     required this.resolveStrategy,
     this.extraPlayMusicModels = const <String>[],
     this.manualTracks = const <ManualTrack>[],
+    this.announceTracks = false,
   });
 
   factory ServerConfig.fromJson(Map<String, Object?> json) =>
@@ -28,6 +29,10 @@ class ServerConfig {
 
   @JsonKey(defaultValue: <ManualTrack>[])
   final List<ManualTrack> manualTracks;
+
+  // 音箱播放前语音播报歌名（仅远端小爱设备生效）。
+  @JsonKey(defaultValue: false)
+  final bool announceTracks;
 
   Map<String, Object?> toJson() => _$ServerConfigToJson(this);
 }

@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/app/theme/hmusic_palette.dart';
 import 'package:hmusic/app/theme/hmusic_theme.dart';
+import 'package:hmusic/core/platform_shell/widgets/adaptive_glass_surface.dart';
 import 'package:hmusic/shared/layout/shell_metrics.dart';
 import 'package:hmusic/shared/models/hmusic_notice.dart';
 import 'package:hmusic/shared/widgets/hmusic_toast.dart';
 
-// docs/03 Toast 规格：无动画、3.2s 自动消失、内容自适应宽 ≤90%、语义左边框、
-// 不挡点击；底距避让底部 chrome（桌面 = mini 包络 76 + 12，窄屏 = 悬浮玻璃
-// chrome 完整包络：底距 + dock + gap + mini 胶囊 + 呼吸距）。
+// docs/03 Toast 规格，液态玻璃升级版：无动画、3.2s 自动消失、内容自适应宽 ≤90%、
+// **胶囊形态**（高度 / 2 圆角）+ **毛玻璃材质**、语义左边框内嵌、不挡点击；
+// 底距避让底部 chrome（桌面 = mini 包络 76 + 12，窄屏 = 悬浮玻璃 chrome 完整包络）。
 
 const String _msg = '已加入队列：海屿你';
 
@@ -45,9 +46,14 @@ Future<void> _pumpHost(
   );
 }
 
-// toast 气泡容器：message 文本向上最近的 Container（带 panel 装饰）。
-Finder _bubble() =>
-    find.ancestor(of: find.text(_msg), matching: find.byType(Container)).first;
+// toast 胶囊容器：message 文本向上最近的 AdaptiveGlassSurface。
+// 长文案测试不用固定 _msg，传入 textFinder 动态查找。
+Finder _capsule([Finder? textFinder]) {
+  final anchor = textFinder ?? find.text(_msg);
+  return find
+      .ancestor(of: anchor, matching: find.byType(AdaptiveGlassSurface))
+      .first;
+}
 
 // 用例间清场：toast 挂在模块级单例上，避免前一个用例的 Timer 泄漏到下一个。
 Future<void> _drain(WidgetTester tester) =>
@@ -82,7 +88,7 @@ void main() {
     await _pumpHost(tester);
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
     await tester.pump();
-    await tester.tapAt(tester.getCenter(_bubble()));
+    await tester.tapAt(tester.getCenter(_capsule()));
     expect(_tapCount, 1);
     await _drain(tester);
   });
@@ -92,7 +98,7 @@ void main() {
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
     await tester.pump();
 
-    final rect = tester.getRect(_bubble());
+    final rect = tester.getRect(_capsule());
     expect(rect.bottom, 800.0 - (kMiniPlayerDesktopInset + 12));
     // 水平中点 = 侧栏右侧内容区的中点，而不是整窗中点。
     expect(
@@ -107,7 +113,7 @@ void main() {
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
     await tester.pump();
 
-    final rect = tester.getRect(_bubble());
+    final rect = tester.getRect(_capsule());
     // 无安全区（测试窗）：底距 10 + dock 66 + gap 8 + mini 50 + 呼吸距 8。
     expect(
       rect.bottom,
@@ -127,16 +133,7 @@ void main() {
     showHMusicToast(_hostContext, HMusicNotice('超长提示' * 40));
     await tester.pump();
 
-    final width = tester
-        .getRect(
-          find
-              .ancestor(
-                of: find.textContaining('超长提示'),
-                matching: find.byType(Container),
-              )
-              .first,
-        )
-        .width;
+    final width = tester.getRect(_capsule(find.textContaining('超长提示'))).width;
     expect(width, lessThanOrEqualTo(390 * 0.9));
     await _drain(tester);
   });
@@ -145,36 +142,60 @@ void main() {
     await _pumpHost(tester);
     showHMusicToast(_hostContext, const HMusicNotice.success(_msg));
     await tester.pump();
-    var strip = tester.widget<ColoredBox>(
-      find.descendant(of: _bubble(), matching: find.byType(ColoredBox)).last,
+    var strip = tester.widget<DecoratedBox>(
+      find.descendant(of: _capsule(), matching: find.byType(DecoratedBox)).last,
     );
-    expect(strip.color, HMusicPalette.light.accent);
+    expect(
+      (strip.decoration as BoxDecoration).color,
+      HMusicPalette.light.accent,
+    );
 
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
     await tester.pump();
-    strip = tester.widget<ColoredBox>(
-      find.descendant(of: _bubble(), matching: find.byType(ColoredBox)).last,
+    strip = tester.widget<DecoratedBox>(
+      find.descendant(of: _capsule(), matching: find.byType(DecoratedBox)).last,
     );
-    expect(strip.color, HMusicPalette.light.mutedStrong);
+    expect(
+      (strip.decoration as BoxDecoration).color,
+      HMusicPalette.light.mutedStrong,
+    );
     await _drain(tester);
   });
 
-  testWidgets('暗色 error：panel 底、红字、红语义条', (tester) async {
+  testWidgets('暗色 error：毛玻璃底 + 红字 + 红语义条', (tester) async {
     await _pumpHost(tester, theme: HMusicTheme.dark());
     showHMusicToast(_hostContext, const HMusicNotice.error(_msg));
     await tester.pump();
 
-    final container = tester.widget<Container>(_bubble());
-    final decoration = container.decoration! as BoxDecoration;
-    expect(decoration.color, HMusicPalette.dark.panel);
+    // 新胶囊用 AdaptiveGlassSurface 包装（毛玻璃），不再直接断言 Container.color。
+    final glass = tester.widget<AdaptiveGlassSurface>(_capsule());
+    expect(glass, isNotNull);
 
     final text = tester.widget<Text>(find.text(_msg));
     expect(text.style?.color, HMusicPalette.dark.danger);
 
-    final strip = tester.widget<ColoredBox>(
-      find.descendant(of: _bubble(), matching: find.byType(ColoredBox)).last,
+    final strip = tester.widget<DecoratedBox>(
+      find.descendant(of: _capsule(), matching: find.byType(DecoratedBox)).last,
     );
-    expect(strip.color, HMusicPalette.dark.danger);
+    expect(
+      (strip.decoration as BoxDecoration).color,
+      HMusicPalette.dark.danger,
+    );
+    await _drain(tester);
+  });
+
+  testWidgets('胶囊形态：圆角 ≈ 高度 / 2', (tester) async {
+    await _pumpHost(tester);
+    showHMusicToast(_hostContext, const HMusicNotice(_msg));
+    await tester.pump();
+
+    final glass = tester.widget<AdaptiveGlassSurface>(_capsule());
+    final rect = tester.getRect(_capsule());
+    final height = rect.height;
+    final expectedRadius = height / 2;
+    // borderRadius 从 AdaptiveGlassSurface.borderRadius 取。
+    final radius = glass.borderRadius.topLeft.x;
+    expect(radius, moreOrLessEquals(expectedRadius, epsilon: 1));
     await _drain(tester);
   });
 }

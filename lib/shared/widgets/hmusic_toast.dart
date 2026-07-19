@@ -3,16 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/theme/hmusic_palette.dart';
+import '../../core/platform_shell/widgets/adaptive_glass_surface.dart';
 import '../layout/shell_metrics.dart';
 import '../models/hmusic_notice.dart';
 
 OverlayEntry? _entry;
 Timer? _timer;
 
-// docs/03 Toast 规格，对齐 web .toast：水平居中、内容自适应宽（max 90%）、
-// panel 底 + hairline + 3px 语义左边框 + shadow-pop、无动画纯出现/消失、
-// 3.2s 自动消失，新 toast 顶替旧 toast。全站轻量结果提示统一走这里，别再用
-// SnackBar——floating SnackBar 在桌面宽窗会拉成整行黑条，且无法关掉出入场动画。
+// Toast 提示，对齐 docs/03 规格并升级为液态玻璃风格：水平居中、内容自适应宽
+//（max 90%）、**胶囊形态**（高度 / 2 圆角）+ **毛玻璃材质**（对齐 mini/dock
+// 的液态语言）、3px 语义左边框内嵌于玻璃之下、无动画纯出现/消失、3.2s 自动
+// 消失，新 toast 顶替旧 toast。全站轻量结果提示统一走这里，别再用 SnackBar——
+// floating SnackBar 在桌面宽窗会拉成整行黑条，且无法关掉出入场动画。
 // 直插 root Overlay + IgnorePointer：不参与页面布局，也不挡底部区域的点击。
 // 底距在 web bottom:28/92 基础上避让本壳的底部 chrome（见 _HMusicToast）。
 void showHMusicToast(BuildContext context, HMusicNotice notice) {
@@ -58,7 +60,6 @@ class _HMusicToast extends StatelessWidget {
               kChromeContentClearance;
     // 桌面居中于侧栏右侧的内容区，而不是整窗——和 mini/页面同一根轴线。
     final contentWidth = desktop ? size.width - kSidebarWidth : size.width;
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final edge = switch (notice.kind) {
       HMusicNoticeKind.info => palette.mutedStrong,
       HMusicNoticeKind.success => palette.accent,
@@ -70,50 +71,75 @@ class _HMusicToast extends StatelessWidget {
       bottom: bottom,
       child: IgnorePointer(
         child: Center(
-          child: Container(
+          child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: contentWidth * 0.9),
-            decoration: BoxDecoration(
-              color: palette.panel,
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: palette.line),
-              // --shadow-pop：7px 15px 36px 4px，暗色加深（.1 → .45）。
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: dark ? 0.45 : 0.10),
-                  offset: const Offset(7, 15),
-                  blurRadius: 36,
-                  spreadRadius: 4,
+            child: _ToastCapsule(palette: palette, edge: edge, notice: notice),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// 胶囊 toast：毛玻璃底 + 3px 语义左边框内嵌，对齐 mini/dock 的液态玻璃语言。
+// 单行高度固定 ~37（V10×2 + 文字行高 17），圆角 = 高度 / 2 = 18.5（胶囊）。
+class _ToastCapsule extends StatelessWidget {
+  const _ToastCapsule({
+    required this.palette,
+    required this.edge,
+    required this.notice,
+  });
+
+  final HMusicPalette palette;
+  final Color edge;
+  final HMusicNotice notice;
+
+  @override
+  Widget build(BuildContext context) {
+    const vPadding = 10.0;
+    const hPadding = 20.0;
+    const edgeWidth = 3.0;
+    // 固定单行高度 = V10×2 + 文字行高 ~17（13.5 × 1.25 行高），圆角 18.5（胶囊）。
+    // 多行文案自然撑高，圆角同比放大保持胶囊形态。
+    const singleLineHeight = vPadding * 2 + 17;
+    const radius = singleLineHeight / 2;
+    return AdaptiveGlassSurface(
+      quality: resolveGlassQuality(context),
+      padding: EdgeInsets.zero,
+      borderRadius: BorderRadius.circular(radius),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: IntrinsicHeight(
+          child: Stack(
+            children: <Widget>[
+              // 内容区：左内边距 = edgeWidth + hPadding，右 = hPadding。
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  edgeWidth + hPadding,
+                  vPadding,
+                  hPadding,
+                  vPadding,
                 ),
-              ],
-            ),
-            // 语义条盖在 hairline 之上并跟着圆角裁切；BoxDecoration 不允许
-            // 非均匀 border 配圆角，只能这样叠。左内边距 23 = 3 语义条 + 20。
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Stack(
-                children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(23, 10, 20, 10),
-                    child: Text(
-                      notice.message,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontSize: 13.5,
-                        color: notice.kind == HMusicNoticeKind.error
-                            ? palette.danger
-                            : palette.textStrong,
-                      ),
-                    ),
+                child: Text(
+                  notice.message,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 13.5,
+                    height: 1.25,
+                    color: notice.kind == HMusicNoticeKind.error
+                        ? palette.danger
+                        : palette.textStrong,
                   ),
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 3,
-                    child: ColoredBox(color: edge),
-                  ),
-                ],
+                ),
               ),
-            ),
+              // 语义左边框：3px 竖条贴左缘，从上到下撑满，内嵌于玻璃之下。
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: edgeWidth,
+                child: DecoratedBox(decoration: BoxDecoration(color: edge)),
+              ),
+            ],
           ),
         ),
       ),

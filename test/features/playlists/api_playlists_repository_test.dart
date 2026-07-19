@@ -109,7 +109,7 @@ void main() {
     expect(detail.items, isEmpty);
   });
 
-  test('playAll 指定本机设备并返回权威 playback', () async {
+  test('playAll 不带 deviceId（服务端 resolve 所选默认设备）并返回权威 playback', () async {
     when(
       () => apiClient.postMap('/playlists/fav/play', body: any(named: 'body')),
     ).thenAnswer(
@@ -143,11 +143,9 @@ void main() {
               ),
             ).captured.single
             as Map<String, Object?>;
-    // 不带 deviceId 时服务端会播到默认设备，本机静音——契约必须锁死。
-    expect(body, <String, Object?>{
-      'startIndex': 2,
-      'deviceId': 'local-browser',
-    });
+    // 不带 deviceId：服务端 resolve 用户选定的默认设备。硬编码本机会把已选
+    // 音箱的播放目标劫持回手机（音箱不停 + 本机开播 = 双端同响）——契约锁死。
+    expect(body, <String, Object?>{'startIndex': 2});
     expect(playback.deviceId, 'local-browser');
     expect(playback.state, PlaybackStatus.playing);
     expect(playback.track?.title, '晴天');

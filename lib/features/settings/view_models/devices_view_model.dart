@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_devices_repository.dart';
@@ -49,7 +50,16 @@ class DevicesViewModel extends Notifier<DevicesState> {
     if (state.actingId.isNotEmpty) return;
     state = state.copyWith(actingId: device.id);
     try {
-      await ref.read(devicesRepositoryProvider).select(device.id);
+      // select 返回切换后的播放状态（服务端同时暂停旧设备、更新 deviceId）。
+      // 必须注入 AudioHandler，否则：1) 本机 player 不停继续播（双端出声）；
+      // 2) AudioHandler._serverState 仍是旧 deviceId（UI 状态不刷新）。
+      final playback = await ref
+          .read(devicesRepositoryProvider)
+          .select(device.id);
+      final handler = await ref.read(hmusicAudioHandlerProvider.future);
+      // autoplay: false，切设备不自动播放——只同步状态、停旧设备。
+      // _applyServerState 内部会判断 deviceId：非本机则 stop player。
+      await handler.applyRemotePlayback(playback, autoplay: false);
       await load();
       state = state.copyWith(
         notice: HMusicNotice.success('默认设备已切换为 ${device.name}'),

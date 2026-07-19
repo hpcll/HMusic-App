@@ -17,6 +17,7 @@ abstract interface class SettingsRepository {
     String? resolveStrategy,
     List<String>? extraPlayMusicModels,
     List<ManualTrack>? manualTracks,
+    bool? announceTracks,
   });
 
   // 诊断页 3s 轮询用：直接问 Server，不经 AudioHandler。

@@ -178,7 +178,7 @@ class _NarrowBody extends StatelessWidget {
             fallbackPlaying: fallbackPlaying,
           ),
           const SizedBox(height: 4),
-          _VolumeSection(controller: controller),
+          _VolumeSection(state: state, controller: controller),
         ],
       ),
     );
@@ -280,7 +280,7 @@ class _WideBody extends ConsumerWidget {
                       fallbackPlaying: fallbackPlaying,
                     ),
                     const SizedBox(height: 4),
-                    _VolumeSection(controller: controller),
+                    _VolumeSection(state: state, controller: controller),
                   ],
                 ),
               ),
@@ -316,11 +316,7 @@ class _WideLyrics extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(playerViewModelProvider);
-    final live = ref.watch(livePositionProvider);
-    final positionMs = live.maybeWhen(
-      data: (value) => value.inMilliseconds,
-      orElse: () => state.positionMs,
-    );
+    final positionMs = playbackPositionOf(ref, state).inMilliseconds;
     final activeLine = ref
         .read(lyricViewModelProvider.notifier)
         .activeLineFor(positionMs);
@@ -341,13 +337,8 @@ class _ProgressSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final live = ref.watch(livePositionProvider);
-    final position = live.maybeWhen(
-      data: (value) => value,
-      orElse: () => Duration(milliseconds: state.positionMs),
-    );
     return PlayerProgress(
-      position: position,
+      position: playbackPositionOf(ref, state),
       duration: Duration(milliseconds: state.durationMs),
       seekEnabled: state.seekEnabled,
       onSeek: controller.seek,
@@ -356,16 +347,31 @@ class _ProgressSection extends ConsumerWidget {
 }
 
 class _VolumeSection extends ConsumerWidget {
-  const _VolumeSection({required this.controller});
+  const _VolumeSection({required this.state, required this.controller});
 
+  final HMusicPlaybackState state;
   final PlayerViewModel controller;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 远端设备（音箱）：调的是音箱音量（Server 0-100），拖动结束一次提交。
+    // ValueKey 按设备切换重建，杜绝本机/音箱共用一份未标记的 slider 状态
+    //（docs/12 §4）；非拖动时随轮询回读的真实音量同步。
+    if (!state.isLocalDevice) {
+      return PlayerVolumeRow(
+        key: ValueKey<String>('volume-${state.deviceId}'),
+        initialVolume: (state.volume / 100).clamp(0, 1).toDouble(),
+        onChanged: (_) {},
+        onChangeEnd: (value) =>
+            controller.setDeviceVolume((value * 100).round()),
+      );
+    }
+    // 本机：just_audio 音量（0-1），连续生效并持久化本地偏好。
     // handler 未就绪时不渲染音量条（本机播放尚未初始化）。
     final handlerAsync = ref.watch(hmusicAudioHandlerProvider);
     return handlerAsync.maybeWhen(
       data: (handler) => PlayerVolumeRow(
+        key: const ValueKey<String>('volume-local'),
         initialVolume: handler.player.volume,
         onChanged: (value) => controller.setLocalVolume(value),
       ),

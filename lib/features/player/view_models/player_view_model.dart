@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/audio/models/hmusic_playback_state.dart';
+import '../../../core/network/api_failure.dart';
 import '../../../shared/models/hmusic_notice.dart';
 
 final Provider<PlayerViewModel> playerViewModelProvider =
@@ -47,6 +48,18 @@ final StreamProvider<Duration> livePositionProvider = StreamProvider<Duration>((
   yield* handler.player.positionStream;
 });
 
+// 进度真相源按播放目标分流：本机取 just_audio 实时 position；远端设备（音箱）
+// 本机 player 停着，取服务端回读值（随远端轮询更新，粒度约 5s）。
+// 进度条/歌词行都从这一个口子取，禁止各页自行判断。
+Duration playbackPositionOf(WidgetRef ref, HMusicPlaybackState state) {
+  if (!state.isLocalDevice) return Duration(milliseconds: state.positionMs);
+  final live = ref.watch(livePositionProvider);
+  return live.maybeWhen(
+    data: (value) => value,
+    orElse: () => Duration(milliseconds: state.positionMs),
+  );
+}
+
 class PlayerViewModel {
   const PlayerViewModel(this._ref);
 
@@ -55,21 +68,43 @@ class PlayerViewModel {
   Future<HMusicAudioHandler> get _handler =>
       _ref.read(hmusicAudioHandlerProvider.future);
 
-  Future<void> play() async => (await _handler).play();
+  // 播放页/mini player 的播控回调都是 fire-and-forget（按钮不 await）：失败
+  // 必须在这里兜住并走全局通知流弹 toast，否则遥控模式音箱失联、会话过期时
+  // 点了毫无反应。PlaybackLoadException 在 handler 内已报过通知，不二次打扰。
+  Future<void> _run(
+    Future<void> Function(HMusicAudioHandler handler) command,
+  ) async {
+    final handler = await _handler;
+    try {
+      await command(handler);
+    } on ApiFailure catch (failure) {
+      handler.reportNotice(failure.message);
+    } on PlaybackLoadException {
+      // 装载失败已由 handler 的通知流报过。
+    }
+  }
 
-  Future<void> pause() async => (await _handler).pause();
+  Future<void> play() => _run((handler) => handler.play());
 
-  Future<void> seek(Duration position) async => (await _handler).seek(position);
+  Future<void> pause() => _run((handler) => handler.pause());
 
-  Future<void> skipToNext() async => (await _handler).skipToNext();
+  Future<void> seek(Duration position) =>
+      _run((handler) => handler.seek(position));
 
-  Future<void> skipToPrevious() async => (await _handler).skipToPrevious();
+  Future<void> skipToNext() => _run((handler) => handler.skipToNext());
 
-  Future<void> setPlayMode(PlayMode mode) async =>
-      (await _handler).setPlayMode(mode);
+  Future<void> skipToPrevious() => _run((handler) => handler.skipToPrevious());
 
+  Future<void> setPlayMode(PlayMode mode) =>
+      _run((handler) => handler.setPlayMode(mode));
+
+  // 本机音量不走网络，失败面为零，保持直通。
   Future<void> setLocalVolume(double volume) async =>
       (await _handler).setLocalVolume(volume);
+
+  // 远端设备（音箱）音量 0-100：经服务端下发设备指令，与本机音量严格分流。
+  Future<void> setDeviceVolume(int volume) =>
+      _run((handler) => handler.setDeviceVolume(volume));
 
   Future<double> readLocalVolume() async => (await _handler).player.volume;
 }

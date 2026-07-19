@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'hmusic_palette.dart';
+import 'hmusic_radii.dart';
 
 // 墨色刊物风主题:直接映射 docs/03 设计 token,不用 fromSeed——
 // 种子色会把品牌青绿铺满全站组件,违反「青绿只表达正在发生的事」铁律。
@@ -78,9 +79,12 @@ abstract final class HMusicTheme {
     );
 
     final hairline = BorderSide(color: p.line);
-    OutlineInputBorder inputBorder(Color color) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(7),
-      borderSide: BorderSide(color: color),
+    // 输入框走「灰底无描边大圆角」的软胶囊观感（对齐系统级登录表单）：
+    // 描边款的线稿感是「硬」的主要来源，全站表单一并柔化；焦点可见性由
+    // 光标承担（与搜索框同纪律），不加 focus 描边。
+    const inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(HMusicRadii.input)),
+      borderSide: BorderSide.none,
     );
 
     return base.copyWith(
@@ -100,7 +104,7 @@ abstract final class HMusicTheme {
         surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(HMusicRadii.card),
           side: hairline,
         ),
       ),
@@ -112,8 +116,10 @@ abstract final class HMusicTheme {
           // 按钮一旦放进 Row/Wrap 等不限宽父级就 RenderBox not laid out。
           // 整行大按钮由调用处的 stretch Column 或局部 styleFrom 负责。
           minimumSize: const Size(64, 44),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+          // 按钮族统一胶囊：与 dock/mini/搜索框的胶囊 chrome 同一语言，
+          // 也是「柔化直角」的主抓手（参考系统级登录页的主按钮形态）。
+          shape: const StadiumBorder(),
           textStyle: const TextStyle(
             fontSize: 14.5,
             fontWeight: FontWeight.w500,
@@ -124,8 +130,8 @@ abstract final class HMusicTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: p.text,
           side: hairline,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+          shape: const StadiumBorder(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -136,16 +142,16 @@ abstract final class HMusicTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: p.panel,
+        fillColor: p.panelSecondary,
         hintStyle: TextStyle(color: p.muted, fontSize: 14),
         labelStyle: TextStyle(color: p.muted, fontSize: 13),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 11,
+          horizontal: 14,
+          vertical: 12,
         ),
-        border: inputBorder(p.line),
-        enabledBorder: inputBorder(p.line),
-        focusedBorder: inputBorder(p.textStrong),
+        border: inputBorder,
+        enabledBorder: inputBorder,
+        focusedBorder: inputBorder,
       ),
       sliderTheme: SliderThemeData(
         activeTrackColor: ink,
@@ -173,13 +179,13 @@ abstract final class HMusicTheme {
         iconColor: p.mutedStrong,
         textColor: p.text,
       ),
-      // docs/03 模态卡：panel 底 / radius 10 / hairline，表单主体保持不透明；
-      // 遮罩的 blur(2px) 由 showHMusicDialog 负责。
+      // docs/03 模态卡：panel 底 / hairline，表单主体保持不透明；圆角随全站
+      // 柔化取 card token；遮罩的 blur(2px) 由 showHMusicDialog 负责。
       dialogTheme: DialogThemeData(
         backgroundColor: p.panel,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(HMusicRadii.card),
           side: hairline,
         ),
       ),

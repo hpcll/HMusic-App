@@ -11,13 +11,14 @@
   见 03；web 侧边栏内的 mini 播放态不复刻——桌面 mini 承载控制，不只指示）。
   mini 悬浮在内容之上，让位走 MediaQuery padding 注入（顶部 28 标题栏基线 +
   底部 mini 包络高度），内容从玻璃下滚过；macOS 窗体垫窗后毛玻璃，侧栏半透明透出壁纸。
-- **窄屏外壳**：`MobileTopBar`（品牌 + 退出）+ `content` + 底部悬浮玻璃 chrome
-  （mini 胶囊 + 5-tab dock 胶囊，对齐 iOS 26+ 原生壳形态；压进安全区悬浮，
-  向下滚收缩为「mini 内联 + 当前 tab 图标圆钮」一排，滚回顶部才展开）。
-  顶栏为全宽玻璃条；chrome 高度由 Scaffold
-  （extendBody/extendBodyBehindAppBar）注入 body 的 MediaQuery padding，
-  各页 paddingOf.top/bottom 让位。
-- **iOS 27 窄屏 chrome**：顶栏、底部导航、mini player 由 Swift/SwiftUI NativeGlassShell 覆盖在
+- **窄屏外壳**：无常驻顶栏（对齐 Apple Music）——顶部只有 `TopEdgeScrim` 滚动消融
+  （状态栏区渐进模糊 + 轻提亮，内容透见不遮挡；off 档退不透明渐变），
+  品牌见登录页、退出登录在设置菜单底部；
+  `content` + 底部悬浮玻璃 chrome（mini 胶囊 + 5-tab dock 胶囊，对齐 iOS 26+
+  原生壳形态；压进安全区悬浮，向下滚收缩为「mini 内联 + 当前 tab 图标圆钮」
+  一排，滚回顶部才展开）。底部 chrome 高度由 Scaffold（extendBody）注入 body
+  的 MediaQuery padding，各页 paddingOf.top/bottom 让位。
+- **iOS 27 窄屏 chrome**：底部导航、mini player 由 Swift/SwiftUI NativeGlassShell 覆盖在
   Flutter 内容层之上；动态高度和安全区回报给 Flutter。iOS<26 走与 Android 相同的
   Flutter 毛玻璃回退壳，形态一致、仅材质不同。
 - **Android 窄屏 chrome**：结构与 iOS 一致，由 Flutter AdaptiveGlassShell 渲染；根据性能档位关闭
@@ -83,7 +84,7 @@
 
 ## 屏 2b · 歌词页（`/lyrics`，窄屏专用沉浸式路由）
 
-- **形态**：沉浸式独立页——外壳在该路由下**隐藏侧栏/顶栏/底部导航**（routes 表 `immersive: true`）。
+- **形态**：沉浸式独立页——外壳在该路由下**隐藏侧栏/底部导航**（routes 表 `immersive: true`）。
   桌面（≥1024）访问自动跳回播放页（桌面已有双栏歌词）。
 - **布局（上→下）**：头部（收起键 chevronDown + 曲名/歌手衬线居中，右侧等宽 spacer 保证绝对居中）
   / 全屏歌词滚动（复用歌词组件：当前行衬线放大、上下 mask 渐隐、行点 seek、自动跟随 +
@@ -109,8 +110,10 @@
 
 ## 屏 3 · 搜索 search.js
 
-- **布局**：标题 + 搜索栏（输入 + 主按钮）+ 结果列表（track-row）。
-- **材质**：搜索输入主体保持不透明；滚动后顶栏可折叠为平台玻璃搜索 chrome。
+- **布局**：标题 + 搜索框 + 结果列表（track-row）。App 搜索框为灰底胶囊 +
+  放大镜前缀（对齐 Apple Music），不搬 web 的独立主按钮——Enter/键盘搜索键提交，
+  搜索中的进度反馈由结果区 spinner 承担。
+- **材质**：搜索输入主体保持不透明；后续可评估滚动时把搜索框钉为平台玻璃搜索 chrome（对齐 Apple Music 搜索页）。
 - **状态放模块级**（keyword/tracks/searched）：切页再回来不丢，刷新才重置。
 - **交互→API**：
   - 搜索（回车/按钮）→ `GET /search?q=`

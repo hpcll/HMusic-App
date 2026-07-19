@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../app/theme/hmusic_radii.dart';
 import '../data/lan_server_scanner.dart';
 
 // 发现区（连接页主角）：自动发现已是连接主路径，卡片按设计系统 .card 规格
-// （panel + hairline + radius 10 + 轻投影）承载「点选即连」；扫描态/空态只占
+// （panel + hairline + card 圆角 + 轻投影）承载「点选即连」；扫描态/空态只占
 // 一行 muted 文案，不抢构图。「重新扫描」挂标签行右端，换 Wi-Fi 不用重启。
 class DiscoveredServerList extends StatelessWidget {
   const DiscoveredServerList({
@@ -106,14 +107,14 @@ class _ServerCard extends StatelessWidget {
     final palette = context.palette;
     return Material(
       color: palette.panel,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(HMusicRadii.card),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: enabled ? onTap : null,
         child: DecoratedBox(
           decoration: BoxDecoration(
             border: Border.all(color: palette.line),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(HMusicRadii.card),
             // --shadow：0 1px 2px 4%，卡片同款克制投影。
             boxShadow: <BoxShadow>[
               BoxShadow(
@@ -132,7 +133,7 @@ class _ServerCard extends StatelessWidget {
                   height: 36,
                   decoration: BoxDecoration(
                     color: palette.panelSecondary,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(HMusicRadii.small),
                   ),
                   child: Icon(
                     Icons.dns_rounded,

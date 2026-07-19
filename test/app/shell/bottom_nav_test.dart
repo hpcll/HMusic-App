@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:hmusic/app/shell/bottom_nav.dart';
 import 'package:hmusic/app/theme/hmusic_theme.dart';
 
-// 悬浮玻璃 dock（Flutter 回退壳）：展开 = 5 tab 等分胶囊条，点 tab 切分支；
-// 收缩 = 当前 tab 的图标圆钮（无标签），点圆钮只展开、不切 tab（对齐
-// iOS 26+ 原生壳 GlassShellOverlay 的收缩语义）。
+// 悬浮玻璃 dock（Flutter 回退壳）：展开 = 5 tab 等分胶囊条，点 tab 切分支、
+// 选中药丸滑到新槽位；收缩 = 当前 tab 的图标圆钮（无标签），点圆钮只展开、
+// 不切 tab（对齐 iOS 26+ 原生壳 GlassShellOverlay 的收缩语义）。
 
 final GlobalKey<_DockHarnessState> _harnessKey = GlobalKey();
 
@@ -80,6 +80,24 @@ void main() {
     await tester.tap(find.text('搜索'));
     await tester.pumpAndSettle();
     expect(find.text('page-1'), findsOneWidget);
+  });
+
+  testWidgets('选中药丸随 tab 切换从 A 槽滑到 B 槽', (tester) async {
+    await _pumpDock(tester);
+
+    AnimatedAlign pill() => tester.widget<AnimatedAlign>(
+      find.descendant(
+        of: find.byType(AppBottomNav),
+        matching: find.byType(AnimatedAlign),
+      ),
+    );
+    // 初始分支 4 = kNavDestinations 首项「榜单」，药丸停在最左槽位。
+    expect(pill().alignment, const Alignment(-1, 0));
+
+    await tester.tap(find.text('统计'));
+    await tester.pumpAndSettle();
+    // 「统计」是第 4 槽（下标 3）→ 对齐目标 -1 + 3×2/4 = 0.5。
+    expect(pill().alignment, const Alignment(0.5, 0));
   });
 
   testWidgets('收缩态只剩当前 tab 图标圆钮，点圆钮展开且不切 tab', (tester) async {

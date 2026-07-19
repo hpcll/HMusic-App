@@ -15,6 +15,10 @@ final NotifierProvider<DiagViewModel, DiagState> diagViewModelProvider =
 class DiagViewModel extends Notifier<DiagState> {
   Timer? _timer;
 
+  // 子页是否存活（轮询开着=在页内）。迟到的异步回包只在存活时写 state：
+  // 子页销毁后再 notify 会打到已 defunct 的订阅 element 上（framework 断言）。
+  bool get _active => _timer != null;
+
   @override
   DiagState build() {
     ref.onDispose(_stop);
@@ -23,11 +27,13 @@ class DiagViewModel extends Notifier<DiagState> {
 
   void startPolling() {
     if (_timer != null) return;
-    unawaited(refreshState());
+    // 上次离开时若有请求在途，busy 标记可能悬着——重进先清，避免按钮永久禁用。
+    if (state.busyKind.isNotEmpty) state = state.copyWith(busyKind: '');
     _timer = Timer.periodic(
       const Duration(seconds: 3),
       (_) => unawaited(refreshState()),
     );
+    unawaited(refreshState());
   }
 
   void stopPolling() => _stop();
@@ -37,6 +43,7 @@ class DiagViewModel extends Notifier<DiagState> {
       final playback = await ref
           .read(settingsRepositoryProvider)
           .getPlaybackState();
+      if (!_active) return; // 页面已离开：丢弃迟到回包。
       state = state.copyWith(playback: playback);
     } on ApiFailure {
       // 尽力而为：轮询失败保持上次状态，不打扰用户。
@@ -49,13 +56,15 @@ class DiagViewModel extends Notifier<DiagState> {
     try {
       await ref.read(settingsRepositoryProvider).playTestTone();
       await refreshState();
+      if (!_active) return;
       state = state.copyWith(
         notice: const HMusicNotice.success('测试音频已下发，注意听音箱'),
       );
     } on ApiFailure catch (failure) {
+      if (!_active) return;
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
-      state = state.copyWith(busyKind: '');
+      if (_active) state = state.copyWith(busyKind: '');
     }
   }
 
@@ -65,11 +74,13 @@ class DiagViewModel extends Notifier<DiagState> {
     state = state.copyWith(busyKind: 'tts');
     try {
       await ref.read(settingsRepositoryProvider).speak(trimmed);
+      if (!_active) return;
       state = state.copyWith(notice: const HMusicNotice.success('播报已下发，注意听音箱'));
     } on ApiFailure catch (failure) {
+      if (!_active) return;
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
-      state = state.copyWith(busyKind: '');
+      if (_active) state = state.copyWith(busyKind: '');
     }
   }
 

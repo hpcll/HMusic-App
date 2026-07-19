@@ -38,6 +38,14 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       ref.read(chartsViewModelProvider.notifier).clearNotice();
     });
     final isWall = ref.watch(chartsViewModelProvider.select((s) => s.isWall));
-    return isWall ? const ChartsWall() : const ChartDetailView();
+    // 详情是页内二级态：系统返回先收回卡片墙，而不是冒泡到壳层退出/切主页
+    //（拦截期间 Android 14+ 预测性返回动画停用，代价可接受）。
+    return PopScope(
+      canPop: isWall,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) ref.read(chartsViewModelProvider.notifier).back();
+      },
+      child: isWall ? const ChartsWall() : const ChartDetailView(),
+    );
   }
 }

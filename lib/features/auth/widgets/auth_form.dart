@@ -23,8 +23,8 @@ class AuthForm extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    // 外置小标签 + panel 白底细边输入框（主题默认 filled）：浮动 label 悬在
-    // 透明描边框里是「线稿感」的来源，外置标签才是 web 表单的成品形态。
+    // 外置小标签 + 灰底无描边圆角输入框（主题默认 filled）：外置标签是 web
+    // 表单的成品形态，软胶囊输入款是全站柔化后的统一表单材质。
     const contentPadding = EdgeInsets.symmetric(horizontal: 14, vertical: 15);
     final labelStyle = TextStyle(
       fontSize: 13,

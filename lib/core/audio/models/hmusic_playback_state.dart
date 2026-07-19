@@ -58,6 +58,13 @@ class HMusicPlaybackState {
   final String? deviceId;
   final String? deviceName;
 
+  // 服务端本机虚拟设备 id（docs/12 C-08：全局单活跃本机客户端）。
+  static const String localDeviceId = 'local-browser';
+
+  // 播放目标是否本机。远端（音箱）时本机 player 必须静默，控制命令全部
+  // 经服务端转发到设备；deviceId 为空（冷状态未定设备）按远端处理，不动 player。
+  bool get isLocalDevice => deviceId == localDeviceId;
+
   @JsonKey(unknownEnumValue: PlaybackStatus.unknown)
   final PlaybackStatus state;
 

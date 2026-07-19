@@ -21,6 +21,7 @@ ServerConfig _$ServerConfigFromJson(Map<String, dynamic> json) => ServerConfig(
           ?.map((e) => ManualTrack.fromJson(e as Map<String, dynamic>))
           .toList() ??
       [],
+  announceTracks: json['announceTracks'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$ServerConfigToJson(ServerConfig instance) =>
@@ -31,6 +32,7 @@ Map<String, dynamic> _$ServerConfigToJson(ServerConfig instance) =>
       'resolveStrategy': instance.resolveStrategy,
       'extraPlayMusicModels': instance.extraPlayMusicModels,
       'manualTracks': instance.manualTracks,
+      'announceTracks': instance.announceTracks,
     };
 
 ManualTrack _$ManualTrackFromJson(Map<String, dynamic> json) => ManualTrack(
