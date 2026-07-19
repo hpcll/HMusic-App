@@ -47,6 +47,10 @@ final FutureProvider<HMusicAudioHandler> hmusicAudioHandlerProvider =
         ),
       );
       ref.onDispose(() => unawaited(handler.disposeHandler()));
+      // 冷启动接续（音箱可能还在播）：不等播放页首订，handler 就绪即拉一次
+      // 服务端状态，首页的 mini player/dock 立刻有「正在播放」。失败静默——
+      // 播放页订阅 serverPlaybackStateProvider 时会再兜底拉取并如实报错。
+      unawaited(handler.ensureServerState().catchError((Object _) {}));
       return handler;
     });
 
@@ -125,8 +129,10 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
     if (_serverState != null) return;
     final state = await _repository.getState();
     _setServerState(state);
-    // 冷启动接续音箱播放：mediaItem 立即跟进，mini player 不用等首轮轮询。
+    // 冷启动接续音箱播放：mediaItem 立即跟进，mini player 不用等首轮轮询；
+    // playbackState 同步发布，播放/暂停按钮与进度不显示成停止态。
     if (!state.isLocalDevice) _syncRemoteMediaItem(state);
+    _publishPlaybackState();
   }
 
   AudioPlayer get player => _player;

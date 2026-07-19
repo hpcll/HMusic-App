@@ -408,6 +408,8 @@ void main() {
 
     // mini player 不等首轮轮询（否则冷启动最多晚 5s 才出现）。
     expect(handler.mediaItem.valueOrNull?.title, '晴天');
+    // playbackState 同步发布：mini 卡按钮/进度立即是远端真值，不显示停止态。
+    expect(handler.playbackState.valueOrNull?.playing, isTrue);
     await handler.disposeHandler();
   });
 
