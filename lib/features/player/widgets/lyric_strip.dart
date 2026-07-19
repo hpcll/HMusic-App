@@ -54,12 +54,9 @@ class _LyricStripState extends ConsumerState<LyricStrip>
     final lines = ref.read(lyricViewModelProvider).lines;
     if (handler == null || lines.isEmpty) return;
 
-    // 远端设备（音箱）本机 player 停着：用服务端回读进度（随远端轮询更新，
-    // 粒度约 5s，染色按段步进）；本机才逐帧读 just_audio。
-    final serverState = handler.serverState;
-    var pos = serverState != null && !serverState.isLocalDevice
-        ? serverState.positionMs
-        : handler.player.position.inMilliseconds;
+    // 进度取 handler.effectivePosition 唯一出口：本机逐帧读 just_audio；
+    // 远端为服务端校准 + 本地外推，染色连续推进不按轮询步进。
+    var pos = handler.effectivePosition.inMilliseconds;
     final durMax = widget.durationMs;
     if (durMax > 0 && pos > durMax) pos = durMax;
 

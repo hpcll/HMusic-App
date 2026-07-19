@@ -81,6 +81,8 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
   late final StreamSubscription<PlayerState> _playerStateSubscription;
   late final StreamSubscription<PlaybackEvent> _playbackEventSubscription;
   server.HMusicPlaybackState? _serverState;
+  // 遥控进度外推器：远端权威进度 5s 一跳，落地即校准、读取时本地预测。
+  final RemotePositionProjector _remoteProjector = RemotePositionProjector();
   final StreamController<server.HMusicPlaybackState> _serverStateController =
       StreamController<server.HMusicPlaybackState>.broadcast();
   // 播放链路自身的失败通知：自动切歌撞死链这类 fire-and-forget 路径没有
@@ -102,6 +104,16 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
       _serverStateController.stream;
 
   server.HMusicPlaybackState? get serverState => _serverState;
+
+  // 实时进度唯一出口（进度条/歌词染色都从这取，禁止各页自行分流）：
+  // 本机取 just_audio 真值；远端取外推估算，不再随 5s 轮询按段步进。
+  Duration get effectivePosition {
+    final state = _serverState;
+    if (state != null && !state.isLocalDevice) {
+      return _remoteProjector.estimate(DateTime.now());
+    }
+    return _player.position;
+  }
 
   // 播放失败等用户必须知道的事：壳层 ref.listen 后统一弹错误 toast。
   Stream<String> get playbackNoticeStream => _noticeController.stream;
@@ -237,6 +249,7 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
 
   void _setServerState(server.HMusicPlaybackState state) {
     _serverState = state;
+    _remoteProjector.sync(state, DateTime.now());
     // 目标为远端即开状态轮询（服务端靠被读驱动音箱回读与自动连播），回本机即停。
     _remotePoller.sync(state);
     if (!_serverStateController.isClosed) _serverStateController.add(state);

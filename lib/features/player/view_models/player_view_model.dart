@@ -38,21 +38,23 @@ final StreamProvider<HMusicNotice> playbackNoticeProvider =
       yield* handler.playbackNoticeStream.map(HMusicNotice.error);
     });
 
-// 本机实时进度：just_audio 的 position（约每 200ms），播放页进度条平滑靠它，
-// 不用服务端每 3 秒的回写值（会一跳一跳）。
+// 实时进度流：统一采样 handler.effectivePosition（本机 just_audio 真值 /
+// 远端本地外推），200ms 与 just_audio positionStream 粒度一致。远端也走这条流，
+// 进度条和歌词染色平滑推进，不再随 5s 轮询按段步进。
 final StreamProvider<Duration> livePositionProvider = StreamProvider<Duration>((
   ref,
 ) async* {
   final handler = await ref.watch(hmusicAudioHandlerProvider.future);
-  yield handler.player.position;
-  yield* handler.player.positionStream;
+  yield handler.effectivePosition;
+  yield* Stream<Duration>.periodic(
+    const Duration(milliseconds: 200),
+    (_) => handler.effectivePosition,
+  );
 });
 
-// 进度真相源按播放目标分流：本机取 just_audio 实时 position；远端设备（音箱）
-// 本机 player 停着，取服务端回读值（随远端轮询更新，粒度约 5s）。
+// 进度真相源按播放目标分流已收敛进 handler.effectivePosition；
 // 进度条/歌词行都从这一个口子取，禁止各页自行判断。
 Duration playbackPositionOf(WidgetRef ref, HMusicPlaybackState state) {
-  if (!state.isLocalDevice) return Duration(milliseconds: state.positionMs);
   final live = ref.watch(livePositionProvider);
   return live.maybeWhen(
     data: (value) => value,

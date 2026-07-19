@@ -30,7 +30,7 @@
 | C-09 | `/devices/:id/select` 当前工作树新增 `playback` 字段 | JSON 解码忽略未知字段；解析 selectedDeviceId 和可选 playback | 冻结新返回 DTO 并补测试 |
 | C-10 | Server DTO 可能添加字段 | 所有响应模型容忍未知字段；只对 P0 必需字段做强校验 | 契约采用向后兼容的 additive changes |
 | C-11 | `/playback/play` 缺省 `deviceId` 时 resolve 用户选定默认设备；显式传值可换目标（Server 已在 playUrl 内先掐停在播的旧远端设备） | 点歌/playAll 一律不发 `deviceId`（跟随所选设备，杜绝劫持回本机造成双端同响）；仅本机直链恢复显式传 `local-browser` | 保持语义冻结 |
-| C-12 | Server 已内置播放看门狗（2026-07-18）：远端 playing/loading 期间每 5s 自轮询设备状态并触发自然播完连播，失败指数退避至 60s；与 refresh-on-read 共用 single-flight，杜绝并发回读双触发 nextPlayback | 播放目标为远端时客户端前台每 5s 轮询 `/playback/state`（RemoteStatePoller）仅为 UI 新鲜度，回本机即停；App 退后台轮询挂起不再影响音箱连播。已知限制：遥控模式进度粒度约 5s（跟随轮询），歌词染色按段步进 | 事件流见 C-02；如需秒级遥控进度需先落地持续 SSE |
+| C-12 | 连播主线=时长定时器（2026-07-20，对齐 xiaomusic/songloft）：远端开播即按曲目时长起服务端定时器（`scheduleAutoNext`，尾部 +2s 余量），到点直接推进队列，不依赖设备状态上报——多数小爱机型播完不转 idle、自循环重拉 URL，「等设备播完」不可靠。pause/stop/切设备停表，resume/seek 按剩余续表，本机不起表（客户端 completed 驱动）。轮询降级为：①UI 新鲜度 ②前半段校准定时器起点（`canCalibrateAutoNext`：剩余>15s 且未过半、设备未回开头才校准，曲末禁止回拨防自循环无限推迟）③兜底三道启发式（`detectRemoteTrackEnded`：近末/idle/跳回）。定时器与轮询均按 `playInstanceSeq` 去重（每次开播含 single_loop 重播递增），同一实例只推进一次 | 播放目标为远端时客户端前台每 5s 轮询 `/playback/state`（RemoteStatePoller）仅为 UI 新鲜度，回本机即停；App 退后台轮询挂起不再影响音箱连播。遥控进度经 RemotePositionProjector 本地外推（服务端校准 + 本地预测，对齐老项目 HMusic），进度条/歌词染色平滑推进不按轮询步进 | 事件流见 C-02；如需秒级遥控进度需先落地持续 SSE |
 
 ## 3. 非幂等请求与重试
 

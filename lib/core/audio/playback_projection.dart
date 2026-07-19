@@ -83,3 +83,49 @@ PlaybackState playbackStateProjection({
     queueIndex: serverState?.queueIndex,
   );
 }
+
+// 遥控进度本地外推（对齐老项目 HMusic 的「服务端校准 + 本地预测」）：
+// 远端（音箱）权威进度随 5s 轮询更新，直接消费会让进度条与歌词染色按段步进。
+// 服务端状态落地时记「基准进度 + 本地时钟锚点」，读取时按 playing 外推
+// 基准 + 流逝时间；轮询落地即是校准——同曲连续播放中 2.5s 内的回跳视为
+// 轮询延迟抖动，单调托底不回扫；切歌 / seek / 暂停立即贴齐服务端值。
+class RemotePositionProjector {
+  server.HMusicPlaybackState? _state;
+  DateTime? _anchor;
+  String? _trackId;
+
+  // 同曲单调下限：校准落地时用上次估算托底，防止外推领先被轮询值拉回扫。
+  int _floorMs = 0;
+
+  static const int _jitterToleranceMs = 2500;
+
+  void sync(server.HMusicPlaybackState state, DateTime now) {
+    final lastEstimateMs = estimate(now).inMilliseconds;
+    final playingContinues =
+        state.track?.id != null &&
+        state.track?.id == _trackId &&
+        state.state == server.PlaybackStatus.playing &&
+        _state?.state == server.PlaybackStatus.playing;
+    final backwardMs = lastEstimateMs - state.positionMs;
+    _floorMs =
+        playingContinues && backwardMs > 0 && backwardMs <= _jitterToleranceMs
+        ? lastEstimateMs
+        : 0;
+    _state = state;
+    _anchor = now;
+    _trackId = state.track?.id;
+  }
+
+  Duration estimate(DateTime now) {
+    final state = _state;
+    final anchor = _anchor;
+    if (state == null || anchor == null) return Duration.zero;
+    var ms = state.positionMs;
+    if (state.state == server.PlaybackStatus.playing) {
+      ms += now.difference(anchor).inMilliseconds;
+    }
+    if (_floorMs > ms) ms = _floorMs;
+    if (state.durationMs > 0 && ms > state.durationMs) ms = state.durationMs;
+    return Duration(milliseconds: ms);
+  }
+}
