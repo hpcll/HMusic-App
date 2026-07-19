@@ -155,13 +155,14 @@
 
 - **卡片墙**：按来源分组（本站/网易云/QQ/Apple），每组卡片网格（`chart-wall` auto-fill minmax230）。
   **卡片 = 卡头(#1封面 44px + 衬线榜名) + Top3 预览(可点播) + 「查看全部 ›」**。
-- **详情**：`‹ 返回` + `播放全部`(仅带 track 的榜) / 榜名 / 描述 / 曲目列表（chart-rank 前三衬线加深）。
+- **详情**：`‹ 返回` + `播放全部`(任意非空榜；Apple 榜服务端搜索匹配后开播) / 榜名 / 描述 / 曲目列表（chart-rank 前三衬线加深；**当前播放的条目排名位换青绿均衡器图标**标识）。
 - **交互→API**：
   - 首次加载 `GET /charts` → 有并发上限地预取 `GET /charts/:id` 填 Top3 预览（顺带焐热后端 6h 缓存）
   - 卡片 Top3 行点歌名 → 直接播（stopPropagation 防冒泡进详情）
   - 点卡片其他区 → 进详情（`GET /charts/:id`）
   - 详情行：播放 `POST /playback/play`（榜条目带 track 直接播；apple 榜 resolveEntry 先 `GET /search`）/ 加队列
-  - 播放全部 → `POST /charts/:id/play`
+  - 播放全部 → `POST /charts/:id/play`（Apple 榜条目无 track：服务端逐条搜「歌名 歌手」匹配，
+    首命中即替换队列开播，其余后台补进队列——按钮不等 50 次搜索）
 - **状态**：`previews{}`（id→Top3，undefined=加载中，null=失败回退描述），全局防连点 `actingRank`。
 
 ## 屏 7 · 统计（成熟图表组件 + HMusic 主题，纯墨配色）

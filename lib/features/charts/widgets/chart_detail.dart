@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../core/models/hmusic_track.dart';
 import '../../../shared/widgets/back_link.dart';
 import '../../../shared/widgets/hmusic_icon_button.dart';
 import '../../../shared/widgets/hmusic_track_row.dart';
 import '../../../shared/widgets/view_title.dart';
+import '../../player/view_models/player_view_model.dart';
 import '../models/chart.dart';
 import '../view_models/charts_view_model.dart';
 
@@ -24,6 +26,11 @@ class ChartDetailView extends ConsumerWidget {
 
     final detail = state.detail;
     final entries = detail?.entries ?? const <ChartEntry>[];
+    // 当前播放曲目（榜内行标识用）：优先 track.id 精确匹配（带快照的榜）；
+    // Apple 榜条目经搜索匹配后 id 对不上，退回「歌名 + 歌手」相等。
+    final playingTrack = ref.watch(
+      serverPlaybackStateProvider.select((s) => s.value?.track),
+    );
 
     return ListView(
       // 水平只留 4：曲目行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
@@ -46,7 +53,9 @@ class ChartDetailView extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
                   BackLink(label: '返回', onTap: notifier.back),
-                  if (detail?.hasPlayableEntries ?? false)
+                  // Apple 榜条目无 track 快照也能整榜播放（服务端搜索匹配），
+                  // 只要榜单有条目就给按钮。
+                  if (entries.isNotEmpty)
                     OutlinedButton(
                       onPressed: state.actingRank == 0
                           ? notifier.playAll
@@ -87,7 +96,9 @@ class ChartDetailView extends ConsumerWidget {
         else
           for (var i = 0; i < entries.length; i++)
             HMusicTrackRow(
-              leading: _ChartRank(rank: entries[i].rank),
+              leading: _isEntryPlaying(entries[i], playingTrack)
+                  ? const _PlayingRank()
+                  : _ChartRank(rank: entries[i].rank),
               coverUrl: entries[i].coverUrl,
               title: entries[i].title,
               subtitle: entries[i].artist,
@@ -142,6 +153,36 @@ class _ChartRank extends StatelessWidget {
                 color: palette.textStrong,
               )
             : TextStyle(fontSize: 14, color: palette.muted),
+      ),
+    );
+  }
+}
+
+// 条目是否为当前播放曲目：带 track 快照按 id 精确匹配；Apple 榜条目经搜索
+// 匹配后 id 对不上，退回「歌名 + 歌手」相等（对不上就不标，尽力而为）。
+bool _isEntryPlaying(ChartEntry entry, HMusicTrack? playing) {
+  if (playing == null) return false;
+  final track = entry.track;
+  if (track != null) return track.id == playing.id;
+  return entry.title == playing.title && entry.artist == playing.artist;
+}
+
+// 排名位的「正在播放」标识：青绿均衡器图标（青绿=全站「正在发生的事」语义，
+// 同 .chart-count），占位宽度与排名一致，封面列不漂移。
+class _PlayingRank extends StatelessWidget {
+  const _PlayingRank();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 28,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Icon(
+          Icons.graphic_eq_rounded,
+          size: 18,
+          color: context.palette.accent,
+        ),
       ),
     );
   }
