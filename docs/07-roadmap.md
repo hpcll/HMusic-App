@@ -38,7 +38,8 @@
       Server playUrl 换目标先掐停旧音箱、目标为远端时本机 player 静默且 5s 轮询驱动状态回读、
       播放页按钮/进度/mediaItem 取服务端权威态、音箱音量走 `/playback/volume`
       拖动结束提交；自动连播已改由 Server 播放看门狗自轮询保障（C-12，2026-07-18），
-      App 退后台不再停摆；待真机 + 真音箱验收）
+      App 退后台不再停摆；播放页已有遥控标识（设备状态行）+ 音量行尾输出钮 +
+      设备选择 sheet（docs/04 屏 2）；待真机 + 真音箱验收）
 - [ ] 直链失效按当前曲目和位置自动恢复一次
 - [ ] 冷启动展示 Server 恢复的暂停态与队列，resume 重新解析后从原位置继续
 
@@ -64,6 +65,8 @@
 - [ ] 启动、内存、耗电和音频卡顿基线
 - [ ] iOS Liquid Glass 合成、Android 三档 blur 的帧时间与 GPU 基线
 - [ ] Reduce Motion、Reduce Transparency、深浅色和高对比度验收
+- [ ] Android 实体音量键遥控音箱 spike（MediaSession remote volume 通道）；
+      iOS 无公开 API 明确不做（决议 2026-07-19，遥控音量用 App 内滑条）
 
 ## P4 - 桌面原生
 
