@@ -285,7 +285,13 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
       // 远端设备接管（或无曲目）：本机静默，周期回写只属于本机播放一并停掉。
       _reportTimer?.cancel();
       _reportTimer = null;
-      await _player.stop();
+      try {
+        // 平台侧装载卡死时 stop 可能永不返回（20s 装载超时只放弃 Dart 侧等待，
+        // 平台加载还悬着）：切设备绝不能被本机 player 拖死，限时后继续走完。
+        await _player.stop().timeout(const Duration(seconds: 3));
+      } on Exception {
+        // 超时/停失败不阻断：目标已是远端，本机下次装载前必先重设音源。
+      }
       _loadedUri = null;
       _syncRemoteMediaItem(state);
       _publishPlaybackState();
@@ -314,12 +320,20 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
           return;
         }
       }
-    } else {
+    } else if (autoplay) {
       // playAll 等组合命令的服务端响应可能不含 streamUrl（只灌队列、不预解析
       // 直链）——必须客户端主动解析，否则 autoplay 下 _loadedUri=null 导致静默
       // 失败，或有旧 _loadedUri 但 player 已 stopped 导致 play() 空转。
       await _recoverOrFail(track, state);
       return; // 恢复路径已递归走完 _applyServerState（含 autoplay）。
+    } else {
+      // 纯状态同步（切设备回本机等，autoplay=false）：不解析、不装载。
+      // 在这里重解析会把「切设备」拖成播放命令——链路慢/挂时设备 sheet 的
+      // actingId 被一路 await 卡死（转圈 + 再也切不动），还会违背切换不自动
+      // 开播的语义。用户按播放时 resume 走服务端 TTL 重解析，从原位置续播。
+      _loadedUri = null;
+      _publishPlaybackState();
+      return;
     }
     if (autoplay && _loadedUri != null) await _player.play();
     _startReporting();

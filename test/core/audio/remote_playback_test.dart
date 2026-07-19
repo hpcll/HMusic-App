@@ -410,4 +410,57 @@ void main() {
     expect(handler.mediaItem.valueOrNull?.title, '晴天');
     await handler.disposeHandler();
   });
+
+  test('切回本机（autoplay=false、无直链）：纯状态同步，不重解析不出声', () async {
+    final repository = _FakeRepository();
+    final player = _player();
+    final handler = _handler(repository, player);
+
+    await handler.applyRemotePlayback(
+      _state(
+        deviceId: HMusicPlaybackState.localDeviceId,
+        state: PlaybackStatus.paused,
+      ),
+      autoplay: false,
+    );
+
+    // 曾经这里会走 _recoverOrFail 重解析装载：把「切设备」拖成播放命令，
+    // 链路慢/挂时设备 sheet 的 actingId 被一路 await 卡死。
+    expect(repository.playTrackDeviceIds, isEmpty);
+    verifyNever(() => player.play());
+    verifyNever(
+      () => player.setAudioSource(
+        any(),
+        initialPosition: any(named: 'initialPosition'),
+      ),
+    );
+    expect(handler.serverState?.deviceId, HMusicPlaybackState.localDeviceId);
+    await handler.disposeHandler();
+  });
+
+  test('本机 player stop 悬挂：切到音箱 3s 兜底完成，不被拖死', () {
+    fakeAsync((async) {
+      final repository = _FakeRepository();
+      final player = _player();
+      // 平台侧装载卡死的写照：stop 永不返回。
+      when(() => player.stop()).thenAnswer((_) => Completer<void>().future);
+      final handler = _handler(repository, player);
+
+      var applied = false;
+      unawaited(
+        handler
+            .applyRemotePlayback(_state(), autoplay: false)
+            .then((_) => applied = true),
+      );
+      async.flushMicrotasks();
+      expect(applied, isFalse); // stop 悬着，切换还没走完。
+
+      async.elapse(const Duration(seconds: 3));
+      expect(applied, isTrue); // 3s 兜底放行，切换完成。
+      expect(handler.serverState?.deviceId, 'speaker-1');
+
+      unawaited(handler.disposeHandler());
+      async.flushMicrotasks();
+    });
+  });
 }

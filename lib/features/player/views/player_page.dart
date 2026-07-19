@@ -13,6 +13,7 @@ import '../../../shared/widgets/state_dot.dart';
 import '../../queue/views/queue_page.dart';
 import '../view_models/lyric_view_model.dart';
 import '../view_models/player_view_model.dart';
+import '../widgets/device_picker_sheet.dart';
 import '../widgets/lyric_scroll_view.dart';
 import '../widgets/lyric_strip.dart';
 import '../widgets/player_controls.dart';
@@ -166,6 +167,11 @@ class _NarrowBody extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+          // 遥控模式标识（仅目标为音箱时占行）：点击弹设备 sheet。
+          if (!state.isLocalDevice) ...<Widget>[
+            const SizedBox(height: 6),
+            _DeviceStatusRow(state: state),
+          ],
           const SizedBox(height: 12),
           // 染色歌词条：当前句逐帧染色，点击进沉浸歌词页（对齐 docs/04 窄屏布局）。
           LyricStrip(durationMs: state.durationMs),
@@ -204,7 +210,6 @@ class _WideBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final palette = context.palette;
 
     return Center(
       child: ConstrainedBox(
@@ -257,20 +262,7 @@ class _WideBody extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        StateDot(state.state),
-                        const SizedBox(width: 7),
-                        Text(
-                          _statusLabel(state),
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: palette.mutedStrong,
-                          ),
-                        ),
-                      ],
-                    ),
+                    Center(child: _DeviceStatusRow(state: state)),
                     const SizedBox(height: 24),
                     _ProgressSection(state: state, controller: controller),
                     const SizedBox(height: 8),
@@ -293,18 +285,49 @@ class _WideBody extends ConsumerWidget {
       ),
     );
   }
+}
 
-  String _statusLabel(HMusicPlaybackState state) {
-    final status = switch (state.state) {
-      PlaybackStatus.playing => '正在播放',
-      PlaybackStatus.paused => '已暂停',
-      PlaybackStatus.loading => '加载中',
-      PlaybackStatus.error => '播放出错',
-      _ => '未在播放',
-    };
-    final device = state.deviceName;
-    return device == null || device.isEmpty ? status : '$status · $device';
+// 设备状态行（B1/B2）：StateDot + 「正在播放 · 客厅音箱」，整行可点弹设备
+// sheet——宽屏常驻（同 web 状态行），窄屏仅遥控模式占行（本机是默认心智）。
+class _DeviceStatusRow extends StatelessWidget {
+  const _DeviceStatusRow({required this.state});
+
+  final HMusicPlaybackState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: () => showDevicePickerSheet(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            StateDot(state.state),
+            const SizedBox(width: 7),
+            Text(
+              _playbackStatusLabel(state),
+              style: TextStyle(fontSize: 12.5, color: palette.mutedStrong),
+            ),
+          ],
+        ),
+      ),
+    );
   }
+}
+
+String _playbackStatusLabel(HMusicPlaybackState state) {
+  final status = switch (state.state) {
+    PlaybackStatus.playing => '正在播放',
+    PlaybackStatus.paused => '已暂停',
+    PlaybackStatus.loading => '加载中',
+    PlaybackStatus.error => '播放出错',
+    _ => '未在播放',
+  };
+  final device = state.deviceName;
+  return device == null || device.isEmpty ? status : '$status · $device';
 }
 
 // 桌面右栏歌词：复用沉浸歌词页的滚动组件，当前行按本机实时进度算。
@@ -354,6 +377,23 @@ class _VolumeSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 音量行 = 音量条 + 行尾输出钮（B2，对齐 Apple Music 输出按钮的位置逻辑）。
+    // 输出钮本机/遥控两种模式都在——它正是从本机切去音箱的入口。
+    return Row(
+      children: <Widget>[
+        Expanded(child: _slider(ref)),
+        IconButton(
+          tooltip: '播放设备',
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.speaker_group_rounded, size: 20),
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          onPressed: () => showDevicePickerSheet(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _slider(WidgetRef ref) {
     // 远端设备（音箱）：调的是音箱音量（Server 0-100），拖动结束一次提交。
     // ValueKey 按设备切换重建，杜绝本机/音箱共用一份未标记的 slider 状态
     //（docs/12 §4）；非拖动时随轮询回读的真实音量同步。
@@ -367,7 +407,7 @@ class _VolumeSection extends ConsumerWidget {
       );
     }
     // 本机：just_audio 音量（0-1），连续生效并持久化本地偏好。
-    // handler 未就绪时不渲染音量条（本机播放尚未初始化）。
+    // handler 未就绪时不渲染音量条（本机播放尚未初始化），输出钮照常可用。
     final handlerAsync = ref.watch(hmusicAudioHandlerProvider);
     return handlerAsync.maybeWhen(
       data: (handler) => PlayerVolumeRow(
