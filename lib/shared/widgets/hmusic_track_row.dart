@@ -20,6 +20,10 @@ class HMusicTrackRow extends StatelessWidget {
     this.onTap,
     this.highlight = false,
     this.showDivider = true,
+    this.contentPadding = const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 10,
+    ),
     super.key,
   });
 
@@ -41,6 +45,7 @@ class HMusicTrackRow extends StatelessWidget {
   // 队列当前曲：标题与序号转青绿（对齐 .queue-current）。
   final bool highlight;
   final bool showDivider;
+  final EdgeInsetsGeometry contentPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +75,7 @@ class HMusicTrackRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(HMusicRadii.small),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: contentPadding,
             child: Row(
               children: <Widget>[
                 if (leading != null) ...<Widget>[

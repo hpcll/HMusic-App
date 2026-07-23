@@ -9,53 +9,45 @@ class MethodChannelPlatformShellBridge implements PlatformShellBridge {
     MethodChannel? methodChannel,
     EventChannel? eventChannel,
   }) : _methodChannel = methodChannel ?? const MethodChannel(_methodName),
-       _eventChannel = eventChannel ?? const EventChannel(_eventName);
+       _eventChannel = eventChannel ?? const EventChannel(_eventName) {
+    _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
+      _handleEvent,
+      onError: _handleEventError,
+      onDone: _closeEventStreams,
+    );
+  }
 
   static const String _methodName = 'com.hupc.hmusic/platform_shell';
   static const String _eventName = 'com.hupc.hmusic/platform_shell/events';
 
   final MethodChannel _methodChannel;
   final EventChannel _eventChannel;
+  final StreamController<ShellReady> _readyController =
+      StreamController<ShellReady>.broadcast();
+  final StreamController<ShellIntent> _intentController =
+      StreamController<ShellIntent>.broadcast();
+  final StreamController<ShellLayout> _layoutController =
+      StreamController<ShellLayout>.broadcast();
+  late final StreamSubscription<Object?> _eventSubscription;
+
+  ShellReady? _latestReady;
+  ShellLayout? _latestLayout;
 
   @override
-  Stream<ShellReady> get readyEvents => _events
-      .where((event) => event['type'] == 'ready')
-      .map(
-        (event) => ShellReady(
-          capabilities:
-              (event['capabilities'] as List<Object?>?)
-                  ?.whereType<String>()
-                  .toList() ??
-              const <String>[],
-        ),
-      );
+  Stream<ShellReady> get readyEvents =>
+      _replayLatest(_readyController.stream, () => _latestReady);
 
   @override
-  Stream<ShellIntent> get intents => _events
-      .where((event) => event['type'] == 'intent')
-      .map(
-        (event) => (_parseIntent(event['intent'] as String?), event['value']),
-      )
-      .where((pair) => pair.$1 != null)
-      .map((pair) => ShellIntent(pair.$1!, pair.$2 as String?));
+  Stream<ShellIntent> get intents => _intentController.stream;
 
   @override
-  Stream<ShellLayout> get layoutChanges => _events
-      .where((event) => event['type'] == 'layoutChanged')
-      .map(
-        (event) => ShellLayout(
-          topInset: (event['topInset'] as num?)?.toDouble() ?? 0,
-          bottomInset: (event['bottomInset'] as num?)?.toDouble() ?? 0,
-        ),
-      );
+  Stream<ShellLayout> get layoutChanges =>
+      _replayLatest(_layoutController.stream, () => _latestLayout);
 
-  // 单例广播流：ready/layout/intent 三路订阅共享一条原生 EventChannel 订阅。
-  // 若做成 getter 每次新建流，多个 listener 会在原生侧反复 onListen 互相顶掉 sink。
-  late final Stream<Map<String, Object?>> _events = _eventChannel
-      .receiveBroadcastStream()
-      .where((Object? event) => event is Map<Object?, Object?>)
-      .cast<Map<Object?, Object?>>()
-      .map((event) => Map<String, Object?>.from(event));
+  Future<void> dispose() async {
+    await _eventSubscription.cancel();
+    await _closeEventStreams();
+  }
 
   @override
   Future<void> configure({
@@ -126,6 +118,62 @@ class MethodChannelPlatformShellBridge implements PlatformShellBridge {
       'shell.updateScroll',
       <String, Object?>{'minimized': minimized},
     );
+  }
+
+  void _handleEvent(Object? rawEvent) {
+    if (rawEvent is! Map<Object?, Object?>) return;
+    final event = Map<String, Object?>.from(rawEvent);
+    switch (event['type']) {
+      case 'ready':
+        final ready = ShellReady(
+          capabilities:
+              (event['capabilities'] as List<Object?>?)
+                  ?.whereType<String>()
+                  .toList() ??
+              const <String>[],
+        );
+        _latestReady = ready;
+        _readyController.add(ready);
+      case 'layoutChanged':
+        final layout = ShellLayout(
+          topInset: (event['topInset'] as num?)?.toDouble() ?? 0,
+          bottomInset: (event['bottomInset'] as num?)?.toDouble() ?? 0,
+        );
+        _latestLayout = layout;
+        _layoutController.add(layout);
+      case 'intent':
+        final type = _parseIntent(event['intent'] as String?);
+        if (type != null) {
+          _intentController.add(ShellIntent(type, event['value'] as String?));
+        }
+    }
+  }
+
+  void _handleEventError(Object error, StackTrace stackTrace) {
+    _readyController.addError(error, stackTrace);
+    _intentController.addError(error, stackTrace);
+    _layoutController.addError(error, stackTrace);
+  }
+
+  Future<void> _closeEventStreams() async {
+    await Future.wait(<Future<void>>[
+      if (!_readyController.isClosed) _readyController.close(),
+      if (!_intentController.isClosed) _intentController.close(),
+      if (!_layoutController.isClosed) _layoutController.close(),
+    ]);
+  }
+
+  Stream<T> _replayLatest<T>(Stream<T> updates, T? Function() latest) {
+    return Stream<T>.multi((controller) {
+      final subscription = updates.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = subscription.cancel;
+      final current = latest();
+      if (current != null) controller.add(current);
+    }, isBroadcast: true);
   }
 
   ShellIntentType? _parseIntent(String? value) {

@@ -32,4 +32,8 @@ abstract interface class SettingsRepository {
     required String currentPassword,
     required String newPassword,
   });
+
+  // 删除账户（App Store 合规）：校验密码后服务端物理清除全部数据并回到未初始化态。
+  // 成功后调用方须清 token + 会话失效回登录/setup。
+  Future<void> deleteAccount({required String password});
 }

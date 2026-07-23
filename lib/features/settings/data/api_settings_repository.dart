@@ -142,6 +142,14 @@ class ApiSettingsRepository implements SettingsRepository {
     }
   }
 
+  @override
+  Future<void> deleteAccount({required String password}) async {
+    await _apiClient.deleteMap(
+      '/auth/account',
+      body: <String, Object?>{'password': password},
+    );
+  }
+
   Future<Map<String, Object?>?> _tryGet(String path) async {
     try {
       return await _apiClient.getMap(path);

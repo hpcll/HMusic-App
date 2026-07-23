@@ -53,11 +53,13 @@ final class NativeGlassShellChannel: NSObject, FlutterStreamHandler {
       // 系统无障碍开关经 SwiftUI Environment 自动生效；Dart 下发值作补充（取 or）。
       host.state.reduceMotion = args["reduceMotion"] as? Bool ?? false
       host.state.reduceTransparency = args["reduceTransparency"] as? Bool ?? false
+      host.syncSystemTabBar()
       result(nil)
     case "shell.updateNavigation":
       if let tab = args["selectedTab"] as? String, !tab.isEmpty {
         host.state.selectedTab = tab
       }
+      host.syncSystemTabBar()
       result(nil)
     case "shell.updateNowPlaying":
       host.state.trackId = args["trackId"] as? String
@@ -74,10 +76,13 @@ final class NativeGlassShellChannel: NSObject, FlutterStreamHandler {
     case "shell.updateLayout":
       host.state.showTabBar = args["showTabBar"] as? Bool ?? false
       host.state.showMiniPlayer = args["showMiniPlayer"] as? Bool ?? false
+      host.syncSystemTabBar()
       host.reportInsetIfNeeded()
       result(nil)
     case "shell.updateScroll":
       host.state.minimized = args["minimized"] as? Bool ?? false
+      host.syncSystemTabBar()
+      host.reportInsetIfNeeded()
       result(nil)
     default:
       result(FlutterMethodNotImplemented)

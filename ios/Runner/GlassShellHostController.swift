@@ -12,7 +12,9 @@ final class GlassShellHostController {
 
   private weak var flutterViewController: UIViewController?
   private var hosting: UIHostingController<AnyView>?
-  private var passthrough: PassthroughView?
+  private var systemTabs: SystemGlassTabBarController?
+  private var overlayPassthrough: PassthroughView?
+  private var tabsPassthrough: PassthroughView?
   private var lastReportedInset: CGFloat = -1
   private let onIntent: (String, String?) -> Void
   private let onInsetChanged: (CGFloat) -> Void
@@ -29,41 +31,96 @@ final class GlassShellHostController {
     guard hosting == nil else { return }
     self.flutterViewController = flutterViewController
 
-    let passthrough = PassthroughView()
+    // 26.x 系统 tab bar 的玻璃与 SwiftUI glassEffect 观感不同（宽平底、偏乳白），
+    // 与 mini 胶囊风格割裂；该版本走 overlay 自绘 dock，27+ 才挂系统 bar。
+    let useSystemDock: Bool
+    if #available(iOS 27.0, *) {
+      useSystemDock = true
+    } else {
+      useSystemDock = false
+    }
+    state.usesSystemDock = useSystemDock
+
+    let overlayPassthrough = PassthroughView()
     let overlay = GlassShellOverlay(
       state: state,
       onIntent: { [weak self] type, value in
         self?.handleOverlayIntent(type: type, value: value)
       },
-      onChromeFrame: { [weak passthrough] id, frame in
-        passthrough?.setInteractiveFrame(frame, for: id)
+      onChromeFrame: { [weak overlayPassthrough] id, frame in
+        overlayPassthrough?.setInteractiveFrame(frame, for: id)
       }
     )
     let hosting = UIHostingController(rootView: AnyView(overlay))
     hosting.view.backgroundColor = .clear
-    passthrough.translatesAutoresizingMaskIntoConstraints = false
+    overlayPassthrough.translatesAutoresizingMaskIntoConstraints = false
     hosting.view.translatesAutoresizingMaskIntoConstraints = false
 
+    if useSystemDock {
+      let tabsPassthrough = PassthroughView()
+      let systemTabs = SystemGlassTabBarController(
+        onSelect: { [weak self] tab in
+          self?.onIntent("selectTab", tab)
+        },
+        // systemTabs 与命中层都铺满 window；仍统一把系统回报的 window 坐标
+        // 转成本层坐标，避免首次布局和收缩态混用两个原点。
+        onFrame: { [weak self, weak tabsPassthrough] windowFrame in
+          guard let tabsPassthrough else { return }
+          let localFrame = tabsPassthrough.convert(windowFrame, from: nil)
+          tabsPassthrough.setInteractiveFrame(localFrame, for: "systemDock")
+          self?.handleSystemDockFrame(localFrame)
+        }
+      )
+      systemTabs.view.backgroundColor = .clear
+      tabsPassthrough.translatesAutoresizingMaskIntoConstraints = false
+      systemTabs.view.translatesAutoresizingMaskIntoConstraints = false
+      flutterViewController.addChild(systemTabs)
+      tabsPassthrough.addSubview(systemTabs.view)
+      flutterViewController.view.addSubview(tabsPassthrough)
+      systemTabs.didMove(toParent: flutterViewController)
+      NSLayoutConstraint.activate([
+        tabsPassthrough.leadingAnchor.constraint(
+          equalTo: flutterViewController.view.leadingAnchor),
+        tabsPassthrough.trailingAnchor.constraint(
+          equalTo: flutterViewController.view.trailingAnchor),
+        tabsPassthrough.topAnchor.constraint(equalTo: flutterViewController.view.topAnchor),
+        tabsPassthrough.bottomAnchor.constraint(
+          equalTo: flutterViewController.view.bottomAnchor),
+        systemTabs.view.leadingAnchor.constraint(equalTo: tabsPassthrough.leadingAnchor),
+        systemTabs.view.trailingAnchor.constraint(equalTo: tabsPassthrough.trailingAnchor),
+        systemTabs.view.topAnchor.constraint(equalTo: tabsPassthrough.topAnchor),
+        // UITabBarController must receive the full window bounds. UIKit applies
+        // the bottom safe area itself; ending this view at the safe-area edge
+        // double-insets its floating bar and clips the tab-title layout.
+        systemTabs.view.bottomAnchor.constraint(
+          equalTo: tabsPassthrough.bottomAnchor),
+      ])
+      self.systemTabs = systemTabs
+      self.tabsPassthrough = tabsPassthrough
+    }
+
     flutterViewController.addChild(hosting)
-    passthrough.addSubview(hosting.view)
-    flutterViewController.view.addSubview(passthrough)
+    overlayPassthrough.addSubview(hosting.view)
+    flutterViewController.view.addSubview(overlayPassthrough)
     NSLayoutConstraint.activate([
-      passthrough.leadingAnchor.constraint(
+      overlayPassthrough.leadingAnchor.constraint(
         equalTo: flutterViewController.view.leadingAnchor),
-      passthrough.trailingAnchor.constraint(
+      overlayPassthrough.trailingAnchor.constraint(
         equalTo: flutterViewController.view.trailingAnchor),
-      passthrough.topAnchor.constraint(equalTo: flutterViewController.view.topAnchor),
-      passthrough.bottomAnchor.constraint(
+      overlayPassthrough.topAnchor.constraint(
+        equalTo: flutterViewController.view.topAnchor),
+      overlayPassthrough.bottomAnchor.constraint(
         equalTo: flutterViewController.view.bottomAnchor),
-      hosting.view.leadingAnchor.constraint(equalTo: passthrough.leadingAnchor),
-      hosting.view.trailingAnchor.constraint(equalTo: passthrough.trailingAnchor),
-      hosting.view.topAnchor.constraint(equalTo: passthrough.topAnchor),
-      hosting.view.bottomAnchor.constraint(equalTo: passthrough.bottomAnchor),
+      hosting.view.leadingAnchor.constraint(equalTo: overlayPassthrough.leadingAnchor),
+      hosting.view.trailingAnchor.constraint(equalTo: overlayPassthrough.trailingAnchor),
+      hosting.view.topAnchor.constraint(equalTo: overlayPassthrough.topAnchor),
+      hosting.view.bottomAnchor.constraint(equalTo: overlayPassthrough.bottomAnchor),
     ])
     hosting.didMove(toParent: flutterViewController)
     self.hosting = hosting
-    self.passthrough = passthrough
+    self.overlayPassthrough = overlayPassthrough
     syncSafeArea()
+    syncSystemTabBar()
   }
 
   // 把 window 安全区注入 SwiftUI 状态（overlay 压安全区定位要用）。
@@ -82,9 +139,18 @@ final class GlassShellHostController {
     syncSafeArea()
     var inset: CGFloat = 0
     if state.showTabBar {
-      inset += GlassShellMetrics.bottomOffset(safeArea: state.bottomSafeArea)
-      inset += GlassShellMetrics.dockHeight
-      if state.showMiniPlayer && state.trackId != nil {
+      if state.usesSystemDock {
+        inset += state.minimized
+          ? state.systemDockBottomOffset + GlassShellMetrics.miniHeight
+          : state.systemDockClearance
+      } else {
+        // 自绘 dock：几何全部来自本地常量，不依赖系统 bar 回报。
+        inset += GlassShellMetrics.bottomOffset(safeArea: state.bottomSafeArea)
+        inset += state.minimized
+          ? GlassShellMetrics.miniHeight
+          : GlassShellMetrics.dockHeight
+      }
+      if !state.minimized && state.showMiniPlayer && state.trackId != nil {
         inset += GlassShellMetrics.miniHeight + GlassShellMetrics.gap
       }
       inset += GlassShellMetrics.contentClearance
@@ -94,16 +160,208 @@ final class GlassShellHostController {
     onInsetChanged(inset)
   }
 
+  func syncSystemTabBar() {
+    systemTabs?.apply(
+      selectedTab: state.selectedTab,
+      visible: state.showTabBar && !state.minimized,
+      reduceMotion: state.reduceMotion
+    )
+  }
+
   private func handleOverlayIntent(type: String, value: String?) {
     if type == "expand" {
       // 收缩态点 pill：本地立即展开保证跟手，同时回传 expandDock 让 Dart
       // 复位滚动去重基线——否则 Dart 仍认为「已收缩」，下一次下滑被去重
       // 拦截，dock 永远收不回去。
       state.minimized = false
+      syncSystemTabBar()
       onIntent("expandDock", nil)
       return
     }
     onIntent(type, value)
+  }
+
+  private func handleSystemDockFrame(_ frame: CGRect) {
+    guard !frame.isEmpty, let passthrough = tabsPassthrough else { return }
+    let clearance = max(0, passthrough.bounds.maxY - frame.minY)
+    let bottomOffset = max(0, passthrough.bounds.maxY - frame.maxY)
+    let horizontalInset = max(
+      GlassShellMetrics.systemDockMinimumHorizontalInset,
+      max(frame.minX, passthrough.bounds.maxX - frame.maxX)
+    )
+    var geometryChanged = false
+    if abs(state.systemDockHorizontalInset - horizontalInset) > 0.5 {
+      state.systemDockHorizontalInset = horizontalInset
+      geometryChanged = true
+    }
+    if abs(state.systemDockClearance - clearance) > 0.5 {
+      state.systemDockClearance = clearance
+      geometryChanged = true
+    }
+    if abs(state.systemDockBottomOffset - bottomOffset) > 0.5 {
+      state.systemDockBottomOffset = bottomOffset
+      geometryChanged = true
+    }
+    if geometryChanged {
+      reportInsetIfNeeded()
+    }
+  }
+}
+
+// 真正的系统 tab bar：布局、Liquid Glass 选中态、按住滑动和系统动效全部交给 UIKit。
+// 子控制器保持透明，业务内容仍由下层 Flutter 绘制；代理只回传 tab id。
+@available(iOS 26.0, *)
+private final class SystemGlassTabBarController: UITabBarController,
+  UITabBarControllerDelegate
+{
+  private let onSelect: (String) -> Void
+  private let onFrame: (CGRect) -> Void
+  private var applyingState = false
+  private var appliedResolvedItemColors = false
+
+  init(onSelect: @escaping (String) -> Void, onFrame: @escaping (CGRect) -> Void) {
+    self.onSelect = onSelect
+    self.onFrame = onFrame
+    super.init(nibName: nil, bundle: nil)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { nil }
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    view.backgroundColor = .clear
+    mode = .tabBar
+    tabBarMinimizeBehavior = .never
+    tabBar.tintColor = .label
+    tabBar.unselectedItemTintColor = .secondaryLabel
+    tabs = GlassDockTab.all.map { item in
+      let tab = UITab(
+        title: item.label,
+        image: UIImage(systemName: item.symbol),
+        identifier: item.id
+      ) { _ in
+        let controller = UIViewController()
+        controller.view.backgroundColor = .clear
+        return controller
+      }
+      tab.preferredPlacement = .fixed
+      return tab
+    }
+    // tabs 赋值会让系统自动选中第一项；此后再挂代理，避免把初始化选择
+    // 误报成用户 intent，抢走 Flutter 当前路由。
+    delegate = self
+    applyTabItemColors()
+  }
+
+  private func applyTabItemColors() {
+    let appearance = tabBar.standardAppearance
+    let itemAppearances = [
+      appearance.stackedLayoutAppearance,
+      appearance.inlineLayoutAppearance,
+      appearance.compactInlineLayoutAppearance,
+    ]
+    for itemAppearance in itemAppearances {
+      itemAppearance.normal.iconColor = .secondaryLabel
+      itemAppearance.normal.titleTextAttributes = [
+        .foregroundColor: UIColor.secondaryLabel,
+      ]
+      itemAppearance.selected.iconColor = .label
+      itemAppearance.selected.titleTextAttributes = [
+        .foregroundColor: UIColor.label,
+      ]
+    }
+    tabBar.standardAppearance = appearance
+    tabBar.scrollEdgeAppearance = appearance
+    // UITab can rebuild its internal bar items when the tab collection changes;
+    // reassert the semantic colors after the appearance is installed.
+    tabBar.tintColor = .label
+    tabBar.unselectedItemTintColor = .secondaryLabel
+    applyResolvedItemColorsIfPossible()
+  }
+
+  private func applyResolvedItemColorsIfPossible() {
+    guard !appliedResolvedItemColors,
+      let items = tabBar.items,
+      items.count == GlassDockTab.all.count
+    else { return }
+    for (item, tab) in zip(items, GlassDockTab.all) {
+      item.image = UIImage(systemName: tab.symbol)?.withTintColor(
+        .secondaryLabel,
+        renderingMode: .alwaysOriginal
+      )
+      item.selectedImage = UIImage(systemName: tab.symbol)?.withTintColor(
+        .label,
+        renderingMode: .alwaysOriginal
+      )
+      item.setTitleTextAttributes(
+        [.foregroundColor: UIColor.secondaryLabel],
+        for: .normal
+      )
+      item.setTitleTextAttributes(
+        [.foregroundColor: UIColor.label],
+        for: .selected
+      )
+    }
+    appliedResolvedItemColors = true
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    applyResolvedItemColorsIfPossible()
+    reportTabBarFrame()
+  }
+
+  private func reportTabBarFrame() {
+    guard !isTabBarHidden else {
+      onFrame(.zero)
+      return
+    }
+    guard let window = view.window else { return }
+    // On iOS 26 the tab bar's bounds include the home-indicator safe area,
+    // while the floating platter is the visible/tappable chrome. Use that
+    // platter for the compact overlay's bottom edge; fall back to the public
+    // tab bar frame if UIKit changes the internal hierarchy.
+    let source = tabBar.subviews.first { subview in
+      let frame = subview.frame
+      return frame.minY <= 0.5
+        && frame.width < tabBar.bounds.width
+        && frame.height > 0
+        && frame.height < tabBar.bounds.height
+    } ?? tabBar
+    onFrame(source.convert(source.bounds, to: window))
+  }
+
+  func apply(selectedTab id: String, visible: Bool, reduceMotion: Bool) {
+    if isTabBarHidden == visible {
+      setTabBarHidden(!visible, animated: !reduceMotion)
+    }
+    if let tab = tab(forIdentifier: id), selectedTab !== tab {
+      applyingState = true
+      selectedTab = tab
+      // UIKit 可能把程序化选择的代理回调推迟到本轮主队列末尾；延后一拍
+      // 再开放用户 intent，保证 Dart 下发状态不会反向触发导航。
+      DispatchQueue.main.async { [weak self] in
+        self?.applyingState = false
+      }
+    }
+    view.setNeedsLayout()
+    // UITabBarController 可能在第一次状态更新后才解析出最终系统 bar frame；
+    // 主队列下一拍主动回报，不能等用户点 tab 才触发布局。
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.view.layoutIfNeeded()
+      self.reportTabBarFrame()
+    }
+  }
+
+  func tabBarController(
+    _ tabBarController: UITabBarController,
+    didSelectTab selectedTab: UITab,
+    previousTab: UITab?
+  ) {
+    guard !applyingState else { return }
+    onSelect(selectedTab.identifier)
   }
 }
 

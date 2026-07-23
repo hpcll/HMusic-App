@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/hmusic_track.dart';
+import '../../../core/platform_shell/widgets/adaptive_glass_surface.dart';
 import '../../../shared/widgets/hmusic_toast.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../view_models/search_view_model.dart';
+import '../widgets/download_quality_sheet.dart';
 import '../widgets/search_input.dart';
 import '../widgets/search_result_list.dart';
 
@@ -77,11 +79,21 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           const Center(child: Text('没有找到结果')),
         ] else if (state.tracks.isNotEmpty) ...<Widget>[
           const SizedBox(height: 18),
-          SearchResultList(
-            tracks: state.tracks,
-            playingTrackId: state.playingTrackId,
-            onPlay: _play,
-            onEnqueue: _enqueue,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: AdaptiveGlassSurface(
+              quality: resolveGlassQuality(context),
+              padding: EdgeInsets.zero,
+              borderRadius: const BorderRadius.all(Radius.circular(14)),
+              shadow: false,
+              child: SearchResultList(
+                tracks: state.tracks,
+                playingTrackId: state.playingTrackId,
+                onPlay: _play,
+                onEnqueue: _enqueue,
+                onDownload: _download,
+              ),
+            ),
           ),
         ],
       ],
@@ -100,5 +112,13 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   Future<void> _enqueue(HMusicTrack track) {
     return ref.read(searchViewModelProvider.notifier).enqueue(track);
+  }
+
+  Future<void> _download(HMusicTrack track) async {
+    final quality = await showDownloadQualitySheet(context, track);
+    if (quality == null || !mounted) return; // 取消
+    await ref
+        .read(searchViewModelProvider.notifier)
+        .download(track, quality: quality.isEmpty ? null : quality);
   }
 }

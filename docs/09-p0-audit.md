@@ -73,8 +73,10 @@ P0 可依赖：
 - [x] App `flutter analyze` 和 `flutter test` 零错误。
 - [x] MVVM 依赖方向和文件规模检查通过；无巨型 View/ViewModel/Service（audio_handler 拆 projection 后 248 行）。
 - [~] iOS 27 原生玻璃底栏/mini player 与 Flutter 双向 intent 打通；旧 iOS 可回退。
-      （Dart PlatformShellController + MethodChannel 桥 + Swift 通道契约补齐，iOS 26.5 模拟器编译通过；
-       SwiftUI 玻璃渲染与真机折射待设备门禁。）
+      （Dart PlatformShellController + MethodChannel 桥 + Swift 通道契约补齐；EventChannel 首帧
+       `ready/layoutChanged` 已缓存重放，避免能力事件丢失后误走 Flutter 回退壳；iOS 27 真机
+       已完成玻璃 dock 与内容折射镜像验收；展开态已替换为原生 `UITabBarController`，系统选择/
+       按住滑动动态待本轮复验；tab intent 已完成前轮真机验收；mini player 和旧 iOS 回退仍待真机验收。）
 - [ ] Android High/Medium/Off 三档玻璃壳布局一致，关闭 blur 后功能完整。
 - [x] 错地址、离线、非 HMusic 服务、401 都有确定状态且不会卡启动（401 单飞 SessionController + 回登录页）。
 - [ ] 首次 setup 与已有账号 login 均可进入应用壳。

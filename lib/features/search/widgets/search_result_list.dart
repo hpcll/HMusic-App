@@ -11,6 +11,7 @@ class SearchResultList extends StatelessWidget {
     required this.playingTrackId,
     required this.onPlay,
     required this.onEnqueue,
+    required this.onDownload,
     super.key,
   });
 
@@ -18,6 +19,7 @@ class SearchResultList extends StatelessWidget {
   final String? playingTrackId;
   final ValueChanged<HMusicTrack> onPlay;
   final ValueChanged<HMusicTrack> onEnqueue;
+  final ValueChanged<HMusicTrack> onDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -34,12 +36,18 @@ class SearchResultList extends StatelessWidget {
     return HMusicTrackRow(
       coverUrl: track.coverUrl,
       title: track.title,
+      contentPadding: const EdgeInsets.only(top: 10, right: 12, bottom: 10),
       subtitle: <String>[
         track.artist,
         if (track.album != null && track.album!.isNotEmpty) track.album!,
       ].join(' · '),
       showDivider: showDivider,
       actions: <Widget>[
+        HMusicIconButton(
+          icon: Icons.download_rounded,
+          tooltip: '下载到服务器',
+          onPressed: () => onDownload(track),
+        ),
         HMusicIconButton(
           icon: Icons.add_rounded,
           tooltip: '加入队列',

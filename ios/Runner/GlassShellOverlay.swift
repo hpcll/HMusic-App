@@ -1,6 +1,7 @@
 import SwiftUI
 
-// iOS 26+ 液态玻璃 dock + mini player 的 SwiftUI overlay。
+// iOS 26+ mini player 与收缩圆钮的 SwiftUI overlay；展开态 dock 由宿主中的
+// UITabBarController 绘制，以获得完整系统 Liquid Glass 行为。
 // 只渲染 chrome 并回传语义 intent；不持有 token、不调 Server（docs/06 §3）。
 //
 // 形态对齐 Apple Music：mini player 胶囊悬浮在 dock 上方，chrome 压进底部
@@ -9,7 +10,7 @@ import SwiftUI
 // 统一在 Dart ScrollMinimizeListener，此处只渲染。玻璃只用于这两块 chrome，
 // 内容（下层 Flutter）不玻璃化（AGENTS 铁律 9）。
 //
-// onChromeFrame：dock/mini 各自把实时 frame（global 坐标）上报宿主，
+// onChromeFrame：mini/收缩圆钮把实时 frame（global 坐标）上报宿主，
 // UIKit 层据此做精确 hitTest——frame 内吃事件，frame 外穿给 Flutter。
 // onGeometryChange 在动画每帧回调，命中区始终跟手，不会出现「看着在这里
 // 点了没反应/点空白误触」。
@@ -24,7 +25,10 @@ struct GlassShellOverlay: View {
   // 收缩/展开时 mini 与 dock 在竖排/内联两种布局间搬家，matchedGeometryEffect
   // 让同一块 chrome 连续形变过去，而不是删除+插入的硬切。
   @Namespace private var chromeSpace
-
+  // 自绘 dock 宽度（用于按槽位定位选中气泡）与当前按压/拖动命中的槽位；
+  // pressedIndex 为 nil 时气泡落在选中 tab，非 nil 时跟手到指下槽位。
+  @State private var dockWidth: CGFloat = 0
+  @State private var pressedIndex: Int?
   var body: some View {
     VStack(spacing: GlassShellMetrics.gap) {
       Spacer(minLength: 0)
@@ -32,17 +36,15 @@ struct GlassShellOverlay: View {
         // 收缩：mini 内联占满剩余宽度、图标圆钮贴右（无 mini 时圆钮居中）。
         HStack(spacing: GlassShellMetrics.gap) {
           miniSlot
-          dockSlot
+          compactDockSlot
         }
       } else {
         miniSlot
-        dockSlot
+        fullDockSlot
       }
     }
-    .padding(.horizontal, GlassShellMetrics.horizontalPadding)
-    .padding(
-      .bottom, GlassShellMetrics.bottomOffset(safeArea: state.bottomSafeArea)
-    )
+    .padding(.horizontal, overlayHorizontalPadding)
+    .padding(.bottom, overlayBottomPadding)
     // chrome 压进系统安全区贴底（Apple Music dock 形态）。
     .ignoresSafeArea(.all, edges: .bottom)
     .animation(
@@ -51,6 +53,27 @@ struct GlassShellOverlay: View {
         : .spring(response: 0.42, dampingFraction: 0.86),
       value: animationKey
     )
+  }
+
+  private var overlayBottomPadding: CGFloat {
+    if !state.usesSystemDock {
+      // 自绘 dock：展开/收缩都压同一条安全区基线。
+      return GlassShellMetrics.bottomOffset(safeArea: state.bottomSafeArea)
+    }
+    if state.minimized {
+      return state.systemDockBottomOffset
+    }
+    if !state.showTabBar {
+      return GlassShellMetrics.bottomOffset(safeArea: state.bottomSafeArea)
+    }
+    return state.systemDockClearance + GlassShellMetrics.gap
+  }
+
+  private var overlayHorizontalPadding: CGFloat {
+    if state.usesSystemDock && state.showTabBar {
+      return state.systemDockHorizontalInset
+    }
+    return GlassShellMetrics.horizontalPadding
   }
 
   // 收缩/曲目/tab/开关任一变化都驱动同一条 spring 动画。
@@ -75,9 +98,11 @@ struct GlassShellOverlay: View {
     }
   }
 
-  @ViewBuilder private var dockSlot: some View {
-    if state.showTabBar {
-      dock
+  // 自绘 dock（26.x）：5 tab 等分玻璃胶囊条，与 mini 同一套 glassChrome 材质。
+  // 与 compactDock 共享 matchedGeometryEffect id，收缩/展开是连续形变。
+  @ViewBuilder private var fullDockSlot: some View {
+    if !state.usesSystemDock && state.showTabBar {
+      fullDock
         .matchedGeometryEffect(id: "dock", in: chromeSpace)
         .reportChromeFrame("dock", to: onChromeFrame)
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -87,35 +112,104 @@ struct GlassShellOverlay: View {
     }
   }
 
-  // dock：展开 = 5 tab 等分胶囊条；收缩 = 当前 tab 图标圆钮，高度降到
-  // mini 同档，与内联 mini 排成等高一行。
-  private var dock: some View {
-    HStack(spacing: 0) {
-      if state.minimized {
-        if let tab = GlassDockTab.all.first(where: { $0.id == state.selectedTab }) {
-          DockItem(tab: tab, active: true, compact: true) {
-            // 收缩态点圆钮只展开，不切 tab。
-            onIntent("expand", nil)
+  private var fullDock: some View {
+    let tabs = GlassDockTab.all
+    let selectedIndex = tabs.firstIndex { $0.id == state.selectedTab } ?? 0
+    let activeIndex = min(max(pressedIndex ?? selectedIndex, 0), tabs.count - 1)
+    return HStack(spacing: 0) {
+      ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+        FullDockItem(tab: tab, active: index == activeIndex)
+      }
+    }
+    .frame(height: GlassShellMetrics.dockHeight)
+    .frame(maxWidth: .infinity)
+    // 选中气泡：对齐系统 lens 比例（比槽位宽一圈、上下收 5），按压放大、
+    // 跟手滑动，松手落位。放在 items 底下、玻璃之上。
+    .background(alignment: .leading) {
+      if dockWidth > 0 {
+        let slot = dockWidth / CGFloat(tabs.count)
+        Capsule(style: .continuous)
+          .fill(Color.primary.opacity(0.08))
+          .frame(
+            width: slot + 8,
+            height: GlassShellMetrics.dockHeight - 10
+          )
+          .scaleEffect(pressedIndex != nil ? 1.1 : 1)
+          .offset(x: slot * CGFloat(activeIndex) - 4)
+          .animation(
+            reduceMotion || state.reduceMotion
+              ? nil
+              : .spring(response: 0.32, dampingFraction: 0.78),
+            value: activeIndex
+          )
+          .animation(
+            reduceMotion || state.reduceMotion
+              ? nil
+              : .spring(response: 0.32, dampingFraction: 0.78),
+            value: pressedIndex != nil
+          )
+      }
+    }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      dockWidth = width
+    }
+    .contentShape(Capsule(style: .continuous))
+    // 按下即吸附到指下槽位，可按住横向拖动，抬手才真正切 tab——
+    // 对齐系统 tab bar 的 lens 跟手交互；轻点等价于按下即抬手。
+    .gesture(
+      DragGesture(minimumDistance: 0)
+        .onChanged { value in
+          guard dockWidth > 0 else { return }
+          let slot = dockWidth / CGFloat(tabs.count)
+          pressedIndex = min(max(Int(value.location.x / slot), 0), tabs.count - 1)
+        }
+        .onEnded { value in
+          defer { pressedIndex = nil }
+          guard dockWidth > 0 else { return }
+          let slot = dockWidth / CGFloat(tabs.count)
+          let index = min(max(Int(value.location.x / slot), 0), tabs.count - 1)
+          if tabs[index].id != state.selectedTab {
+            onIntent("selectTab", tabs[index].id)
           }
         }
-      } else {
-        ForEach(GlassDockTab.all, id: \.id) { tab in
-          DockItem(
-            tab: tab,
-            active: tab.id == state.selectedTab,
-            compact: false,
-            namespace: chromeSpace
-          ) {
-            onIntent("selectTab", tab.id)
-          }
+    )
+    .glassChrome(
+      capsule: true,
+      reduceTransparency: reduceTransparency || state.reduceTransparency
+    )
+  }
+
+  @ViewBuilder private var compactDockSlot: some View {
+    if state.showTabBar && state.minimized {
+      compactDock
+        .matchedGeometryEffect(id: "dock", in: chromeSpace)
+        .reportChromeFrame("compactDock", to: onChromeFrame)
+        // 自绘 dock 与圆钮共存于 SwiftUI，matchedGeometry 直接连续形变；
+        // 系统 dock 在 UIKit 里无法 matched，用「更大、贴右下」缩到位近似
+        // dock 收进右下角，展开反向放大交还。
+        .transition(
+          state.usesSystemDock
+            ? .scale(scale: 2.6, anchor: .bottomTrailing).combined(with: .opacity)
+            : .opacity
+        )
+    } else {
+      Color.clear.frame(height: 0)
+        .onAppear { onChromeFrame("compactDock", .zero) }
+    }
+  }
+
+  private var compactDock: some View {
+    HStack(spacing: 0) {
+      if let tab = GlassDockTab.all.first(where: { $0.id == state.selectedTab }) {
+        CompactDockItem(tab: tab) {
+          // 收缩态点圆钮只展开，不切 tab。
+          onIntent("expand", nil)
         }
       }
     }
-    .frame(
-      height: state.minimized
-        ? GlassShellMetrics.miniHeight : GlassShellMetrics.dockHeight
-    )
-    .frame(maxWidth: state.minimized ? nil : .infinity)
+    .frame(height: GlassShellMetrics.miniHeight)
     .glassChrome(
       capsule: true,
       reduceTransparency: reduceTransparency || state.reduceTransparency
@@ -137,56 +231,48 @@ extension View {
   }
 }
 
-// 单个 dock tab：SF Symbol + 小字标签；active 用主题墨色、其余 secondary，
-// 展开态选中项背后垫灰药丸，切 tab 时经 matchedGeometryEffect 从 A 滑到 B
-//（对齐 Apple Music tab bar；与 Flutter 底栏 AnimatedAlign 药丸同纪律）。
-// compact（收缩圆钮）只留图标，无药丸，标签语义走 accessibilityLabel。
+// 自绘 dock 的单个 tab：SF Symbol + 小字标签；active 用主题墨色、其余 secondary。
+// 选中态只换颜色，图标恒为线条款——与 Flutter 底栏同纪律。
 @available(iOS 26.0, *)
-private struct DockItem: View {
+private struct FullDockItem: View {
   let tab: GlassDockTab
   let active: Bool
-  let compact: Bool
-  var namespace: Namespace.ID? = nil
-  let onTap: () -> Void
 
-  @Environment(\.colorScheme) private var colorScheme
-
+  // 点选由 dock 级的 DragGesture 统一处理（跟手 lens），此处只渲染图标+标签。
   var body: some View {
-    Button(action: onTap) {
-      VStack(spacing: 3) {
-        Image(systemName: tab.symbol)
-          .font(.system(size: 22, weight: .medium))
-        if !compact {
-          Text(tab.label)
-            .font(.system(size: 11))
-        }
-      }
-      // 选中态 = 灰药丸 + 换色（墨 vs 灰），图标恒为线条款；
-      // fill 变体视觉重量参差（chart.bar.fill 尤重），不用。
-      .foregroundStyle(active ? Color.primary : Color.secondary)
-      .frame(
-        maxWidth: compact ? nil : .infinity,
-        maxHeight: compact ? nil : .infinity
-      )
-      .padding(.horizontal, compact ? 26 : 0)
-      .background { selectionPill }
-      .contentShape(Rectangle())
+    VStack(spacing: 3) {
+      Image(systemName: tab.symbol)
+        .font(.system(size: 22, weight: .medium))
+      Text(tab.label)
+        .font(.system(size: 11))
     }
-    .buttonStyle(.plain)
+    .foregroundStyle(active ? Color.primary : Color.secondary)
+    .frame(maxWidth: .infinity)
+    .contentShape(Rectangle())
+    .accessibilityElement()
     .accessibilityLabel(tab.label)
     .accessibilityAddTraits(active ? [.isSelected] : [])
   }
+}
 
-  // 灰药丸只做「所在位置」提示，浓度压低（暗色略提亮）不与内容抢戏；
-  // matchedGeometryEffect 挂在含内缩边距的整槽框上，滑动时内缩恒定。
-  @ViewBuilder private var selectionPill: some View {
-    if active, !compact, let namespace {
-      Capsule(style: .continuous)
-        .fill(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.07))
-        .padding(.horizontal, 5)
-        .padding(.vertical, 7)
-        .matchedGeometryEffect(id: "dockSelection", in: namespace)
+// 系统 tab bar 收缩后的本地圆钮；展开态完全交给 UIKit UITabBarController。
+@available(iOS 26.0, *)
+private struct CompactDockItem: View {
+  let tab: GlassDockTab
+  let onTap: () -> Void
+
+  var body: some View {
+    Button(action: onTap) {
+      Image(systemName: tab.symbol)
+        .font(.system(size: 22, weight: .medium))
+        .foregroundStyle(Color.primary)
+        .frame(height: GlassShellMetrics.miniHeight)
+        .padding(.horizontal, 26)
+        .contentShape(Rectangle())
     }
+    .buttonStyle(.plain)
+    .accessibilityLabel(tab.label)
+    .accessibilityAddTraits(.isSelected)
   }
 }
 
@@ -207,8 +293,12 @@ extension View {
             )
             .shadow(color: .black.opacity(0.10), radius: 12, y: 4)
         )
-    } else {
+    } else if #available(iOS 27.0, *) {
       self.glassEffect(.regular.interactive(), in: .capsule)
+    } else {
+      // iOS 26.x 的 .regular 偏磨砂，与 UIKit 系统 dock 的透亮玻璃不同风格；
+      // 换 .clear 靠齐。27 起 .regular 与系统 bar 观感一致，维持原状。
+      self.glassEffect(.clear.interactive(), in: .capsule)
     }
   }
 }

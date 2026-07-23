@@ -116,10 +116,11 @@
 
 ## 屏 3 · 搜索 search.js
 
-- **布局**：标题 + 搜索框 + 结果列表（track-row）。App 搜索框为灰底胶囊 +
+- **布局**：标题 + 搜索框 + 结果列表（track-row）。App 搜索框为玻璃胶囊 +
   放大镜前缀（对齐 Apple Music），不搬 web 的独立主按钮——Enter/键盘搜索键提交，
   搜索中的进度反馈由结果区 spinner 承担。
-- **材质**：搜索输入主体保持不透明；后续可评估滚动时把搜索框钉为平台玻璃搜索 chrome（对齐 Apple Music 搜索页）。
+- **材质**：搜索输入使用平台自适应玻璃胶囊；结果列表共用一块玻璃面板，禁止逐行叠加
+  BackdropFilter。iOS 内容层仍由 Flutter 合成，不冒充 UIKit 原生 Liquid Glass 控件。
 - **状态放模块级**（keyword/tracks/searched）：切页再回来不丢，刷新才重置。
 - **交互→API**：
   - 搜索（回车/按钮）→ `GET /search?q=`

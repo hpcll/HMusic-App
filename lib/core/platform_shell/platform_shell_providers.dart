@@ -57,7 +57,9 @@ class NoOpPlatformShellBridge implements PlatformShellBridge {
 final Provider<PlatformShellBridge> platformShellBridgeProvider =
     Provider<PlatformShellBridge>((ref) {
       if (defaultTargetPlatform == TargetPlatform.iOS) {
-        return MethodChannelPlatformShellBridge();
+        final bridge = MethodChannelPlatformShellBridge();
+        ref.onDispose(() => unawaited(bridge.dispose()));
+        return bridge;
       }
       return NoOpPlatformShellBridge();
     });

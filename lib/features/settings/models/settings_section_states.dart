@@ -86,18 +86,25 @@ class DiagState {
 }
 
 class SecurityState {
-  const SecurityState({this.changing = false, this.notice});
+  const SecurityState({
+    this.changing = false,
+    this.deleting = false,
+    this.notice,
+  });
 
   final bool changing;
+  final bool deleting;
   final HMusicNotice? notice;
 
   SecurityState copyWith({
     bool? changing,
+    bool? deleting,
     HMusicNotice? notice,
     bool clearNotice = false,
   }) {
     return SecurityState(
       changing: changing ?? this.changing,
+      deleting: deleting ?? this.deleting,
       notice: clearNotice ? null : (notice ?? this.notice),
     );
   }

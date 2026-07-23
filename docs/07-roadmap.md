@@ -21,8 +21,15 @@
 - [x] 真服务器集成测试（integration_test/live_server_test.dart）：macOS ✓、iOS 26.5 模拟器 ✓（system/info + 鉴权搜索）
 - [x] streamUrl host 重绑定覆盖 `127.0.0.1` 返回值
 - [~] iOS 27 Swift/SwiftUI NativeGlassShell 最小 spike：底栏 + mini player + intent 通道
-      （Dart 侧 PlatformShellController intent 派发 + Swift 通道契约补齐并 iOS 26.5 模拟器编译通过；
-       SwiftUI 玻璃渲染与真机折射待设备门禁）
+      （Dart 侧 PlatformShellController intent 派发 + Swift 通道契约补齐；修复 EventChannel 首帧
+       `ready/layoutChanged` 早于类型监听建立而丢失、导致误用 Flutter 回退壳的问题，并补事件重放
+       回归测试；iOS 27 真机已完成玻璃 dock 与内容折射镜像验收；展开态已替换为原生
+       `UITabBarController`；统一系统 Dock frame 的 window/local 坐标，按真实底缘与左右边界
+       对齐收缩圆钮，并修复初始化选择回调抢路由、首次布局需点击才稳定的问题；iOS 26.5
+       模拟器冷启动已验收；原生 Tab controller 改为全屏宿主、由 UIKit 自行处理底部安全区，
+       系统可见 platter frame 用于收缩态底缘对齐，修复选中/未选中标题基线错位与底缘裁切；
+       tab intent 已完成前轮真机验收；mini player
+       折射和旧 iOS 回退仍待真机验收）
 - [ ] Android AdaptiveGlassSurface spike：High/Medium/Off 三档和滚动性能
 - [ ] Android/iOS 真机前后台与锁屏最小验收
 - [x] 冻结 App Store 首发功能边界、Demo Server 方案和公网 HTTPS/LAN HTTP 策略（ADR-0003）

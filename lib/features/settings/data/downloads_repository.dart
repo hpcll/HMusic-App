@@ -7,6 +7,9 @@ abstract interface class DownloadsRepository {
   // 已下载/下载中列表，按创建时间倒序（服务端已排好）。
   Future<List<DownloadRecord>> list();
 
+  // 发起下载（搜索页触发）：quality 省略时服务端用默认音质。
+  Future<void> start(HMusicTrack track, {String? quality});
+
   // 删除本地文件和记录。
   Future<void> remove(String id);
 

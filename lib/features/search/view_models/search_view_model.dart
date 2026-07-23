@@ -5,6 +5,7 @@ import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/queue/api_queue_repository.dart';
 import '../../../shared/models/hmusic_notice.dart';
+import '../../settings/data/api_downloads_repository.dart';
 import '../data/api_search_repository.dart';
 import '../models/search_view_state.dart';
 
@@ -39,6 +40,23 @@ class SearchViewModel extends Notifier<SearchViewState> {
       await ref.read(queueRepositoryProvider).addTrack(track);
       state = state.copyWith(
         notice: HMusicNotice.success('已加入队列：${track.title}'),
+        clearError: true,
+      );
+    } on ApiFailure catch (failure) {
+      state = state.copyWith(errorMessage: failure.message);
+    }
+  }
+
+  // 下载到服务器本地（对齐 web「下载到服务器」）：下载后这首歌播放走本地文件、
+  // 免直链过期。quality 省略时服务端按默认音质下。发起是尽力而为，进度在设置
+  // 下载管理页看，这里只报「已开始」。
+  Future<void> download(HMusicTrack track, {String? quality}) async {
+    try {
+      await ref
+          .read(downloadsRepositoryProvider)
+          .start(track, quality: quality);
+      state = state.copyWith(
+        notice: HMusicNotice.success('已开始下载：${track.title}'),
         clearError: true,
       );
     } on ApiFailure catch (failure) {

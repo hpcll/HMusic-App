@@ -25,3 +25,14 @@ macos/Flutter/ephemeral/
 # System / logs
 .DS_Store
 *.log
+
+# AI 代理指令 / 内部文档 - 严禁入库（本地保留）
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.github/copilot-instructions.md
+
+# 敏感文件 - 严禁入库
+.env
+.env.*
+*.har

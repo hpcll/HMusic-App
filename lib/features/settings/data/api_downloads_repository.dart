@@ -34,10 +34,18 @@ class ApiDownloadsRepository implements DownloadsRepository {
   }
 
   @override
-  Future<void> retry(HMusicTrack track) async {
+  Future<void> start(HMusicTrack track, {String? quality}) async {
     await _apiClient.postMap(
       '/downloads',
-      body: <String, Object?>{'track': track.toJson()},
+      body: <String, Object?>{
+        'track': track.toJson(),
+        if (quality != null) 'quality': quality,
+      },
     );
+  }
+
+  @override
+  Future<void> retry(HMusicTrack track) async {
+    await start(track);
   }
 }

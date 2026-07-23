@@ -134,8 +134,11 @@ App 适配：Filled/Outlined 全胶囊（StadiumBorder、padding 水平 20）—
 ### 导航项
 - 桌面 `.side-item`：flex，muted-2 字，hover 底→panel-2；**active：底→text-strong，字→bg（墨底反白）**
 - 窄屏 `.nav-item`：竖排 icon+label 10.5px，active 字→text-strong；图标 21px
-  App 适配（悬浮 dock）：active 项背后垫灰药丸（text-strong α 亮 .07 / 暗 .12，
-  槽内缩 5/7），切 tab 药丸从 A 槽滑到 B 槽（§4）；点按无矩形水波，反馈由药丸承担。
+  App 适配（悬浮 dock）：iOS 26+ 展开态直接使用公开的 `UITabBarController` 默认
+  Liquid Glass tab bar，不自绘选中气泡、不实现拖动手势。气泡越界、融合收腰、按住滑动、
+  吸附和后续系统调整全部由 UIKit 提供；Swift delegate 只把选中的 tab id 回传为语义 intent。
+  滚动收缩后的单图标圆钮仍由薄 SwiftUI overlay 承载。“降低透明度”由系统无障碍外观接管。
+  Android / iOS<26 保持同形灰药丸；点按无矩形水波，反馈由选中气泡承担。
 
 ### 状态点 .dot（7px 圆）
 `dot-playing:accent` / `dot-paused:#c99700` / `dot-idle/stopped:muted` / `dot-error:danger`
@@ -155,6 +158,8 @@ App 适配（web 的 28/92 按其底边 chrome 定）：底距必须避让本壳
 `width:100%; border:1px line; radius-sm; padding:9px 12px; font14; focus 边→text-strong`
 App 适配：灰底（panel-2）无描边、radius 14、padding 14/12，focus 不加描边
 （可见性由光标承担，与搜索框同纪律）——移动端软表单款，web 描边款不变。
+搜索页例外：搜索框使用平台自适应玻璃胶囊，结果列表共用一块玻璃面板；禁止逐行建立
+BackdropFilter。
 
 ## 4. 动效清单（全部 transition，无重动画）
 
@@ -172,7 +177,7 @@ App 适配：灰底（panel-2）无描边、radius 14、padding 14/12，focus �
 
 | 场景 | iOS 26+ | Android / iOS<26 |
 |---|---|---|
-| tab 切换 | 系统材质选择态 + 选中药丸 matchedGeometryEffect 从 A 滑到 B（spring .42/.86） | 260ms easeOutCubic 药丸滑动（AnimatedAlign）+ 颜色过渡 |
+| tab 切换 | `UITabBarController` 系统默认 Liquid Glass 选择、按住滑动与吸附；不维护自定义曲线 | 260ms easeOutCubic 药丸滑动（AnimatedAlign）+ 颜色过渡 |
 | mini player 显隐 | 系统 spring/玻璃容器尺寸变化 | 220ms easeOut 高度过渡 |
 | dock/mini 滚动收缩、展开 | 系统 spring（response .42 / damping .86） | 320ms easeOutCubic 几何插值：dock 向右缩短成圆钮、mini 同步下落同排（宽/高/圆角连续 + 两层交叉淡化） |
 | 按压 | 系统液态反馈 | 100-140ms scale 0.97 + 高光变化 |
