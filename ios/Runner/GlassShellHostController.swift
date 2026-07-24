@@ -32,8 +32,9 @@ final class GlassShellHostController {
     self.flutterViewController = flutterViewController
 
     // 全版本都挂系统 tab bar：只有 UIKit 能给出原生 lens 选中态与长按跟手，
-    // 自绘无法 1:1 复刻。26.x 的玻璃接受系统原样（材质无法定制，尝试调透
-    // 反而破坏原生 Liquid Glass），只靠 tintColor + appearance 统一着色。
+    // 自绘无法 1:1 复刻。材质必须留给系统默认 Liquid Glass——不要写
+    // standardAppearance / 背景相关属性（Apple 文档：自定义 appearance 会
+    // 盖掉或干扰系统玻璃，相册/Apple Music 也不自定义 bar 背景）。
     let useSystemDock = true
     state.usesSystemDock = useSystemDock
 
@@ -293,24 +294,12 @@ private final class SystemGlassTabBarController: UITabBarController,
     let traits = traitCollection
     let active = HMusicChromeColor.textStrong.resolvedColor(with: traits)
     let inactive = HMusicChromeColor.muted.resolvedColor(with: traits)
-    let appearance = tabBar.standardAppearance
-    let itemAppearances = [
-      appearance.stackedLayoutAppearance,
-      appearance.inlineLayoutAppearance,
-      appearance.compactInlineLayoutAppearance,
-    ]
-    for itemAppearance in itemAppearances {
-      itemAppearance.normal.iconColor = inactive
-      itemAppearance.normal.titleTextAttributes = [
-        .foregroundColor: inactive,
-      ]
-      itemAppearance.selected.iconColor = active
-      itemAppearance.selected.titleTextAttributes = [
-        .foregroundColor: active,
-      ]
-    }
-    tabBar.standardAppearance = appearance
-    tabBar.scrollEdgeAppearance = appearance
+
+    // 关键：不碰 standardAppearance / scrollEdgeAppearance / background*。
+    // iOS 26 上写 appearance 会盖掉系统 Liquid Glass（相册/系统 App 也不写）。
+    // 未选中色系统又忽略 unselectedItemTintColor，所以图标用 alwaysOriginal 烤色，
+    // 标题用 item 级 textAttributes；tint 只作系统选中 lens 的兜底。
+    tabBar.isTranslucent = true
     tabBar.tintColor = active
     tabBar.unselectedItemTintColor = inactive
 
