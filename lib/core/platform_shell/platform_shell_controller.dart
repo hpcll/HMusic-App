@@ -8,17 +8,16 @@ import '../../features/charts/views/charts_page.dart';
 import '../../features/player/view_models/player_view_model.dart';
 import '../../features/player/views/player_page.dart';
 import '../../features/playlists/views/playlists_page.dart';
-import '../../features/search/views/search_page.dart';
 import '../../features/settings/views/settings_page.dart';
 import '../../features/stats/views/stats_page.dart';
 import 'platform_shell_bridge.dart';
 
-// tab id ↔ 路由 ↔ 标题的唯一映射，顺序与 bottom_nav 窄屏 5 tab 一致。
+// tab id ↔ 路由 ↔ 标题的唯一映射，顺序与 bottom_nav 窄屏 4 tab 一致。
 // Swift dock 与 Flutter 底栏共用这套 id，原生 selectTab intent 的 value 必须在此表内。
+// 搜索并入榜单页头胶囊（push /search 全屏），不再是窄屏 dock tab。
 const List<(String id, String path, String title)> kShellTabs =
     <(String, String, String)>[
       ('charts', ChartsPage.path, '榜单'),
-      ('search', SearchPage.path, '搜索'),
       ('playlists', PlaylistsPage.path, '歌单'),
       ('stats', StatsPage.path, '统计'),
       ('settings', SettingsPage.path, '设置'),

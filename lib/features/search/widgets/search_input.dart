@@ -13,12 +13,16 @@ class SearchInput extends StatelessWidget {
     required this.controller,
     required this.isSearching,
     required this.onSearch,
+    this.autofocus = false,
     super.key,
   });
 
   final TextEditingController controller;
   final bool isSearching;
   final VoidCallback onSearch;
+
+  // push 形态（榜单页搜索胶囊进入）自动聚焦，落页即可打字。
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +39,7 @@ class SearchInput extends StatelessWidget {
       shadow: false,
       child: TextField(
         controller: controller,
+        autofocus: autofocus,
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
           hintText: '搜索歌曲或歌手',

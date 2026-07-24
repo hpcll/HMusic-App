@@ -32,10 +32,10 @@ const List<NavDestinationSpec> kSidebarDestinations = <NavDestinationSpec>[
 // 非主页 tab 一级页按返回先回这里，主页再返回才交还系统退出 App。
 const int kHomeBranch = 4;
 
-// 窄屏 dock 5 tab 精选（播放/队列走 mini player push 全屏页，移动专属交互）。
+// 窄屏 dock 4 tab 精选（播放/队列走 mini player push 全屏页；搜索并入
+// 榜单页头胶囊 push 全屏页——搜索页内容太薄，不值一个常驻 tab）。
 const List<NavDestinationSpec> kNavDestinations = <NavDestinationSpec>[
   NavDestinationSpec(Icons.leaderboard_rounded, '榜单', kHomeBranch),
-  NavDestinationSpec(Icons.search_rounded, '搜索', 1),
   NavDestinationSpec(Icons.library_music_rounded, '歌单', 3),
   NavDestinationSpec(Icons.insights_rounded, '统计', 5),
   NavDestinationSpec(Icons.settings_rounded, '设置', 6),

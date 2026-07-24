@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:hmusic/app/shell/bottom_nav.dart';
 import 'package:hmusic/app/theme/hmusic_theme.dart';
 
-// 悬浮玻璃 dock（Flutter 回退壳）：展开 = 5 tab 等分胶囊条，点 tab 切分支、
-// 选中药丸滑到新槽位；收缩 = 当前 tab 的图标圆钮（无标签），点圆钮只展开、
-// 不切 tab（对齐 iOS 26+ 原生壳 GlassShellOverlay 的收缩语义）。
+// 悬浮玻璃 dock（Flutter 回退壳）：展开 = 4 tab 等分胶囊条（搜索并入榜单页头，
+// 不占 dock 位），点 tab 切分支、选中药丸滑到新槽位；收缩 = 当前 tab 的图标
+// 圆钮（无标签），点圆钮只展开、不切 tab（对齐 iOS 26+ 原生壳收缩语义）。
 
 final GlobalKey<_DockHarnessState> _harnessKey = GlobalKey();
 
@@ -69,17 +69,19 @@ class _DockHarnessState extends State<_DockHarness> {
 }
 
 void main() {
-  testWidgets('展开态渲染 5 tab，点 tab 切换分支', (tester) async {
+  testWidgets('展开态渲染 4 tab，点 tab 切换分支', (tester) async {
     await _pumpDock(tester);
 
-    for (final label in <String>['榜单', '搜索', '歌单', '统计', '设置']) {
+    for (final label in <String>['榜单', '歌单', '统计', '设置']) {
       expect(find.text(label), findsOneWidget);
     }
+    // 搜索并入榜单页头，dock 不再有搜索 tab。
+    expect(find.text('搜索'), findsNothing);
     expect(find.text('page-4'), findsOneWidget);
 
-    await tester.tap(find.text('搜索'));
+    await tester.tap(find.text('歌单'));
     await tester.pumpAndSettle();
-    expect(find.text('page-1'), findsOneWidget);
+    expect(find.text('page-3'), findsOneWidget);
   });
 
   testWidgets('选中药丸随 tab 切换从 A 槽滑到 B 槽', (tester) async {
@@ -96,8 +98,9 @@ void main() {
 
     await tester.tap(find.text('统计'));
     await tester.pumpAndSettle();
-    // 「统计」是第 4 槽（下标 3）→ 对齐目标 -1 + 3×2/4 = 0.5。
-    expect(pill().alignment, const Alignment(0.5, 0));
+    // 「统计」是第 3 槽（下标 2）→ 对齐目标 -1 + 2×2/3（按实现同式算，避免
+    // 1/3 与 -1+4/3 的浮点尾差导致恒等断言失败）。
+    expect(pill().alignment, const Alignment(-1 + 2 * 2 / 3, 0));
   });
 
   testWidgets('收缩态只剩当前 tab 图标圆钮，点圆钮展开且不切 tab', (tester) async {
@@ -106,7 +109,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 圆钮只留图标，所有标签文字（含当前 tab）都不再渲染。
-    for (final label in <String>['榜单', '搜索', '歌单', '统计', '设置']) {
+    for (final label in <String>['榜单', '歌单', '统计', '设置']) {
       expect(find.text(label), findsNothing);
     }
     expect(find.byIcon(Icons.leaderboard_rounded), findsOneWidget);
@@ -114,8 +117,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.leaderboard_rounded));
     await tester.pumpAndSettle();
     expect(_harnessKey.currentState!.expandCount, 1);
-    // 展开而非切 tab：5 tab 回来，页面仍是榜单分支。
-    expect(find.text('搜索'), findsOneWidget);
+    // 展开而非切 tab：4 tab 回来，页面仍是榜单分支。
+    expect(find.text('歌单'), findsOneWidget);
     expect(find.text('page-4'), findsOneWidget);
   });
 }

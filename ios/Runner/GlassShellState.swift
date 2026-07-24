@@ -55,8 +55,9 @@ enum GlassShellMetrics {
   }
 }
 
-// dock 5 tab 的 id/SF Symbol/标签，id 与 Dart kShellTabs 严格一致，
-// 图标语义对齐 Flutter bottom_nav（leaderboard/search/library/insights/settings）。
+// dock 4 tab 的 id/SF Symbol/标签，id 与 Dart kShellTabs 严格一致，
+// 图标语义对齐 Flutter bottom_nav（leaderboard/library/insights/settings）。
+// 搜索并入榜单页头胶囊（Dart push 全屏搜索页），不占 dock 位。
 struct GlassDockTab {
   let id: String
   let symbol: String
@@ -66,7 +67,6 @@ struct GlassDockTab {
     // trophy 而非 chart.bar：后者线条版是空心方块轮廓，混在单笔画家族里突兀；
     // 奖杯与 Material leaderboard 的备选（emoji_events）同语义，笔画协调。
     GlassDockTab(id: "charts", symbol: "trophy", label: "榜单"),
-    GlassDockTab(id: "search", symbol: "magnifyingglass", label: "搜索"),
     GlassDockTab(id: "playlists", symbol: "music.note.list", label: "歌单"),
     GlassDockTab(id: "stats", symbol: "chart.line.uptrend.xyaxis", label: "统计"),
     GlassDockTab(id: "settings", symbol: "gearshape", label: "设置"),

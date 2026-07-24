@@ -21,10 +21,11 @@ import '../shell/app_shell.dart';
 // 401 单飞 invalidate 后重算 redirect 退到登录页。
 //
 // 结构：connect / auth 为独立全屏页；StatefulShellRoute 7 分支对齐 web 侧栏
-// （正在播放/搜索/队列/歌单/榜单/统计/设置）。播放与队列是「双路由」：
+// （正在播放/搜索/队列/歌单/榜单/统计/设置）。播放、队列与搜索是「双路由」：
 //   tabPath 分支 → 桌面侧栏 tab（外壳常驻，内容区切换）；
-//   /player、/queue 顶级 push 路由 → 窄屏全屏覆盖（系统返回手势可退出，docs/04 教训）。
-// 窄屏永不进这两个分支（mini/入口按宽度分流），桌面永不 push 顶级版。
+//   /player、/queue、/search 顶级 push 路由 → 窄屏全屏覆盖（系统返回手势可退出）。
+// 窄屏永不进这三个分支（播放/队列走 mini 入口、搜索走榜单页头胶囊），
+// 桌面永不 push 顶级版。
 GoRouter buildAppRouter(Ref ref) {
   final session = ref.read(sessionControllerProvider);
   final refreshNotifier = _SessionRefreshNotifier(session);
@@ -67,7 +68,7 @@ GoRouter buildAppRouter(Ref ref) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: SearchPage.path,
+                path: SearchPage.tabPath,
                 builder: (context, state) => const SearchPage(),
               ),
             ],
@@ -117,6 +118,10 @@ GoRouter buildAppRouter(Ref ref) {
       GoRoute(
         path: QueuePage.path,
         builder: (context, state) => const QueuePage(),
+      ),
+      GoRoute(
+        path: SearchPage.path,
+        builder: (context, state) => const SearchPage(),
       ),
       GoRoute(
         path: PlayerPage.path,
