@@ -204,6 +204,21 @@ final class GlassShellHostController {
   }
 }
 
+// dock 选中/未选中色：与 Flutter HMusicPalette / AppBottomNav 对齐
+// （textStrong / muted），随系统深浅色切换，避免系统 secondaryLabel 过淡。
+private enum HMusicChromeColor {
+  static let textStrong = UIColor { traits in
+    traits.userInterfaceStyle == .dark
+      ? UIColor(red: 0xF0 / 255, green: 0xF0 / 255, blue: 0xF2 / 255, alpha: 1)
+      : UIColor(red: 0x1A / 255, green: 0x1A / 255, blue: 0x1A / 255, alpha: 1)
+  }
+  static let muted = UIColor { traits in
+    traits.userInterfaceStyle == .dark
+      ? UIColor(red: 0x85 / 255, green: 0x85 / 255, blue: 0x8A / 255, alpha: 1)
+      : UIColor(red: 0x99 / 255, green: 0x99 / 255, blue: 0x99 / 255, alpha: 1)
+  }
+}
+
 // 真正的系统 tab bar：布局、Liquid Glass 选中态、按住滑动和系统动效全部交给 UIKit。
 // 子控制器保持透明，业务内容仍由下层 Flutter 绘制；代理只回传 tab id。
 @available(iOS 26.0, *)
@@ -228,8 +243,10 @@ private final class SystemGlassTabBarController: UITabBarController,
     view.backgroundColor = .clear
     mode = .tabBar
     tabBarMinimizeBehavior = .never
-    tabBar.tintColor = .label
-    tabBar.unselectedItemTintColor = .secondaryLabel
+    // 选中/未选中色对齐 Flutter AppBottomNav：textStrong / muted（非系统
+    // .label / .secondaryLabel——后者未选中态过淡，和安卓/iOS<26 不一致）。
+    tabBar.tintColor = HMusicChromeColor.textStrong
+    tabBar.unselectedItemTintColor = HMusicChromeColor.muted
     tabs = GlassDockTab.all.map { item in
       let tab = UITab(
         title: item.label,
@@ -250,6 +267,8 @@ private final class SystemGlassTabBarController: UITabBarController,
   }
 
   private func applyTabItemColors() {
+    let active = HMusicChromeColor.textStrong
+    let inactive = HMusicChromeColor.muted
     let appearance = tabBar.standardAppearance
     let itemAppearances = [
       appearance.stackedLayoutAppearance,
@@ -257,13 +276,13 @@ private final class SystemGlassTabBarController: UITabBarController,
       appearance.compactInlineLayoutAppearance,
     ]
     for itemAppearance in itemAppearances {
-      itemAppearance.normal.iconColor = .secondaryLabel
+      itemAppearance.normal.iconColor = inactive
       itemAppearance.normal.titleTextAttributes = [
-        .foregroundColor: UIColor.secondaryLabel,
+        .foregroundColor: inactive,
       ]
-      itemAppearance.selected.iconColor = .label
+      itemAppearance.selected.iconColor = active
       itemAppearance.selected.titleTextAttributes = [
-        .foregroundColor: UIColor.label,
+        .foregroundColor: active,
       ]
     }
     tabBar.standardAppearance = appearance
@@ -272,8 +291,8 @@ private final class SystemGlassTabBarController: UITabBarController,
     // 状态渲染。UITab 是懒加载：手动往 tabBar.items 烤 .alwaysOriginal 图片
     // 只有当前已实现的 item 吃得下，其余要等被点过才重建——正是「未点的 tab
     // 显示异常、点过才正常」的根因，故不再手动覆盖 items。
-    tabBar.tintColor = .label
-    tabBar.unselectedItemTintColor = .secondaryLabel
+    tabBar.tintColor = active
+    tabBar.unselectedItemTintColor = inactive
   }
 
   override func viewDidLayoutSubviews() {
