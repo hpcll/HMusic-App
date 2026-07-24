@@ -31,14 +31,10 @@ final class GlassShellHostController {
     guard hosting == nil else { return }
     self.flutterViewController = flutterViewController
 
-    // 26.x 系统 tab bar 的玻璃与 SwiftUI glassEffect 观感不同（宽平底、偏乳白），
-    // 与 mini 胶囊风格割裂；该版本走 overlay 自绘 dock，27+ 才挂系统 bar。
-    let useSystemDock: Bool
-    if #available(iOS 27.0, *) {
-      useSystemDock = true
-    } else {
-      useSystemDock = false
-    }
+    // 全版本都挂系统 tab bar：只有 UIKit 能给出原生 lens 选中态与长按跟手，
+    // 自绘无法 1:1 复刻。26.x 的玻璃接受系统原样（材质无法定制，尝试调透
+    // 反而破坏原生 Liquid Glass），只靠 tintColor + appearance 统一着色。
+    let useSystemDock = true
     state.usesSystemDock = useSystemDock
 
     let overlayPassthrough = PassthroughView()
@@ -217,7 +213,6 @@ private final class SystemGlassTabBarController: UITabBarController,
   private let onSelect: (String) -> Void
   private let onFrame: (CGRect) -> Void
   private var applyingState = false
-  private var appliedResolvedItemColors = false
 
   init(onSelect: @escaping (String) -> Void, onFrame: @escaping (CGRect) -> Void) {
     self.onSelect = onSelect
@@ -273,42 +268,16 @@ private final class SystemGlassTabBarController: UITabBarController,
     }
     tabBar.standardAppearance = appearance
     tabBar.scrollEdgeAppearance = appearance
-    // UITab can rebuild its internal bar items when the tab collection changes;
-    // reassert the semantic colors after the appearance is installed.
+    // 选中/未选中着色统一交给 tintColor + appearance item 配色，由 UIKit 按
+    // 状态渲染。UITab 是懒加载：手动往 tabBar.items 烤 .alwaysOriginal 图片
+    // 只有当前已实现的 item 吃得下，其余要等被点过才重建——正是「未点的 tab
+    // 显示异常、点过才正常」的根因，故不再手动覆盖 items。
     tabBar.tintColor = .label
     tabBar.unselectedItemTintColor = .secondaryLabel
-    applyResolvedItemColorsIfPossible()
-  }
-
-  private func applyResolvedItemColorsIfPossible() {
-    guard !appliedResolvedItemColors,
-      let items = tabBar.items,
-      items.count == GlassDockTab.all.count
-    else { return }
-    for (item, tab) in zip(items, GlassDockTab.all) {
-      item.image = UIImage(systemName: tab.symbol)?.withTintColor(
-        .secondaryLabel,
-        renderingMode: .alwaysOriginal
-      )
-      item.selectedImage = UIImage(systemName: tab.symbol)?.withTintColor(
-        .label,
-        renderingMode: .alwaysOriginal
-      )
-      item.setTitleTextAttributes(
-        [.foregroundColor: UIColor.secondaryLabel],
-        for: .normal
-      )
-      item.setTitleTextAttributes(
-        [.foregroundColor: UIColor.label],
-        for: .selected
-      )
-    }
-    appliedResolvedItemColors = true
   }
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
-    applyResolvedItemColorsIfPossible()
     reportTabBarFrame()
   }
 
