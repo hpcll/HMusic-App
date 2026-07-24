@@ -228,6 +228,9 @@ private final class SystemGlassTabBarController: UITabBarController,
   private let onSelect: (String) -> Void
   private let onFrame: (CGRect) -> Void
   private var applyingState = false
+  /// 避免 viewDidLayoutSubviews 里反复烤图触发布局循环；
+  /// 指纹含 items 数量 + 深浅色 + 选中 id。
+  private var lastColorFingerprint: String = ""
 
   init(onSelect: @escaping (String) -> Void, onFrame: @escaping (CGRect) -> Void) {
     self.onSelect = onSelect
@@ -243,14 +246,16 @@ private final class SystemGlassTabBarController: UITabBarController,
     view.backgroundColor = .clear
     mode = .tabBar
     tabBarMinimizeBehavior = .never
-    // 选中/未选中色对齐 Flutter AppBottomNav：textStrong / muted（非系统
-    // .label / .secondaryLabel——后者未选中态过淡，和安卓/iOS<26 不一致）。
+    // iOS 26 Liquid Glass UITabBar 实测会忽略 unselectedItemTintColor /
+    // appearance.normal.iconColor，未选中图标跟 tintColor 一样深。
+    // 选中/未选中色要对齐 Flutter AppBottomNav（textStrong / muted），
+    // 只能给 image / selectedImage 烤 .alwaysOriginal。
     tabBar.tintColor = HMusicChromeColor.textStrong
     tabBar.unselectedItemTintColor = HMusicChromeColor.muted
     tabs = GlassDockTab.all.map { item in
       let tab = UITab(
         title: item.label,
-        image: UIImage(systemName: item.symbol),
+        image: Self.symbolImage(item.symbol, color: HMusicChromeColor.muted),
         identifier: item.id
       ) { _ in
         let controller = UIViewController()
@@ -260,15 +265,34 @@ private final class SystemGlassTabBarController: UITabBarController,
       tab.preferredPlacement = .fixed
       return tab
     }
+    // 预热全部 VC：UITab 懒加载，不点过的 item 不会进 tabBar.items，
+    // 烤色也就覆盖不全。强制 resolve 后 items 一次齐。
+    for tab in tabs {
+      _ = tab.viewController
+    }
     // tabs 赋值会让系统自动选中第一项；此后再挂代理，避免把初始化选择
     // 误报成用户 intent，抢走 Flutter 当前路由。
     delegate = self
     applyTabItemColors()
   }
 
-  private func applyTabItemColors() {
-    let active = HMusicChromeColor.textStrong
-    let inactive = HMusicChromeColor.muted
+  private static func symbolImage(_ name: String, color: UIColor) -> UIImage? {
+    UIImage(systemName: name)?.withTintColor(color, renderingMode: .alwaysOriginal)
+  }
+
+  private func applyTabItemColors(force: Bool = false) {
+    let defs = GlassDockTab.all
+    let itemCount = tabBar.items?.count ?? 0
+    let styleTag = traitCollection.userInterfaceStyle == .dark ? "d" : "l"
+    let selectedId = selectedTab?.identifier ?? ""
+    let fingerprint = "\(itemCount)|\(defs.count)|\(styleTag)|\(selectedId)"
+    if !force, fingerprint == lastColorFingerprint, itemCount == defs.count {
+      return
+    }
+
+    let traits = traitCollection
+    let active = HMusicChromeColor.textStrong.resolvedColor(with: traits)
+    let inactive = HMusicChromeColor.muted.resolvedColor(with: traits)
     let appearance = tabBar.standardAppearance
     let itemAppearances = [
       appearance.stackedLayoutAppearance,
@@ -287,16 +311,40 @@ private final class SystemGlassTabBarController: UITabBarController,
     }
     tabBar.standardAppearance = appearance
     tabBar.scrollEdgeAppearance = appearance
-    // 选中/未选中着色统一交给 tintColor + appearance item 配色，由 UIKit 按
-    // 状态渲染。UITab 是懒加载：手动往 tabBar.items 烤 .alwaysOriginal 图片
-    // 只有当前已实现的 item 吃得下，其余要等被点过才重建——正是「未点的 tab
-    // 显示异常、点过才正常」的根因，故不再手动覆盖 items。
     tabBar.tintColor = active
     tabBar.unselectedItemTintColor = inactive
+
+    // UIKit 在选中切换 / trait 变化时会按 UITab.image 重建 bar item，
+    // 丢掉手改的 selectedImage；items 齐了就重烤。
+    if tabs.count == defs.count {
+      for (tab, def) in zip(tabs, defs) {
+        tab.image = Self.symbolImage(def.symbol, color: inactive)
+      }
+    }
+    if let items = tabBar.items, items.count == defs.count {
+      for (item, def) in zip(items, defs) {
+        item.image = Self.symbolImage(def.symbol, color: inactive)
+        item.selectedImage = Self.symbolImage(def.symbol, color: active)
+        item.setTitleTextAttributes([.foregroundColor: inactive], for: .normal)
+        item.setTitleTextAttributes([.foregroundColor: active], for: .selected)
+      }
+      lastColorFingerprint = fingerprint
+    } else {
+      // items 尚未齐：保留旧指纹外的状态，等 layout 再试。
+      lastColorFingerprint = ""
+    }
+  }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+      applyTabItemColors()
+    }
   }
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
+    applyTabItemColors()
     reportTabBarFrame()
   }
 
@@ -331,14 +379,17 @@ private final class SystemGlassTabBarController: UITabBarController,
       // 再开放用户 intent，保证 Dart 下发状态不会反向触发导航。
       DispatchQueue.main.async { [weak self] in
         self?.applyingState = false
+        self?.applyTabItemColors()
       }
     }
+    applyTabItemColors()
     view.setNeedsLayout()
     // UITabBarController 可能在第一次状态更新后才解析出最终系统 bar frame；
     // 主队列下一拍主动回报，不能等用户点 tab 才触发布局。
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       self.view.layoutIfNeeded()
+      self.applyTabItemColors()
       self.reportTabBarFrame()
     }
   }
@@ -348,6 +399,7 @@ private final class SystemGlassTabBarController: UITabBarController,
     didSelectTab selectedTab: UITab,
     previousTab: UITab?
   ) {
+    applyTabItemColors()
     guard !applyingState else { return }
     onSelect(selectedTab.identifier)
   }
