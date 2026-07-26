@@ -4,7 +4,9 @@ import '../models/mi_account.dart';
 // 扫码：start 拿 loginUrl 本地渲染，poll 每 2s 查；密码：start 可能直登或要短信，
 // confirm/resend 走短信挑战；导入：STS 地址或 serviceToken+userId 兜底。
 abstract interface class MiAccountRepository {
-  Future<MiStatus> status();
+  // verify=true 请求服务端做限频真校验（GET /mi/status?verify=1）：
+  // 冷启/回前台的过期检测用；设置页普通刷新保持快照读取。
+  Future<MiStatus> status({bool verify});
 
   // ===== 扫码通道 =====
   Future<MiQrSession> startQr();

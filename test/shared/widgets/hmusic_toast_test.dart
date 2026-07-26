@@ -7,8 +7,9 @@ import 'package:hmusic/shared/layout/shell_metrics.dart';
 import 'package:hmusic/shared/models/hmusic_notice.dart';
 import 'package:hmusic/shared/widgets/hmusic_toast.dart';
 
-// docs/03 Toast 规格，液态玻璃升级版：无动画、3.2s 自动消失、内容自适应宽 ≤90%、
-// **胶囊形态**（高度 / 2 圆角）+ **毛玻璃材质**、语义左边框内嵌、不挡点击；
+// docs/03 Toast 规格，Apple Music 式胶囊：180ms 淡入 + 上浮、3.2s 后 140ms
+// 淡出、内容自适应宽 ≤90%、胶囊形态（高度 / 2 圆角）+ 毛玻璃、无 hairline、
+// 语义 leading 图标（✓ 青绿 / ⚠ 红 / info 无）、文字恒墨色、不挡点击；
 // 底距避让底部 chrome（桌面 = mini 包络 76 + 12，窄屏 = 悬浮玻璃 chrome 完整包络）。
 
 const String _msg = '已加入队列：海屿你';
@@ -55,21 +56,41 @@ Finder _capsule([Finder? textFinder]) {
       .first;
 }
 
-// 用例间清场：toast 挂在模块级单例上，避免前一个用例的 Timer 泄漏到下一个。
-Future<void> _drain(WidgetTester tester) =>
-    tester.pump(const Duration(seconds: 4));
+Finder _capsuleIcon() =>
+    find.descendant(of: _capsule(), matching: find.byType(Icon));
+
+// 用例间清场：toast 挂在模块级单例上，pumpAndSettle 走完淡出动画与移除，
+// 避免前一个用例的 Timer/Ticker 泄漏到下一个。
+Future<void> _drain(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 4));
+  await tester.pumpAndSettle();
+}
+
+// 挂载帧建立 ticker 基线后再推进 200ms，让 180ms 入场动画走完。
+Future<void> _pumpEntrance(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 200));
+}
 
 void main() {
-  testWidgets('无动画立即出现，3.2s 后自动消失', (tester) async {
+  testWidgets('180ms 淡入出现，3.2s 后淡出消失', (tester) async {
     await _pumpHost(tester);
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
-    // 单帧 pump 即完整可见 = 无入场动画。
     await tester.pump();
     expect(find.text(_msg), findsOneWidget);
 
-    await tester.pump(const Duration(milliseconds: 3100));
-    expect(find.text(_msg), findsOneWidget);
+    // 入场完成后完全可见。
     await tester.pump(const Duration(milliseconds: 200));
+    final opacity = tester.widget<Opacity>(
+      find.ancestor(of: find.text(_msg), matching: find.byType(Opacity)).first,
+    );
+    expect(opacity.opacity, 1.0);
+
+    // 3.2s 前仍在；触发自动消失后走完淡出即移除。
+    await tester.pump(const Duration(milliseconds: 2900));
+    expect(find.text(_msg), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pumpAndSettle();
     expect(find.text(_msg), findsNothing);
   });
 
@@ -87,7 +108,7 @@ void main() {
   testWidgets('不拦截其下的点击', (tester) async {
     await _pumpHost(tester);
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
-    await tester.pump();
+    await _pumpEntrance(tester);
     await tester.tapAt(tester.getCenter(_capsule()));
     expect(_tapCount, 1);
     await _drain(tester);
@@ -96,7 +117,7 @@ void main() {
   testWidgets('桌面：居中于内容区、底部避开 mini player 包络', (tester) async {
     await _pumpHost(tester);
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
-    await tester.pump();
+    await _pumpEntrance(tester);
 
     final rect = tester.getRect(_capsule());
     expect(rect.bottom, 800.0 - (kMiniPlayerDesktopInset + 12));
@@ -111,7 +132,7 @@ void main() {
   testWidgets('窄屏：让出悬浮 dock + mini 胶囊包络', (tester) async {
     await _pumpHost(tester, size: const Size(390, 844));
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
-    await tester.pump();
+    await _pumpEntrance(tester);
 
     final rect = tester.getRect(_capsule());
     // 无安全区（测试窗）：底距 10 + dock 66 + gap 8 + mini 50 + 呼吸距 8。
@@ -131,63 +152,53 @@ void main() {
   testWidgets('长文案不超过内容区 90% 宽', (tester) async {
     await _pumpHost(tester, size: const Size(390, 844));
     showHMusicToast(_hostContext, HMusicNotice('超长提示' * 40));
-    await tester.pump();
+    await _pumpEntrance(tester);
 
     final width = tester.getRect(_capsule(find.textContaining('超长提示'))).width;
     expect(width, lessThanOrEqualTo(390 * 0.9));
     await _drain(tester);
   });
 
-  testWidgets('语义左边框：success 青绿 / info 灰', (tester) async {
+  testWidgets('语义图标：success ✓ 青绿 / error ⚠ 红 / info 无图标', (tester) async {
     await _pumpHost(tester);
     showHMusicToast(_hostContext, const HMusicNotice.success(_msg));
-    await tester.pump();
-    var strip = tester.widget<DecoratedBox>(
-      find.descendant(of: _capsule(), matching: find.byType(DecoratedBox)).last,
-    );
-    expect(
-      (strip.decoration as BoxDecoration).color,
-      HMusicPalette.light.accent,
-    );
+    await _pumpEntrance(tester);
+    var icon = tester.widget<Icon>(_capsuleIcon());
+    expect(icon.icon, Icons.check_rounded);
+    expect(icon.color, HMusicPalette.light.accent);
+
+    showHMusicToast(_hostContext, const HMusicNotice.error(_msg));
+    await _pumpEntrance(tester);
+    icon = tester.widget<Icon>(_capsuleIcon());
+    expect(icon.icon, Icons.error_outline_rounded);
+    expect(icon.color, HMusicPalette.light.danger);
 
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
-    await tester.pump();
-    strip = tester.widget<DecoratedBox>(
-      find.descendant(of: _capsule(), matching: find.byType(DecoratedBox)).last,
-    );
-    expect(
-      (strip.decoration as BoxDecoration).color,
-      HMusicPalette.light.mutedStrong,
-    );
+    await _pumpEntrance(tester);
+    expect(_capsuleIcon(), findsNothing);
     await _drain(tester);
   });
 
-  testWidgets('暗色 error：毛玻璃底 + 红字 + 红语义条', (tester) async {
+  testWidgets('暗色 error：毛玻璃底 + 墨色文字 + 无 hairline', (tester) async {
     await _pumpHost(tester, theme: HMusicTheme.dark());
     showHMusicToast(_hostContext, const HMusicNotice.error(_msg));
-    await tester.pump();
+    await _pumpEntrance(tester);
 
-    // 新胶囊用 AdaptiveGlassSurface 包装（毛玻璃），不再直接断言 Container.color。
     final glass = tester.widget<AdaptiveGlassSurface>(_capsule());
-    expect(glass, isNotNull);
+    expect(glass.hairline, isFalse);
 
+    // 语义由图标承担，文字不再整句变红。
     final text = tester.widget<Text>(find.text(_msg));
-    expect(text.style?.color, HMusicPalette.dark.danger);
-
-    final strip = tester.widget<DecoratedBox>(
-      find.descendant(of: _capsule(), matching: find.byType(DecoratedBox)).last,
-    );
-    expect(
-      (strip.decoration as BoxDecoration).color,
-      HMusicPalette.dark.danger,
-    );
+    expect(text.style?.color, HMusicPalette.dark.textStrong);
+    final icon = tester.widget<Icon>(_capsuleIcon());
+    expect(icon.color, HMusicPalette.dark.danger);
     await _drain(tester);
   });
 
   testWidgets('胶囊形态：圆角 ≈ 高度 / 2', (tester) async {
     await _pumpHost(tester);
     showHMusicToast(_hostContext, const HMusicNotice(_msg));
-    await tester.pump();
+    await _pumpEntrance(tester);
 
     final glass = tester.widget<AdaptiveGlassSurface>(_capsule());
     final rect = tester.getRect(_capsule());

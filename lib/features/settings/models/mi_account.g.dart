@@ -8,11 +8,13 @@ part of 'mi_account.dart';
 
 MiStatus _$MiStatusFromJson(Map<String, dynamic> json) => MiStatus(
   loggedIn: json['loggedIn'] as bool? ?? false,
+  sessionExpired: json['sessionExpired'] as bool? ?? false,
   accountMasked: json['accountMasked'] as String?,
 );
 
 Map<String, dynamic> _$MiStatusToJson(MiStatus instance) => <String, dynamic>{
   'loggedIn': instance.loggedIn,
+  'sessionExpired': instance.sessionExpired,
   'accountMasked': ?instance.accountMasked,
 };
 

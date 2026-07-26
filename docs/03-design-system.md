@@ -150,9 +150,12 @@ App 适配：Filled/Outlined 全胶囊（StadiumBorder、padding 水平 20）—
 ### Toast
 `position:fixed; bottom:28px(窄屏92px); 居中; padding:10px 20px; radius-sm; shadow-pop`
 左边框 3px 表意：info→muted-2 / success→accent / error→danger(且字变红)。3.2s 自动消失。
-App 适配（web 的 28/92 按其底边 chrome 定）：底距必须避让本壳底部 chrome——桌面抬到
-悬浮 mini 包络（76）+12 并水平居中于侧栏右侧内容区；窄屏抬到悬浮玻璃 chrome 完整包络
-之上（底距 + dock 66 + gap 8 + mini 50 + 呼吸距 8，随安全区上浮）。
+App 适配（Apple Music 式玻璃胶囊，刻意偏离 web）：无 hairline、无左色条，语义改由
+leading 图标承担——success ✓ accent（accent 铁律 5 处之一）/ error ⚠ danger / info 无
+图标，文字恒墨色（错误不再整句变红）；180ms 淡入 + 上浮 8px 入场、140ms 淡出（减动效
+直切）。底距必须避让本壳底部 chrome——桌面抬到悬浮 mini 包络（76）+12 并水平居中于
+侧栏右侧内容区；窄屏抬到悬浮玻璃 chrome 完整包络之上（底距 + dock 66 + gap 8 +
+mini 50 + 呼吸距 8，随安全区上浮）。
 
 ### 输入
 `width:100%; border:1px line; radius-sm; padding:9px 12px; font14; focus 边→text-strong`
@@ -171,7 +174,7 @@ BackdropFilter。
 | 歌词行 | color, font-size（当前行放大变衬线） | .25s ease |
 | 音量 flyout | opacity（悬浮展开，不占布局） | .2s ease |
 | track-actions 显隐 | opacity | .12s ease |
-| toast | 无动画，纯出现/消失 | — |
+| toast | web 无动画；App 180ms 淡入+上浮 8px / 140ms 淡出（减动效直切） | easeOutCubic / easeIn |
 
 平台玻璃额外动效：
 

@@ -146,7 +146,7 @@ family/wy-*/qq-* 的 entry 带 track（点了直接播）；apple-* 无 track（
 
 ## 11. Mi 小米账号 `/mi`
 
-| GET | `/status` | → `{loggedIn, accountMasked?, ...}` |
+| GET | `/status` | → `{loggedIn, sessionExpired, accountMasked?, ...}`；`?verify=1` 触发限频真校验（≥5min 一次，拉设备列表验 serviceToken，401 确证才翻状态，网络抖动保持快照） |
 | POST | `/login` | `{account,password,captchaCode?,webCredentials?}` 兼容直登通道 |
 | POST | `/qr/start` | → `{qrId, loginUrl, expiresAt}`（前端本地渲染二维码） |
 | GET | `/qr/:id/status` | → `{status: pending\|success\|failed\|expired, message?}` 每 2s 轮询 |
@@ -158,6 +158,11 @@ family/wy-*/qq-* 的 entry 带 track（点了直接播）；apple-* 无 track（
 | POST | `/logout` | — |
 
 smsStatus: `recent`(最近发过) / `limited`(限频，建议扫码) / 其他(已发送)。
+
+会话过期语义：任何真实小米调用（播放控制 ubus / TTS / 设备列表 / 探测 / 状态真校验）遇到
+401 时，Server 当场落库 `sessionExpired=true` 并翻 `loggedIn=false`（保留 accountMasked 与
+deviceId，重登复用设备标识降风控）；主动 `/logout` 清空该标记。客户端据此区分「登录已过期」
+与「未登录」，过期后调用需会话的接口返回 409 `MI_SESSION_EXPIRED`（不再是 `MI_ACCOUNT_NOT_LOGGED_IN`）。
 
 ## 12. Config `/config`
 

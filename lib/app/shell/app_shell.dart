@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,11 +7,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/player/view_models/player_view_model.dart';
 import '../../features/player/widgets/mini_player.dart';
+import '../../features/settings/view_models/mi_session_watch_view_model.dart';
 import '../../shared/widgets/hmusic_toast.dart';
 import '../app_providers.dart';
 import '../theme/hmusic_palette.dart';
 import 'bottom_nav.dart';
 import 'flutter_glass_shell.dart';
+import 'mi_session_banner.dart';
 import 'sidebar.dart';
 import 'top_edge_scrim.dart';
 
@@ -34,7 +38,12 @@ class AppShell extends ConsumerWidget {
     ref.listen(playbackNoticeProvider, (_, next) {
       if (next.isLoading) return;
       final notice = next.value;
-      if (notice != null) showHMusicToast(context, notice);
+      if (notice != null) {
+        showHMusicToast(context, notice);
+        // 播放报错常见根因是小米会话过期，Server 已在 401 时落库；
+        // 限频快照回读让过期横幅当场出现，不用等下次冷启动。
+        unawaited(ref.read(miSessionWatchProvider.notifier).refreshQuick());
+      }
     });
     final isDesktop = MediaQuery.sizeOf(context).width >= 860;
     // 正在播放分支（branch 0）本身就是完整播放视图，mini player 冗余，隐藏。
@@ -84,6 +93,18 @@ class AppShell extends ConsumerWidget {
                           bottom: 0,
                           child: MiniPlayer(),
                         ),
+                      // 过期横幅悬浮内容区顶缘：36 = 隐藏标题栏让位 28 + 8 呼吸距。
+                      Positioned(
+                        top: 36,
+                        left: 16,
+                        right: 16,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 480),
+                            child: const MiSessionBanner(),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -107,50 +128,67 @@ class AppShell extends ConsumerWidget {
       shell: navigationShell,
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: overlay,
-        child: ListenableBuilder(
-          listenable: shellController,
-          builder: (context, _) {
-            if (shellController.nativeChromeActive) {
-              // 原生 dock/mini 悬浮在 Flutter 层之上；内容经 MediaQuery padding 让位——
-              // 各页 ListView 的底部 padding 需累加 MediaQuery.paddingOf(context).bottom，
-              // 玻璃下仍有内容滚动（scroll-under），列表末尾不被遮挡。
-              // 滚动经 controller 上报原生：向下滚收缩，滚回顶部才展开
-              //（ScrollMinimizeListener 两壳统一语义）。
-              final media = MediaQuery.of(context);
-              return MediaQuery(
-                data: media.copyWith(
-                  padding: media.padding.copyWith(
-                    bottom: shellController.nativeBottomInset,
-                  ),
-                ),
-                child: Scaffold(
-                  // 无常驻顶栏：与回退壳一致，顶部只留滚动消融 scrim。
-                  body: Stack(
-                    children: <Widget>[
-                      Positioned.fill(
-                        child: ScrollMinimizeListener(
-                          onMinimized: (minimized) => shellController
-                              .reportScroll(minimized: minimized),
-                          child: navigationShell,
-                        ),
+        // 过期横幅压在两种窄屏壳（原生 chrome / Flutter 回退壳）之上，
+        // 悬浮于状态栏下缘；胶囊外区域不吃点击。
+        child: Stack(
+          children: <Widget>[
+            ListenableBuilder(
+              listenable: shellController,
+              builder: (context, _) {
+                if (shellController.nativeChromeActive) {
+                  // 原生 dock/mini 悬浮在 Flutter 层之上；内容经 MediaQuery padding 让位——
+                  // 各页 ListView 的底部 padding 需累加 MediaQuery.paddingOf(context).bottom，
+                  // 玻璃下仍有内容滚动（scroll-under），列表末尾不被遮挡。
+                  // 滚动经 controller 上报原生：向下滚收缩，滚回顶部才展开
+                  //（ScrollMinimizeListener 两壳统一语义）。
+                  final media = MediaQuery.of(context);
+                  return MediaQuery(
+                    data: media.copyWith(
+                      padding: media.padding.copyWith(
+                        bottom: shellController.nativeBottomInset,
                       ),
-                      const Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        child: TopEdgeScrim(),
+                    ),
+                    child: Scaffold(
+                      // 无常驻顶栏：与回退壳一致，顶部只留滚动消融 scrim。
+                      body: Stack(
+                        children: <Widget>[
+                          Positioned.fill(
+                            child: ScrollMinimizeListener(
+                              onMinimized: (minimized) => shellController
+                                  .reportScroll(minimized: minimized),
+                              child: navigationShell,
+                            ),
+                          ),
+                          const Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: TopEdgeScrim(),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  );
+                }
+                return FlutterGlassShell(
+                  shell: navigationShell,
+                  showMini: !onPlayerTab,
+                  miniActive: miniActive,
+                );
+              },
+            ),
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 8,
+              left: 16,
+              right: 16,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: const MiSessionBanner(),
                 ),
-              );
-            }
-            return FlutterGlassShell(
-              shell: navigationShell,
-              showMini: !onPlayerTab,
-              miniActive: miniActive,
-            );
-          },
+              ),
+            ),
+          ],
         ),
       ),
     );

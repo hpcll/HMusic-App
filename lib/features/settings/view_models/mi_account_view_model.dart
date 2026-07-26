@@ -7,6 +7,7 @@ import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_mi_account_repository.dart';
 import '../models/mi_account.dart';
 import '../models/mi_account_state.dart';
+import 'mi_session_watch_view_model.dart';
 
 final NotifierProvider<MiAccountViewModel, MiAccountState>
 miAccountViewModelProvider =
@@ -29,8 +30,14 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
   Future<void> loadStatus() async {
     try {
       final status = await ref.read(miAccountRepositoryProvider).status();
+      // 登录态掉线（主动退出/会话过期/他端登出）时清干净三通道：登录面板
+      // 重新展开必须从新鲜扫码页开始，不残留上一轮「登录成功」等旧态。
+      final droppedOut = state.loggedIn && !status.loggedIn;
       // 每次确认状态都收起「更换账号」：登录成功/退出后回到默认视图。
       state = state.copyWith(status: status, changingAccount: false);
+      if (droppedOut) _resetChannels(changingAccount: false);
+      // 同步全局过期横幅：重新登录/退出后立即消退，不等下一轮检测。
+      ref.read(miSessionWatchProvider.notifier).applyStatus(status);
     } on ApiFailure catch (failure) {
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }

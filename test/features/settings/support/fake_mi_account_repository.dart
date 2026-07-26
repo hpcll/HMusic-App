@@ -10,8 +10,8 @@ class FakeMiAccountRepository implements MiAccountRepository {
   final List<String> calls = <String>[];
 
   @override
-  Future<MiStatus> status() async {
-    calls.add('status');
+  Future<MiStatus> status({bool verify = false}) async {
+    calls.add(verify ? 'status:verify' : 'status');
     return current;
   }
 

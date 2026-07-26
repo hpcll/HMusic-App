@@ -89,7 +89,8 @@ class _MiAccountSectionViewState extends ConsumerState<MiAccountSectionView> {
   }
 }
 
-// 状态卡：已登录显示掩码账号 + 青绿点 + 更换/退出键；未登录显示 muted 点 + 提示。
+// 状态卡：已登录显示掩码账号 + 青绿点 + 更换/退出键；未登录显示 muted 点 + 提示；
+// 登录已过期（Server 401 确证）显示 danger 点 + 掩码，如实告知需重新登录。
 class _StatusCard extends StatelessWidget {
   const _StatusCard({
     required this.state,
@@ -105,12 +106,21 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     if (!state.loggedIn) {
+      final expired = state.status?.sessionExpired ?? false;
+      final masked = state.status?.accountMasked ?? '';
       return HMusicCard(
         child: Row(
           children: <Widget>[
-            const StateDot(PlaybackStatus.idle),
+            StateDot(expired ? PlaybackStatus.error : PlaybackStatus.idle),
             const SizedBox(width: 8),
-            Text('未登录小米账号', style: TextStyle(color: palette.text)),
+            Expanded(
+              child: Text(
+                expired ? '$masked 登录已过期，请重新登录'.trim() : '未登录小米账号',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: palette.text),
+              ),
+            ),
           ],
         ),
       );

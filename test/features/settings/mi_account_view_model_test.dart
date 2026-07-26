@@ -88,4 +88,30 @@ void main() {
     expect(state.loggedIn, isFalse);
     expect(state.showLoginPanel, isTrue);
   });
+
+  test('退出登录清干净三通道：不残留上一轮扫码结果', () async {
+    final repository = FakeMiAccountRepository(
+      current: const MiStatus(loggedIn: true, accountMasked: '138****0000'),
+    );
+    final container = _container(repository);
+    final viewModel = container.read(miAccountViewModelProvider.notifier);
+
+    await viewModel.loadStatus();
+    // 制造脏通道：换到密码页并发起一轮扫码（stage 离开 idle、持有会话）。
+    viewModel.toggleChangeAccount();
+    viewModel.switchTab(MiTab.password);
+    await viewModel.startQr();
+    expect(
+      container.read(miAccountViewModelProvider).qrStage,
+      MiQrStage.pending,
+    );
+
+    await viewModel.logout();
+    final state = container.read(miAccountViewModelProvider);
+    // 掉线后的登录面板必须从新鲜扫码页开始。
+    expect(state.qrStage, MiQrStage.idle);
+    expect(state.qrSession, isNull);
+    expect(state.tab, MiTab.qr);
+    expect(state.challenge, isNull);
+  });
 }

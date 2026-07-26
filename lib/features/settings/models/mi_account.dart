@@ -2,16 +2,24 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'mi_account.g.dart';
 
-// 小米账号登录状态（GET /mi/status）。loggedIn 决定状态卡展示登录态/退出键。
+// 小米账号登录状态（GET /mi/status）。loggedIn 决定状态卡展示登录态/退出键；
+// sessionExpired 区分「登录已过期」与「未登录」（旧 Server 无此字段，默认 false）。
 @JsonSerializable(includeIfNull: false)
 class MiStatus {
-  const MiStatus({required this.loggedIn, this.accountMasked});
+  const MiStatus({
+    required this.loggedIn,
+    this.sessionExpired = false,
+    this.accountMasked,
+  });
 
   factory MiStatus.fromJson(Map<String, Object?> json) =>
       _$MiStatusFromJson(json);
 
   @JsonKey(defaultValue: false)
   final bool loggedIn;
+
+  @JsonKey(defaultValue: false)
+  final bool sessionExpired;
 
   final String? accountMasked;
 

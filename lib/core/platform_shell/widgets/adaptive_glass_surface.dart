@@ -29,6 +29,7 @@ class AdaptiveGlassSurface extends StatelessWidget {
     this.padding = const EdgeInsets.all(12),
     this.borderRadius = const BorderRadius.all(Radius.circular(10)),
     this.shadow = true,
+    this.hairline = true,
     super.key,
   });
 
@@ -39,6 +40,10 @@ class AdaptiveGlassSurface extends StatelessWidget {
 
   // 悬浮卡投影；贴边条形态关掉。
   final bool shadow;
+
+  // 1px 白描边。toast/横幅这类轻浮层按 Apple Music 无 hairline 语言关掉，
+  // dock/mini 等常驻 chrome 维持默认。
+  final bool hairline;
 
   // 饱和度 1.25 的颜色矩阵（Rec.709 亮度权重）：模糊采样后轻微提饱和。
   static const List<double> _saturate = <double>[
@@ -73,9 +78,11 @@ class AdaptiveGlassSurface extends StatelessWidget {
             ? Theme.of(context).colorScheme.surface
             : tint,
         borderRadius: borderRadius,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: dark ? 0.12 : 0.45),
-        ),
+        border: hairline
+            ? Border.all(
+                color: Colors.white.withValues(alpha: dark ? 0.12 : 0.45),
+              )
+            : null,
         boxShadow: shadow
             ? const <BoxShadow>[
                 BoxShadow(

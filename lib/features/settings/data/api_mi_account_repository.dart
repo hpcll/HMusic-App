@@ -17,8 +17,13 @@ class ApiMiAccountRepository implements MiAccountRepository {
   final ApiClient _apiClient;
 
   @override
-  Future<MiStatus> status() async {
-    return MiStatus.fromJson(await _apiClient.getMap('/mi/status'));
+  Future<MiStatus> status({bool verify = false}) async {
+    return MiStatus.fromJson(
+      await _apiClient.getMap(
+        '/mi/status',
+        query: verify ? const <String, Object?>{'verify': '1'} : null,
+      ),
+    );
   }
 
   @override
