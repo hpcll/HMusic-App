@@ -45,7 +45,26 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) ref.read(chartsViewModelProvider.notifier).back();
       },
-      child: isWall ? const ChartsWall() : const ChartDetailView(),
+      // 墙 ↔ 详情原为硬切换（同帧跳变，观感像坏了）；改 220ms 淡入 + 1.5% 上浮
+      //（同 mini player 显隐档），入出双向共用一条曲线；减动效直切。
+      child: AnimatedSwitcher(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.015),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        ),
+        child: isWall ? const ChartsWall() : const ChartDetailView(),
+      ),
     );
   }
 }

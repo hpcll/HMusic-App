@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/platform_shell/widgets/adaptive_glass_surface.dart';
+import '../../../shared/widgets/pressable_scale.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../../search/views/search_page.dart';
 import '../models/chart.dart';
@@ -265,11 +266,11 @@ class _ChartsHeaderDelegate extends SliverPersistentHeaderDelegate {
               ),
             ),
           ),
-          const Positioned(
+          Positioned(
             left: 16,
             right: 16,
             bottom: 12,
-            child: _SearchEntry(),
+            child: _SearchEntry(pinProgress: progress),
           ),
         ],
       ),
@@ -282,10 +283,19 @@ class _ChartsHeaderDelegate extends SliverPersistentHeaderDelegate {
 }
 
 // 页头搜索入口：假输入胶囊（非真 TextField，避免抢焦点/弹键盘），
-// 形态与搜索页 SearchInput 一致（全胶囊、放大镜前缀、muted hint、玻璃底），
+// 形态与搜索页 SearchInput 一致（全胶囊、放大镜前缀、muted hint），
 // 点击 push 全屏搜索页（键盘即起）。
+// 材质随吸顶进度过渡：展开态背后是纯暖纸，玻璃无内容可采样、只剩 hairline 圈
+//（违背无线北极星），故盖 panel-2 读作灰底填充（Apple Music 搜索页顶部同款）；
+// 吸顶后灰层随 progress 淡出，玻璃直接采样滚过的内容，回到悬浮玻璃语言。
+// 灰层必须叠在玻璃「之上」：垫在背后会被 62% 不透明的 tint（值≈背景色）稀释到
+// 只剩 1 个色阶，实机采样验证过，肉眼完全读不出灰底。
+// 高光边恒关——轻浮层按 Apple Music 无 hairline 语言（同 toast/横幅）。
 class _SearchEntry extends StatelessWidget {
-  const _SearchEntry();
+  const _SearchEntry({required this.pinProgress});
+
+  // 0 = 页头完全展开，1 = 收拢吸顶（SliverPersistentHeader 逐帧驱动，天然连续）。
+  final double pinProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -294,28 +304,45 @@ class _SearchEntry extends StatelessWidget {
     return Semantics(
       button: true,
       label: '搜索',
-      child: AdaptiveGlassSurface(
-        quality: resolveGlassQuality(context),
-        padding: EdgeInsets.zero,
-        borderRadius: radius,
-        shadow: false,
-        child: InkWell(
-          onTap: () => context.push(SearchPage.path),
-          borderRadius: radius,
-          child: SizedBox(
-            height: 44,
-            child: Row(
-              children: <Widget>[
-                const SizedBox(width: 14),
-                Icon(Icons.search_rounded, size: 20, color: palette.muted),
-                const SizedBox(width: 8),
-                Text(
-                  '搜索歌曲或歌手',
-                  style: TextStyle(fontSize: 14.5, color: palette.muted),
-                ),
-              ],
+      child: PressableScale(
+        onTap: () => context.push(SearchPage.path),
+        child: Stack(
+          children: <Widget>[
+            // 玻璃在最底（兼作 Stack 尺寸基准）：吸顶后灰层退场，它接管材质。
+            AdaptiveGlassSurface(
+              quality: resolveGlassQuality(context),
+              padding: EdgeInsets.zero,
+              borderRadius: radius,
+              shadow: false,
+              hairline: false,
+              child: const SizedBox(height: 44, width: double.infinity),
             ),
-          ),
+            // 灰层叠在玻璃之上、内容之下：展开态整块 panel-2 实心灰，随吸顶淡出。
+            Positioned.fill(
+              child: Opacity(
+                opacity: (1 - pinProgress).clamp(0.0, 1.0),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: palette.panelSecondary,
+                    borderRadius: radius,
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: Row(
+                children: <Widget>[
+                  const SizedBox(width: 14),
+                  Icon(Icons.search_rounded, size: 20, color: palette.muted),
+                  const SizedBox(width: 8),
+                  Text(
+                    '搜索歌曲或歌手',
+                    style: TextStyle(fontSize: 14.5, color: palette.muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

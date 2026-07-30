@@ -84,7 +84,7 @@ Future<void> _pump(WidgetTester tester) async {
     ),
   );
   // load() 经 microtask 触发 → 目录到达 → 预览预取（二段异步）逐条回填。
-  // pumpAndSettle 推进到静止：Hero 分页点是 180ms 有限动画，无无限循环，不会 hang。
+  // pumpAndSettle 推进到静止：骨架↔内容 180ms 淡化是有限动画，无无限循环，不会 hang。
   await tester.pumpAndSettle();
 }
 
@@ -99,8 +99,8 @@ void main() {
     expect(find.byType(ChartsHeroCarousel), findsOneWidget);
     // 本站只有旗舰一张榜（纯重复分区隐藏），仅网易云（2 榜）保留分区行。
     expect(find.byType(ChartsSectionRow), findsOneWidget);
-    // 分区小节标题带 chevron。
-    expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+    // 分区标题不挂 chevron：卡带已陈列全部榜单，无下级目的地，箭头是假承诺。
+    expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
   });
 
   testWidgets('hero shows source label and serif chart name', (tester) async {

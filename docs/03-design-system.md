@@ -127,6 +127,14 @@ App 适配：Filled/Outlined 全胶囊（StadiumBorder、padding 水平 20）—
 - `.track-actions` 桌面 hover 才显（`@media (hover:hover) and (min-width:860px)` opacity 0→1），触屏常显
 - `.track-cols`（≥861px）：`grid 1fr 1fr; column-gap:28px` 宽屏双列（榜单/歌单详情，50 首减半滚动）
 
+### 榜单卡 .chart-card（App 端偏离）
+卡头（#1 封面 44 + 衬线榜名）+ Top3 可点播预览。**整卡点击进详情，卡内不放「查看全部」
+文字行**——与整卡点击同义的第二入口，删掉换来预览区呼吸。分区小节标题同理不带 chevron：
+卡带已陈列该来源全部榜单，分区层级没有「更多」目的地（Apple Music 的「›」都真的可点进
+下级页，有指无路是假承诺）。
+预览区固定 78 包络保证网格等高，包络随 textScaler 等比伸缩；横滑卡带把字号钳到 1.2 倍
+（`MediaQuery.withClampedTextScaling`），避免像素级等高在无障碍大字号下溢出。
+
 ### 圆形图标按钮
 - `.icon-btn` 34×34 圆 / line 边 / hover 边→strong；svg 16px
 - 播放页主控 `.ctrl-btn` 46×46 圆；`.ctrl-btn.primary` 64×64 ink 底白字（播放键），active `scale(.95)`
@@ -163,6 +171,9 @@ App 适配：灰底（panel-2）无描边、radius 14、padding 14/12，focus �
 （可见性由光标承担，与搜索框同纪律）——移动端软表单款，web 描边款不变。
 搜索页例外：搜索框使用平台自适应玻璃胶囊，结果列表共用一块玻璃面板；禁止逐行建立
 BackdropFilter。
+榜单页头搜索胶囊：材质随吸顶进度过渡——展开态背后是纯暖纸，玻璃无内容可采样、只剩
+hairline 圈（违背无线北极星），故垫 panel-2 读作灰底填充；吸顶后垫层随 progress 淡出，
+玻璃直接采样滚过的内容。hairline 恒关（同 toast/横幅的 Apple Music 无线语言）。
 
 ## 4. 动效清单（全部 transition，无重动画）
 
@@ -175,6 +186,13 @@ BackdropFilter。
 | 音量 flyout | opacity（悬浮展开，不占布局） | .2s ease |
 | track-actions 显隐 | opacity | .12s ease |
 | toast | web 无动画；App 180ms 淡入+上浮 8px / 140ms 淡出（减动效直切） | easeOutCubic / easeIn |
+| 可点元素按压（App） | transform scale .97（`PressableScale`） | 120ms easeOut |
+| 骨架 → 内容（App） | opacity 交叉淡化（`AnimatedSwitcher`） | 180ms easeOut / easeIn |
+| 远程图首帧到达（App） | opacity 0→1，垫深色占位在底层防白闪 | 200ms easeOut |
+
+**App 按压纪律**：可点元素统一用 `PressableScale`（scale .97 / 120ms），不用 Material
+矩形水波——iOS 上涟漪出戏，且水波的矩形/圆角包络与胶囊语言冲突。滚动容器内安全
+（滑动触发 tapCancel 立即回弹）。减动效环境所有 App 侧动效直切（`disableAnimationsOf`）。
 
 平台玻璃额外动效：
 
