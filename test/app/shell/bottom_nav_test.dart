@@ -112,9 +112,9 @@ void main() {
     for (final label in <String>['榜单', '歌单', '统计', '设置']) {
       expect(find.text(label), findsNothing);
     }
-    expect(find.byIcon(Icons.leaderboard_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.local_fire_department_rounded), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.leaderboard_rounded));
+    await tester.tap(find.byIcon(Icons.local_fire_department_rounded));
     await tester.pumpAndSettle();
     expect(_harnessKey.currentState!.expandCount, 1);
     // 展开而非切 tab：4 tab 回来，页面仍是榜单分支。

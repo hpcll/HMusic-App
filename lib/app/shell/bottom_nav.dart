@@ -23,7 +23,7 @@ const List<NavDestinationSpec> kSidebarDestinations = <NavDestinationSpec>[
   NavDestinationSpec(Icons.search_rounded, '搜索', 1),
   NavDestinationSpec(Icons.queue_music_rounded, '队列', 2),
   NavDestinationSpec(Icons.library_music_rounded, '歌单', 3),
-  NavDestinationSpec(Icons.leaderboard_rounded, '榜单', 4),
+  NavDestinationSpec(Icons.local_fire_department_rounded, '榜单', 4),
   NavDestinationSpec(Icons.insights_rounded, '统计', 5),
   NavDestinationSpec(Icons.settings_rounded, '设置', 6),
 ];
@@ -35,11 +35,22 @@ const int kHomeBranch = 4;
 // 窄屏 dock 4 tab 精选（播放/队列走 mini player push 全屏页；搜索并入
 // 榜单页头胶囊 push 全屏页——搜索页内容太薄，不值一个常驻 tab）。
 const List<NavDestinationSpec> kNavDestinations = <NavDestinationSpec>[
-  NavDestinationSpec(Icons.leaderboard_rounded, '榜单', kHomeBranch),
+  // local_fire_department（火焰）= 榜单页的「最热歌曲」，与原生 dock 的 SF
+  // flame 同一表意——否则 iOS 26 走原生壳、18.x 走本回退，两代机图标不一致。
+  // 排除 format_list_numbered / leaderboard / emoji_events 的理由见 Swift 侧
+  // GlassDockTab.all 注释（都在 22pt 实测过）。
+  NavDestinationSpec(Icons.local_fire_department_rounded, '榜单', kHomeBranch),
   NavDestinationSpec(Icons.library_music_rounded, '歌单', 3),
   NavDestinationSpec(Icons.insights_rounded, '统计', 5),
   NavDestinationSpec(Icons.settings_rounded, '设置', 6),
 ];
+
+// dock 图标字号 28 而非 22：Flutter 的 Icon(size:) 是字形框，UIKit 的
+// SymbolConfiguration(pointSize:) 是渲染点尺寸，同一个数字下墨迹不等大——
+// 22 字号 Material 墨迹只有 ~18pt，而原生 22pt SF 墨迹 ~22.5pt，18.x 看起来
+// 比 26+ 小一档。28 字号实测墨迹 22.5pt，与原生四图标均值一致。
+// 改此值需同步核对 kChromeDockHeight(66) 的容纳：28 + 3 + 标签 ~15 ≈ 46。
+const double kDockIconSize = 28;
 
 // 窄屏悬浮玻璃 dock，形态对齐 iOS 26+ 原生壳（GlassShellOverlay）：胶囊压进
 // 安全区、悬在 home indicator 上方。展开 = 5 tab 等分胶囊条，选中态是会在
@@ -228,11 +239,11 @@ class _NavItem extends StatelessWidget {
     final palette = context.palette;
     final color = active ? palette.textStrong : palette.muted;
     final content = compact
-        ? Center(widthFactor: 1, child: Icon(spec.icon, size: 22, color: color))
+        ? Center(widthFactor: 1, child: Icon(spec.icon, size: kDockIconSize, color: color))
         : Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Icon(spec.icon, size: 22, color: color),
+              Icon(spec.icon, size: kDockIconSize, color: color),
               const SizedBox(height: 3),
               Text(spec.label, style: TextStyle(fontSize: 11, color: color)),
             ],

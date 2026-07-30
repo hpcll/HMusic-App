@@ -36,3 +36,6 @@ GEMINI.md
 .env
 .env.*
 *.har
+
+# Claude Code 本地配置与验证截图（体积大、机器相关，不入仓）
+.claude/

@@ -56,7 +56,7 @@ enum GlassShellMetrics {
 }
 
 // dock 4 tab 的 id/SF Symbol/标签，id 与 Dart kShellTabs 严格一致，
-// 图标语义对齐 Flutter bottom_nav（leaderboard/library/insights/settings）。
+// 图标语义对齐 Flutter bottom_nav（local_fire_department/library/insights/settings）。
 // 搜索并入榜单页头胶囊（Dart push 全屏搜索页），不占 dock 位。
 struct GlassDockTab {
   let id: String
@@ -64,9 +64,14 @@ struct GlassDockTab {
   let label: String
 
   static let all: [GlassDockTab] = [
-    // trophy 而非 chart.bar：后者线条版是空心方块轮廓，混在单笔画家族里突兀；
-    // 奖杯与 Material leaderboard 的备选（emoji_events）同语义，笔画协调。
-    GlassDockTab(id: "charts", symbol: "trophy", label: "榜单"),
+    // flame：榜单页实际内容是「热门歌曲 · 最热」，火焰直接对应「热度」。
+    // 逐个排除过的备选（都在 dock 真实的 22pt 下量过，别再回头选）：
+    // - list.number：1/2/3 在 22pt 糊成一团墨点，放大才认得出是数字；
+    // - chart.bar(.fill)：与统计的 chart.line.uptrend 同属图表族，相邻会撞；
+    // - trophy：表意偏「获奖/成就」，易读成徽章而非热度榜；
+    // - medal/rosette：Material 无对应字形，两代机会长得不一样。
+    // 另外 flame 渲染宽 23pt，接近原 trophy 的 27pt，换上不会让 dock 重心跳。
+    GlassDockTab(id: "charts", symbol: "flame", label: "榜单"),
     GlassDockTab(id: "playlists", symbol: "music.note.list", label: "歌单"),
     GlassDockTab(id: "stats", symbol: "chart.line.uptrend.xyaxis", label: "统计"),
     GlassDockTab(id: "settings", symbol: "gearshape", label: "设置"),

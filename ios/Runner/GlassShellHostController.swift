@@ -250,7 +250,7 @@ private final class SystemGlassTabBarController: UITabBarController,
     // iOS 26 Liquid Glass 忽略 unselectedItemTintColor，未选中会跟选中一样深。
     // 用 alwaysOriginal 烤 textStrong/muted（对齐 Flutter AppBottomNav）。
     // 关键约束：
-    // 1) 用系统默认 SF Symbol 尺寸（不设 pointSize），保留 tab 布局度量；
+    // 1) SF Symbol 钉死 pointSize 22（见 tabSymbol），与 SwiftUI overlay 同尺寸；
     // 2) image / selectedImage 只在 items 齐套或深浅色切换时写一次，
     //    绝不在 viewDidLayoutSubviews 每帧重烤——那会把标题挤出胶囊。
     tabBar.isTranslucent = true
@@ -279,10 +279,22 @@ private final class SystemGlassTabBarController: UITabBarController,
     bakeTabColorsIfNeeded(force: true)
   }
 
-  // 默认 SF Symbol（无自定义 configuration）+ alwaysOriginal。
-  // 自定义 pointSize/画布会改变 intrinsic size，标题被挤出 floating glass。
+  // 钉死 pointSize 22 对齐 GlassShellOverlay 的 .font(.system(size: 22))——
+  // 两条原生路径同尺寸，否则系统默认尺寸跟 Dynamic Type 浮动，26+ 原生壳
+  // 会比 Flutter 回退壳明显大一圈。
+  // 注意 Flutter 侧写的是 kDockIconSize = 28 而非 22：那是字形框尺寸，与本处
+  // 的渲染点尺寸不是同一个量，两边墨迹都落在 ~22.5pt（见 bottom_nav.dart 注释）。
+  // scale .medium 保持字形在 22pt 画布内的比例，不额外放大 intrinsic size：
+  // 历史上把标题挤出 floating glass 的是自定义画布/更大 pointSize，不是本配置。
+  private static let symbolConfig = UIImage.SymbolConfiguration(
+    pointSize: 22,
+    weight: .medium,
+    scale: .medium
+  )
+
   private static func tabSymbol(_ name: String, color: UIColor) -> UIImage? {
-    UIImage(systemName: name)?.withTintColor(color, renderingMode: .alwaysOriginal)
+    UIImage(systemName: name, withConfiguration: symbolConfig)?
+      .withTintColor(color, renderingMode: .alwaysOriginal)
   }
 
   private func bakeTabColorsIfNeeded(force: Bool = false) {
