@@ -50,6 +50,15 @@ DownloadRecord { id;trackKey;source;title;artist;album?;coverUrl?;track;quality?
 `publicBaseUrl` 是 Server 对外生成音频 URL 的实时生效值（Server 会把回环/失效 IPv4 替换为
 其当前局域网地址），不等于客户端实际连接地址，禁止据此覆盖用户填写的 server base。
 
+### 1.1 升级（需登录，2026-08-16）
+
+| GET | `/system/update` | 查 GitHub Release 最新版（5min 缓存）→ `{current,latest,hasUpdate,notes,publishedAt,url,deployMode,canSelfUpdate,updating}` |
+| POST | `/system/update` | 一键升级：native 后台执行 `install.sh --update`；docker 经 hmusic-updater 守护容器（watchtower HTTP API）拉新镜像重建。→ `{started:true}`；缺守护/不支持 409（`UPDATE_DOCKER_MODE`/`UPDATE_NOT_SUPPORTED`，message 带手动命令） |
+| GET | `/system/update/log` | → `{updating,log}`，`data/update.log` 尾部 8KB，升级失败排查用 |
+
+触发后 Server 会短暂停止并以新版重启；客户端应轮询公开的 `/system/info` 直到 `version`
+变化（成功）或超时（引导看 log）。GitHub 不可达时 GET 返回 502 `UPDATE_CHECK_FAILED`。
+
 ## 2. Auth `/auth`
 
 | 方法 | 路径 | 认证 | 入参 | 出参 |
@@ -200,6 +209,45 @@ Range。Flutter 必须保留返回 URL 的 path/query，并把 scheme/host/port 
 
 完成的曲目播放时由 Server 自动优先命中 `/proxy/local/:token`，客户端仍消费普通 playback
 `streamUrl`，无需识别本地/上游来源。下载管理不属于 P0 最小纵切，排入 P2。
+
+## 16. Library `/library`（NAS 本地曲库，P6/M1，2026-07-31）
+
+| GET | `/library?search=&artist=&album=&folder=&limit=&offset=` | → `{items, total, scan, scrape}`；items 按 artist/title 排序，`limit≤200`。`folder=` 空串是合法值（根目录直属） |
+| GET | `/library/groups?by=artist\|album\|folder` | 分类聚合 → `{groups: [{name, count}]}`；`name` 空串 = 未知歌手/未知专辑/根目录 |
+| POST | `/library/scan` | 触发增量扫描（幂等，扫描中返回当前进度）→ `{scan}`；扫描完自动接一轮刮削 |
+| POST | `/library/scrape` | 手动补刮封面/歌词（幂等）→ `{scrape}` |
+| DELETE | `/library/:id` | 移出曲库 → `{deletedId}`；`origin=scan` 仅删记录不动原文件（目录仍在配置时重扫会回来），download/upload 连文件一起删 |
+
+- `LibraryItem`：`{id, trackKey, origin: scan|upload|download, source, title, artist,
+  album?, durationMs?, coverUrl?, folder, hasLyric, fileExt, byteSize, createdAt,
+  updatedAt, track}`。
+- 每条自带 `track` 形态（`url` 为签名本地代理地址），客户端直接 `POST /playback/play
+  {track}` 即可播放——`resolveTrack` 对带 url 的 track 短路，免插件解析。
+- `scan` 状态：`{status: idle|scanning|done|failed, added, updated, removed, skipped,
+  startedAt?, finishedAt?, error?}`。启动时 Server 自动扫一轮。
+- 扫描来源身份 `local:<路径哈希>` 稳定（重扫不换），歌单里存的本地曲目快照不断链；
+  下载入库保留原平台 `source:sourceTrackId`，在线点播同曲自动命中本地文件。
+- 存量目录经 `PATCH /config` 的 `libraryDirs: string[]`（绝对路径，最多 16 个）配置，
+  只读扫描，永不改动用户原文件。扫描范围严格限于 `DATA_DIR/music` + `libraryDirs`。
+- **封面/歌词刮削**：本地优先（内嵌封面 → 同目录 cover/folder/front/album.jpg →
+  同名 `.lrc`），缺失部分回退在线音源按「歌名 + 歌手」匹配（标题歌手对不上宁可留空，
+  不做错配）。`scrape` 状态：`{status: idle|running|done, total, filled, missed}`；
+  条目状态 `pending|done|miss`，`miss` 不重复刮以免每轮扫描重复打网络请求。
+- 本地曲目歌词经 `GET /tracks/:id/lyrics` 读取，命中曲库落库的 lrc；`source=local`
+  不再走在线音源查询（音源侧查无此曲，只会白等超时）。
+- `/proxy/local/:token` 的 token 兼容三种身份：曲库 trackKey / 曲库条目 id / 下载记录 id；
+  内嵌封面经 `cover:<trackKey>` token 出流。
+
+| POST | `/library/upload` | multipart 单文件（字段名 `file`，≤500MB，仅 mp3/flac/m4a/ogg/wav/aac）→ `{item}`（含 track，已入库） |
+
+上传流式落盘（临时名 + 原子改名），读标签入库 `origin=upload`；同名文件自动加序号。
+
+## 16.1 小爱语音接管 spike（M3，2026-07-31）
+
+| GET | `/mi/conversation/probe?deviceId=` | 拉指定（缺省第一台）音箱最近 5 条对话 → `{device, records: [{query, time, requestId}], raw}` |
+
+非公开接口（与 xiaomusic 同源），固件差异可能拿不到——`raw` 透出原始响应供真机
+判断。records 可用即 M3 全量可行；不可用则 M3 改道。
 
 ## 静态前端
 

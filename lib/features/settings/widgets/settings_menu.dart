@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../app/theme/hmusic_radii.dart';
+import '../../../core/app_version.dart';
 import '../models/settings_section.dart';
 import '../models/settings_summary.dart';
 
@@ -70,6 +71,9 @@ const List<_MenuGroupSpec> _kGroups = <_MenuGroupSpec>[
   _MenuGroupSpec('安全', <_MenuItemSpec>[
     _MenuItemSpec(SettingsSection.security, Icons.lock_outline_rounded),
   ]),
+  _MenuGroupSpec('关于', <_MenuItemSpec>[
+    _MenuItemSpec(SettingsSection.about, Icons.system_update_alt_rounded),
+  ]),
 ];
 
 String _summaryFor(SettingsSummary summary, SettingsSection section) {
@@ -80,6 +84,7 @@ String _summaryFor(SettingsSummary summary, SettingsSection section) {
     SettingsSection.downloads => summary.downloads,
     SettingsSection.tracks => summary.tracks,
     SettingsSection.config => summary.config,
+    SettingsSection.about => 'v$kAppVersion',
     _ => '',
   };
 }

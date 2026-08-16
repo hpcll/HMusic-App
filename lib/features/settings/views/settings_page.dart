@@ -17,7 +17,9 @@ import '../view_models/security_view_model.dart';
 import '../view_models/settings_menu_view_model.dart';
 import '../view_models/sources_view_model.dart';
 import '../view_models/tracks_view_model.dart';
+import '../view_models/update_view_model.dart';
 import '../widgets/account_card.dart';
+import '../widgets/sections/about_section.dart';
 import '../widgets/sections/config_section.dart';
 import '../widgets/sections/devices_section.dart';
 import '../widgets/sections/diag_section.dart';
@@ -156,6 +158,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         SettingsSection.diag => const DiagSectionView(),
         SettingsSection.security => const SecuritySectionView(),
         SettingsSection.tracks => const TracksSectionView(),
+        SettingsSection.about => const AboutSectionView(),
       },
     );
   }
@@ -205,6 +208,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       miAccountViewModelProvider.select((s) => s.notice),
       (_, m) =>
           show(m, ref.read(miAccountViewModelProvider.notifier).clearNotice),
+    );
+    ref.listen(
+      updateViewModelProvider.select((s) => s.notice),
+      (_, m) => show(m, ref.read(updateViewModelProvider.notifier).clearNotice),
     );
   }
 }

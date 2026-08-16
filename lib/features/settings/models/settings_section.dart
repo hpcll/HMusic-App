@@ -1,4 +1,4 @@
-// 设置中心的八个子页（对齐 web SECTION_COMPONENTS 的 key 集合）。
+// 设置中心的子页（对齐 web SECTION_COMPONENTS 的 key 集合；about 为 App 独有）。
 enum SettingsSection {
   mi('小米账号'),
   devices('播放设备'),
@@ -7,7 +7,8 @@ enum SettingsSection {
   tracks('手工曲目'),
   config('运行配置'),
   diag('链路诊断'),
-  security('修改密码');
+  security('修改密码'),
+  about('关于与更新');
 
   const SettingsSection(this.label);
 
