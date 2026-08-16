@@ -133,6 +133,12 @@ Server 音频代理对上游握手限时 15 秒（仅响应头阶段，正文流
 
 ## 9. 音频焦点与中断
 
+会话必须在建 `AudioPlayer` 之前配置（`hmusicAudioHandlerProvider` 内
+`AudioSession.instance.configure(AudioSessionConfiguration.music())`，2026-08-01 补）。
+装了 `audio_session` 却不 configure 时平台按「未声明用途」的默认会话走：iOS 静音键
+掐播放、中断后不恢复；macOS 上曲目与输出设备采样率不一致（44.1k 曲目 / 48k 扬声器）
+时重采样劣化，表现为持续电流刺啦声。music() 预设声明本 App 为音乐播放器。
+
 | 场景 | 预期 |
 |---|---|
 | 来电/闹钟 | 暂停或 duck 由 audio_session 决策；中断结束只在系统允许且此前正在播时恢复 |

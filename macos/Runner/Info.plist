@@ -22,6 +22,14 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- 局域网 HTTP 放行：just_audio 经 AVFoundation 拉流会走 ATS，缺此项时
+		     NAS 曲库/代理直链在 macOS 一律装载失败（dio 走自有 socket 不受影响，
+		     所以只有播放坏、API 正常）。与 iOS 保持同一策略，不放开任意明文。 -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_hmusic._tcp</string>

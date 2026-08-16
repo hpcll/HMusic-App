@@ -24,7 +24,7 @@ class QueueViewModel extends Notifier<QueueViewState> {
   // 禁止先 /queue/current 再 play 的两步写法（半成功窗口），见 docs/08。
   Future<void> playAt(int index) async {
     final item = _itemAt(index);
-    if (item == null || state.busyItemId != null) return;
+    if (item == null || state.isMutating) return;
     state = state.copyWith(busyItemId: item.id, clearError: true);
     try {
       final handler = await ref.read(hmusicAudioHandlerProvider.future);
@@ -39,9 +39,12 @@ class QueueViewModel extends Notifier<QueueViewState> {
   }
 
   // 无单曲删除接口：整体替换为去掉该曲后的列表，指针按删除位相应前移。
-  Future<void> removeAt(int index) async {
+  // 返回是否成功，供左滑删除决定走移除动画还是回弹。
+  Future<bool> removeAt(int index) {
     final queue = state.queue;
-    if (queue == null || _itemAt(index) == null) return;
+    if (queue == null || _itemAt(index) == null || state.isMutating) {
+      return Future<bool>.value(false);
+    }
     final remaining = <HMusicTrack>[
       for (var i = 0; i < queue.items.length; i++)
         if (i != index) queue.items[i].track,
@@ -52,7 +55,7 @@ class QueueViewModel extends Notifier<QueueViewState> {
         : current >= remaining.length
         ? remaining.length - 1
         : current;
-    await _run(
+    return _mutate(
       () => ref
           .read(queueRepositoryProvider)
           .replaceQueue(
@@ -64,11 +67,11 @@ class QueueViewModel extends Notifier<QueueViewState> {
   }
 
   Future<void> changeMode(PlayMode mode) {
-    return _run(() => ref.read(queueRepositoryProvider).setPlayMode(mode));
+    return _mutate(() => ref.read(queueRepositoryProvider).setPlayMode(mode));
   }
 
   Future<void> clear() {
-    return _run(() => ref.read(queueRepositoryProvider).clear());
+    return _mutate(() => ref.read(queueRepositoryProvider).clear());
   }
 
   HMusicQueueItem? _itemAt(int index) {
@@ -77,7 +80,19 @@ class QueueViewModel extends Notifier<QueueViewState> {
     return items[index];
   }
 
-  Future<void> _run(Future<HMusicQueue> Function() action) async {
+  // 写操作统一互斥：任意写（点播/删除/清空/换模式）进行中即拒绝新写，
+  // 避免 replaceQueue 与 mode/clear 交错落地造成指针或模式错位。
+  Future<bool> _mutate(Future<HMusicQueue> Function() action) async {
+    if (state.isMutating) return false;
+    state = state.copyWith(mutating: true);
+    try {
+      return await _run(action);
+    } finally {
+      state = state.copyWith(mutating: false);
+    }
+  }
+
+  Future<bool> _run(Future<HMusicQueue> Function() action) async {
     try {
       final queue = await action();
       state = state.copyWith(
@@ -85,11 +100,13 @@ class QueueViewModel extends Notifier<QueueViewState> {
         queue: queue,
         clearError: true,
       );
+      return true;
     } on ApiFailure catch (failure) {
       state = state.copyWith(
         status: QueueStatus.loaded,
         errorMessage: failure.message,
       );
+      return false;
     }
   }
 }

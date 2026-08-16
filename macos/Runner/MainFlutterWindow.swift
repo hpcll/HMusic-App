@@ -18,7 +18,7 @@ private final class FlutterGlassContainerViewController: NSViewController {
     fatalError("init(coder:) has not been implemented")
   }
 
-  private let flutterViewController: FlutterViewController
+  let flutterViewController: FlutterViewController
 
   override func loadView() {
     let containerView = NSView()
@@ -73,6 +73,28 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // 键盘焦点必须显式交给 FlutterViewController：官方模板把它直接设为
+    // contentViewController，AppKit 自然会把它接进响应链；这里为毛玻璃套了一层
+    // 容器，焦点会停在窗口自身，Flutter 收不到任何按键（表现为所有输入框都打不
+    // 出字，鼠标点击却正常）。注意接收键盘的是 VC 而非其 view——实测
+    // FlutterView.acceptsFirstResponder == false，把 view 设为第一响应者只会
+    // 静默落到窗口上。
+    self.makeFirstResponder(flutterViewController)
+
     super.awakeFromNib()
+  }
+
+  // 窗口重新激活（切回 App、从后台唤回）时同样要把焦点还给 Flutter：焦点若
+  // 落回窗口自身，输入框就再也打不出字。Flutter 内部不改这里的第一响应者
+  //（它自己在 VC 内部分发焦点），所以只认「当前是不是这个 VC」即可。
+  override func becomeKey() {
+    super.becomeKey()
+    guard
+      let container = contentViewController as? FlutterGlassContainerViewController
+    else { return }
+    let controller = container.flutterViewController
+    if firstResponder !== controller {
+      makeFirstResponder(controller)
+    }
   }
 }

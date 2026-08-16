@@ -56,6 +56,15 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
     await loadList();
   }
 
+  // NAS 曲库系统视图开合（列表 ↔ 曲库同页切换）。
+  void openLibrary() {
+    if (!state.libraryOpen) state = state.copyWith(libraryOpen: true);
+  }
+
+  void closeLibrary() {
+    if (state.libraryOpen) state = state.copyWith(libraryOpen: false);
+  }
+
   Future<void> create(String name) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty || state.busy) return;
@@ -114,20 +123,23 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
     }
   }
 
-  Future<void> removeItem(String itemId) async {
+  // 返回是否成功，供行左滑删除决定走移除动画还是回弹。
+  Future<bool> removeItem(String itemId) async {
     final detail = state.detail;
-    if (detail == null || state.busy) return;
+    if (detail == null || state.busy) return false;
     state = state.copyWith(busy: true, clearError: true);
     try {
       final updated = await ref
           .read(playlistsRepositoryProvider)
           .removeItem(detail.id, itemId);
       state = state.copyWith(busy: false, detail: updated);
+      return true;
     } on ApiFailure catch (failure) {
       state = state.copyWith(
         busy: false,
         notice: HMusicNotice.error(failure.message),
       );
+      return false;
     }
   }
 

@@ -44,10 +44,21 @@ class ChartsWall extends ConsumerWidget {
       return const _Centered(child: CircularProgressIndicator());
     }
     if (state.status == ChartsStatus.error && state.charts.isEmpty) {
-      return _Centered(
-        child: Text(
-          state.errorMessage ?? '榜单加载失败',
-          style: TextStyle(color: palette.muted),
+      // 错误态做成可滚容器：页级 RefreshIndicator 才能对它生效，下拉即重试。
+      return LayoutBuilder(
+        builder: (context, constraints) => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: <Widget>[
+            SizedBox(
+              height: constraints.maxHeight,
+              child: Center(
+                child: Text(
+                  '${state.errorMessage ?? '榜单加载失败'}（下拉重试）',
+                  style: TextStyle(color: palette.muted),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -59,6 +70,7 @@ class ChartsWall extends ConsumerWidget {
 
     if (wide) {
       return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         // 顶/底累加环境 padding：顶部消融带与悬浮 mini/dock 之下让位（scroll-under）。
         padding: EdgeInsets.only(
           top: 24 + MediaQuery.paddingOf(context).top,
@@ -117,6 +129,7 @@ class ChartsWall extends ConsumerWidget {
     // 窄屏：页头做成 pinned sliver——向上滚动时大标题随内容滚走渐隐，
     // 搜索胶囊停驻在状态栏下、悬浮于滚过的内容之上（对齐 Apple Music 搜索页）。
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: <Widget>[
         SliverPersistentHeader(
           pinned: true,

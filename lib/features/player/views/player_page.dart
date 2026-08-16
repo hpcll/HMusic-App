@@ -13,6 +13,7 @@ import '../../../shared/widgets/state_dot.dart';
 import '../../queue/views/queue_page.dart';
 import '../view_models/lyric_view_model.dart';
 import '../view_models/player_view_model.dart';
+import '../widgets/cover_swipe_area.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/lyric_scroll_view.dart';
 import '../widgets/lyric_strip.dart';
@@ -141,12 +142,17 @@ class _NarrowBody extends StatelessWidget {
       child: Column(
         children: <Widget>[
           // 封面占满剩余高度并保持正方形：矮屏/横屏自动收缩，不撑爆布局。
+          // 移动专属：封面左右滑切歌（docs/05 手势表），桌面双栏不挂。
           Expanded(
             flex: 5,
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
-                child: PlayerCover(track: track),
+                child: CoverSwipeArea(
+                  onNext: controller.skipToNext,
+                  onPrevious: controller.skipToPrevious,
+                  child: PlayerCover(track: track),
+                ),
               ),
             ),
           ),

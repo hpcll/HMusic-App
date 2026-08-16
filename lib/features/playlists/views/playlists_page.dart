@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/widgets/hmusic_toast.dart';
+import '../../library/view_models/library_view_model.dart';
+import '../../library/widgets/library_view.dart';
 import '../view_models/playlists_view_model.dart';
 import '../widgets/playlist_detail_view.dart';
 import '../widgets/playlists_list_view.dart';
 
-// 歌单页（底栏 tab 分支内容）：列表 ↔ 详情同页切换，对齐 web playlists.js。
-// 「已下载」系统视图依赖 downloads（P2），本里程碑先不做。
+// 歌单页（底栏 tab 分支内容）：列表 ↔ 详情 ↔ NAS 曲库三态同页切换，
+// 对齐 web playlists.js 的系统视图心智——壳的 dock/侧栏全程常驻。
 class PlaylistsPage extends ConsumerStatefulWidget {
   const PlaylistsPage({super.key});
 
@@ -37,17 +39,34 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
       showHMusicToast(context, notice);
       ref.read(playlistsViewModelProvider.notifier).clearNotice();
     });
-    final isList = ref.watch(
-      playlistsViewModelProvider.select((s) => s.isList),
-    );
-    // 详情是页内二级态：系统返回先收回列表（并刷新曲目数），不冒泡到壳层。
+    final state = ref.watch(playlistsViewModelProvider);
+    // 详情/曲库都是页内二级态：系统返回逐层收回（曲库内先退组，再退曲库），
+    // 不冒泡到壳层。
     return PopScope(
-      canPop: isList,
+      canPop: state.isList,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        unawaited(ref.read(playlistsViewModelProvider.notifier).backToList());
+        final notifier = ref.read(playlistsViewModelProvider.notifier);
+        if (state.detail != null) {
+          unawaited(notifier.backToList());
+          return;
+        }
+        final library = ref.read(libraryViewModelProvider);
+        if (library.activeGroup != null) {
+          ref.read(libraryViewModelProvider.notifier).closeGroup();
+          return;
+        }
+        notifier.closeLibrary();
       },
-      child: isList ? const PlaylistsListView() : const PlaylistDetailView(),
+      child: state.detail != null
+          ? const PlaylistDetailView()
+          : state.libraryOpen
+          ? LibraryView(
+              onBack: ref
+                  .read(playlistsViewModelProvider.notifier)
+                  .closeLibrary,
+            )
+          : const PlaylistsListView(),
     );
   }
 }

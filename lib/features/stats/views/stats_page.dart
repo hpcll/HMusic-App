@@ -45,19 +45,24 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     });
     final state = ref.watch(statsViewModelProvider);
 
-    return ListView(
-      // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度（Flutter 壳下为 0）。
-      padding: EdgeInsets.fromLTRB(
-        16,
-        24 + MediaQuery.paddingOf(context).top,
-        16,
-        32 + MediaQuery.paddingOf(context).bottom,
+    // 下拉刷新重拉统计（docs/05 列表下拉手势）。
+    return RefreshIndicator.adaptive(
+      onRefresh: ref.read(statsViewModelProvider.notifier).load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度（Flutter 壳下为 0）。
+        padding: EdgeInsets.fromLTRB(
+          16,
+          24 + MediaQuery.paddingOf(context).top,
+          16,
+          32 + MediaQuery.paddingOf(context).bottom,
+        ),
+        children: <Widget>[
+          const ViewTitle('听歌统计'),
+          const SizedBox(height: 22),
+          ..._content(context, state, palette),
+        ],
       ),
-      children: <Widget>[
-        const ViewTitle('听歌统计'),
-        const SizedBox(height: 22),
-        ..._content(context, state, palette),
-      ],
     );
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -32,6 +33,14 @@ class PlaybackLoadException implements Exception {
 
 final FutureProvider<HMusicAudioHandler> hmusicAudioHandlerProvider =
     FutureProvider<HMusicAudioHandler>((ref) async {
+      // 音频会话必须在建 player 前配置好（docs/08）：装了 audio_session 却不
+      // configure，iOS/Android 会按「未声明用途」的默认会话走——静音键掐掉播放、
+      // 来电中断后不恢复。music() 预设声明本 App 是音乐播放器。
+      // 注意 macOS 侧该插件是空实现（只存配置并广播，AVAudioSession 为 iOS 专有），
+      // 桌面端的输出质量问题不在这条链路上，别指望改这里能解决。
+      await AudioSession.instance.then(
+        (session) => session.configure(const AudioSessionConfiguration.music()),
+      );
       final handler = await AudioService.init(
         builder: () => HMusicAudioHandler(
           playbackRepository: ref.watch(playbackRepositoryProvider),

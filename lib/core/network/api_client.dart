@@ -79,6 +79,49 @@ class ApiClient {
     );
   }
 
+  // multipart 文件上传（曲库上传等）：与 _requestMap 同一套 base/token/错误
+  // 归一，附带发送进度回调。字段名固定 file，与 Server @fastify/multipart 对齐。
+  Future<Map<String, Object?>> uploadFile(
+    String path, {
+    required String filePath,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    try {
+      final base = await _serverConfigStore.read();
+      if (base == null) {
+        throw const ApiFailure(
+          kind: ApiFailureKind.invalidConfiguration,
+          message: '尚未配置 HMusic Server',
+        );
+      }
+      final headers = <String, Object?>{};
+      final token = await _tokenStore.read();
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      final form = FormData.fromMap(<String, Object?>{
+        'file': await MultipartFile.fromFile(filePath),
+      });
+      final response = await _dio.requestUri<Object?>(
+        _buildUri(base, path, null),
+        data: form,
+        options: Options(method: 'POST', headers: headers),
+        onSendProgress: onProgress,
+      );
+      return _asMap(response.data);
+    } on DioException catch (error) {
+      throw await _mapDioFailure(error, authenticated: true);
+    } on ApiFailure {
+      rethrow;
+    } catch (error) {
+      throw ApiFailure(
+        kind: ApiFailureKind.unknown,
+        message: '上传失败，请稍后重试',
+        details: error,
+      );
+    }
+  }
+
   Future<Map<String, Object?>> _requestMap(
     String method,
     String path, {

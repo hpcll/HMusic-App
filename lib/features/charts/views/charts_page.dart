@@ -63,7 +63,14 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
             child: child,
           ),
         ),
-        child: isWall ? const ChartsWall() : const ChartDetailView(),
+        // 墙形态支持下拉刷新（docs/05）；详情不挂——榜单内容按日更新，
+        // 返回墙后重进即可，不为二级态引入误刷主数据的入口。
+        child: isWall
+            ? RefreshIndicator.adaptive(
+                onRefresh: ref.read(chartsViewModelProvider.notifier).load,
+                child: const ChartsWall(),
+              )
+            : const ChartDetailView(),
       ),
     );
   }
