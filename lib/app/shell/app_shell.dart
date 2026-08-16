@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/upgrade/upgrade_gate.dart';
 import '../../features/player/view_models/player_view_model.dart';
 import '../../features/player/widgets/mini_player.dart';
 import '../../features/settings/view_models/mi_session_watch_view_model.dart';
@@ -32,6 +33,15 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 强制升级门：进壳后查一次（服务端 minAppVersion + 远程配置），命中由
+    // router redirect 押入强升页。checked 后不再重查（重新检测在强升页）。
+    if (!ref.watch(upgradeGateProvider.select((s) => s.checked))) {
+      unawaited(
+        Future<void>.microtask(
+          () => ref.read(upgradeGateProvider.notifier).check(),
+        ),
+      );
+    }
     // 播放链路的全局失败通知：自动切歌等后台路径没有页面级 VM 兜着，只能在
     // 常驻壳层统一弹 toast（各页自己的 notice 监听照旧）。isLoading 挡掉
     // provider 重建时带旧值的过渡帧，避免旧通知重弹。

@@ -64,3 +64,23 @@ class AppReleaseInfo {
 
   bool hasUpdateOver(String current) => isNewerVersion(version, current);
 }
+
+// App 仓库根的 app-config.json：不发服务端新版也能全局控制老 App 准入。
+// minVersion 高于当前版本即强制升级；notice/downloadUrl 展示在强升页。
+class AppRemoteConfig {
+  const AppRemoteConfig({this.minVersion = '', this.notice, this.downloadUrl});
+
+  factory AppRemoteConfig.fromJson(Map<String, Object?> json) {
+    return AppRemoteConfig(
+      minVersion: '${json['minVersion'] ?? ''}',
+      notice: json['notice'] == null ? null : '${json['notice']}',
+      downloadUrl: json['downloadUrl'] == null
+          ? null
+          : '${json['downloadUrl']}',
+    );
+  }
+
+  final String minVersion;
+  final String? notice;
+  final String? downloadUrl;
+}

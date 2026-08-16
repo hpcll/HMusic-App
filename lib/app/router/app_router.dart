@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/session/session_controller.dart';
 import '../../core/session/session_providers.dart';
+import '../../core/upgrade/force_upgrade_page.dart';
+import '../../core/upgrade/upgrade_gate.dart';
 import '../../features/auth/views/auth_page.dart';
 import '../../features/charts/views/charts_page.dart';
 import '../../features/connection/views/connection_page.dart';
@@ -30,21 +32,38 @@ GoRouter buildAppRouter(Ref ref) {
   final session = ref.read(sessionControllerProvider);
   final refreshNotifier = _SessionRefreshNotifier(session);
   ref.onDispose(refreshNotifier.dispose);
+  // 强制升级门翻转时驱动 redirect 重算（命中即押入强升页，解除即放行）。
+  ref.listen(upgradeGateProvider, (_, __) => refreshNotifier.refresh());
 
   return GoRouter(
     initialLocation: ConnectionPage.path,
     refreshListenable: refreshNotifier,
     redirect: (context, state) {
+      // 强制升级门优先于会话门：命中后除强升页与连接页（换兼容服务器的
+      // 逃生口，页内已先 reset）外全部封锁。
+      final gate = ref.read(upgradeGateProvider);
+      final atGate = state.matchedLocation == ForceUpgradePage.path;
+      if (gate.required && !atGate) {
+        return ForceUpgradePage.path;
+      }
+      if (!gate.required && atGate) {
+        // 重新检测通过后放出去（回榜单首页，窄宽两形态都可达）。
+        return ChartsPage.path;
+      }
       final invalid = session.isInvalid;
       final atAuth =
           state.matchedLocation == AuthPage.path ||
           state.matchedLocation == ConnectionPage.path;
-      if (invalid && !atAuth) {
+      if (invalid && !atAuth && !atGate) {
         return AuthPage.path;
       }
       return null;
     },
     routes: <RouteBase>[
+      GoRoute(
+        path: ForceUpgradePage.path,
+        builder: (context, state) => const ForceUpgradePage(),
+      ),
       GoRoute(
         path: ConnectionPage.path,
         builder: (context, state) => const ConnectionPage(),
@@ -136,13 +155,15 @@ GoRouter buildAppRouter(Ref ref) {
 }
 
 // 把 SessionController 的 ChangeNotifier 桥接成 GoRouter 的 refreshListenable。
-// isInvalid 翻转时驱动 redirect 重算，自动退出受保护页。
+// isInvalid 翻转时驱动 redirect 重算，自动退出受保护页；升级门翻转走 refresh()。
 class _SessionRefreshNotifier extends ChangeNotifier {
   _SessionRefreshNotifier(this._session) {
     _session.addListener(_handleChange);
   }
 
   final SessionController _session;
+
+  void refresh() => notifyListeners();
 
   void _handleChange() {
     notifyListeners();

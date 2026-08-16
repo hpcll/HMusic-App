@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_version.dart';
+import '../../../core/models/server_info.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/providers/infrastructure_providers.dart';
@@ -31,12 +32,18 @@ abstract class UpdateRepository {
   // 公开接口（无鉴权）：升级期间轮询服务端是否已带新版本号回来。
   Future<String> serverVersion();
 
+  // 公开接口：服务端版本 + 最低 App 版本要求（强制升级门用）。
+  Future<ServerInfo> serverInfo();
+
   Future<ServerUpdateInfo> checkServer();
 
   Future<void> triggerServerUpdate();
 
   // App 自身最新 Release；仓库还没发布过任何 Release 时返回 null。
   Future<AppReleaseInfo?> latestAppRelease();
+
+  // 仓库里的远程配置（多镜像尝试，全挂返回 null——门控按「无配置」放行）。
+  Future<AppRemoteConfig?> remoteAppConfig();
 }
 
 class ApiUpdateRepository implements UpdateRepository {
@@ -51,6 +58,13 @@ class ApiUpdateRepository implements UpdateRepository {
   Future<String> serverVersion() async {
     final info = await _apiClient.getMap('/system/info', authenticated: false);
     return '${info['version'] ?? ''}';
+  }
+
+  @override
+  Future<ServerInfo> serverInfo() async {
+    return ServerInfo.fromJson(
+      await _apiClient.getMap('/system/info', authenticated: false),
+    );
   }
 
   @override
@@ -87,5 +101,32 @@ class ApiUpdateRepository implements UpdateRepository {
         message: '无法连接 GitHub 检查 App 更新（网络不通或超时）',
       );
     }
+  }
+
+  // 远程配置镜像序列：GitHub raw 主源 + jsDelivr CDN 兜底（大陆网络下
+  // raw 常不可达）。任一成功即用，全部失败按无配置处理（门控放行）。
+  static const List<String> _remoteConfigMirrors = <String>[
+    'https://raw.githubusercontent.com/$kAppReleaseRepo/main/app-config.json',
+    'https://fastly.jsdelivr.net/gh/$kAppReleaseRepo@main/app-config.json',
+  ];
+
+  @override
+  Future<AppRemoteConfig?> remoteAppConfig() async {
+    for (final url in _remoteConfigMirrors) {
+      try {
+        final response = await _github.get<Object?>(url);
+        final data = response.data;
+        final map = data is Map<String, Object?>
+            ? data
+            : data is Map
+            ? data.map((k, v) => MapEntry('$k', v as Object?))
+            : null;
+        if (map == null) continue;
+        return AppRemoteConfig.fromJson(map);
+      } on DioException {
+        continue; // 换下一个镜像。
+      }
+    }
+    return null;
   }
 }

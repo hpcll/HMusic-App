@@ -118,7 +118,9 @@
 - [~] 自动升级方案按各平台能力分别确定（2026-08-16：设置 →「关于与更新」上线——
       Server 升级检查 `/system/update` + 一键升级（native 部署后台跑
       `install.sh --update`，轮询 `/system/info` 确认新版）；App 自查 GitHub
-      Releases 跳浏览器下载。剩余：各平台安装包内下载安装、iOS App Store 通道）
+      Releases 跳浏览器下载。2026-08-17：强制升级门——Server `minAppVersion`
+      + 仓库 `app-config.json`（raw/jsDelivr 双镜像）双通道，命中押全屏强升页。
+      剩余：各平台安装包内下载安装、iOS App Store 通道）
 - [ ] README 安装、连接和故障排查
 
 ## P6 - NAS 曲库与语音接管

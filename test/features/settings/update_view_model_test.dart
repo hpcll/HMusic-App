@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hmusic/core/models/server_info.dart';
 import 'package:hmusic/core/network/api_failure.dart';
 import 'package:hmusic/features/settings/data/api_update_repository.dart';
 import 'package:hmusic/features/settings/models/app_update.dart';
@@ -42,6 +43,16 @@ class _FakeUpdateRepository implements UpdateRepository {
 
   @override
   Future<AppReleaseInfo?> latestAppRelease() async => appRelease;
+
+  @override
+  Future<ServerInfo> serverInfo() async => ServerInfo(
+    name: 'HMusic Server',
+    version: version,
+    apiVersion: 'v1',
+  );
+
+  @override
+  Future<AppRemoteConfig?> remoteAppConfig() async => null;
 }
 
 ProviderContainer _container(_FakeUpdateRepository repository) {

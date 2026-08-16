@@ -8,6 +8,7 @@ class ServerInfo {
     required this.name,
     required this.version,
     required this.apiVersion,
+    this.minAppVersion = '',
     this.capabilities = const <String, bool>{},
   });
 
@@ -17,6 +18,9 @@ class ServerInfo {
   final String name;
   final String version;
   final String apiVersion;
+
+  // 服务端要求的最低 App 版本（'' / '0.0.0' = 不强制）；旧服务端无此字段。
+  final String minAppVersion;
   final Map<String, bool> capabilities;
 
   Map<String, Object?> toJson() => _$ServerInfoToJson(this);

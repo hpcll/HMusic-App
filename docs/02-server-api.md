@@ -44,7 +44,7 @@ DownloadRecord { id;trackKey;source;title;artist;album?;coverUrl?;track;quality?
 
 ## 1. System `/system`（公开）
 
-| GET | `/system/info` | → `{name,version,apiVersion,mode,publicBaseUrl,capabilities}`；连接页优先用它探活 |
+| GET | `/system/info` | → `{name,version,apiVersion,minAppVersion,mode,publicBaseUrl,capabilities}`；连接页优先用它探活。`minAppVersion`（0.0.0/缺失 = 不强制）低于门槛的 App 进全屏强升页（`core/upgrade/`），换兼容服务器可解 |
 | GET | `/system/test-tone.wav` | 公开 WAV，支持 Range；主要供 Server 诊断 |
 
 `publicBaseUrl` 是 Server 对外生成音频 URL 的实时生效值（Server 会把回环/失效 IPv4 替换为
