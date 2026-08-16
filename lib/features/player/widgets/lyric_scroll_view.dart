@@ -48,6 +48,12 @@ class _LyricScrollViewState extends ConsumerState<LyricScrollView> {
   // 首次拿到歌词行时立即落位（进页/异步加载完成都会走到），只做一次。
   bool _didInitialFollow = false;
 
+  // 用户手动滚动时暂停自动跟随（回看前文不被弹回），停手 3s 后恢复并归位。
+  // 只认带 dragDetails 的 ScrollStart（手指拖动）；ensureVisible 的程序滚动
+  // dragDetails 为 null，不会误触发。
+  bool _userScrolling = false;
+  Timer? _resumeTimer;
+
   @override
   void didUpdateWidget(LyricScrollView old) {
     super.didUpdateWidget(old);
@@ -59,13 +65,30 @@ class _LyricScrollViewState extends ConsumerState<LyricScrollView> {
 
   @override
   void dispose() {
+    _resumeTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _userScrolling = true;
+      _resumeTimer?.cancel();
+    } else if (notification is ScrollEndNotification && _userScrolling) {
+      _resumeTimer?.cancel();
+      _resumeTimer = Timer(const Duration(seconds: 3), () {
+        _userScrolling = false;
+        _followActive();
+      });
+    }
+    return false;
   }
 
   // 当前行滚到视口中线略偏上。secondPass 标记校正帧，防目标行物化不出来时死循环。
   void _followActive({bool animate = true, bool secondPass = false}) {
     if (!mounted || widget.activeLine < 0 || !_controller.hasClients) return;
+    if (_userScrolling) return;
     final lineContext = _activeKey.currentContext;
     if (lineContext != null) {
       unawaited(
@@ -144,21 +167,24 @@ class _LyricScrollViewState extends ConsumerState<LyricScrollView> {
           stops: <double>[0.0, 0.12, 0.88, 1.0],
         ).createShader(rect),
         blendMode: BlendMode.dstIn,
-        child: ListView.builder(
-          controller: _controller,
-          padding: EdgeInsets.only(
-            top: constraints.maxHeight * _alignment,
-            bottom: constraints.maxHeight * (1 - _alignment),
-          ),
-          itemCount: lines.length,
-          itemBuilder: (context, i) => _LyricRow(
-            key: i == widget.activeLine ? _activeKey : null,
-            line: lines[i],
-            active: i == widget.activeLine,
-            palette: palette,
-            onTap: widget.seekEnabled
-                ? () => widget.onLineTap(lines[i].timeMs)
-                : null,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _onScrollNotification,
+          child: ListView.builder(
+            controller: _controller,
+            padding: EdgeInsets.only(
+              top: constraints.maxHeight * _alignment,
+              bottom: constraints.maxHeight * (1 - _alignment),
+            ),
+            itemCount: lines.length,
+            itemBuilder: (context, i) => _LyricRow(
+              key: i == widget.activeLine ? _activeKey : null,
+              line: lines[i],
+              active: i == widget.activeLine,
+              palette: palette,
+              onTap: widget.seekEnabled
+                  ? () => widget.onLineTap(lines[i].timeMs)
+                  : null,
+            ),
           ),
         ),
       ),

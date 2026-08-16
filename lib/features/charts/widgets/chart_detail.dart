@@ -32,17 +32,11 @@ class ChartDetailView extends ConsumerWidget {
       serverPlaybackStateProvider.select((s) => s.value?.track),
     );
 
-    return ListView(
-      // 水平只留 4：曲目行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
-      // 排名数字左缘与页头/标题同压 16 基线（红线验收：返回/榜名/排名一条线）。
-      // 头部文字块自行补 12。底部累加环境 padding：iOS 26+ 原生 dock 悬浮时
-      // 让出 chrome 高度（Flutter 壳下为 0）。
-      padding: EdgeInsets.fromLTRB(
-        4,
-        12 + MediaQuery.paddingOf(context).top,
-        4,
-        32 + MediaQuery.paddingOf(context).bottom,
-      ),
+    // 头部（返回/播放全部/榜名/简介）+ 加载/空态占位；曲目行走 builder 懒建，
+    // 100+ 行的榜首帧不再全量 build。加载中不出旧榜的行（与旧全量分支语义一致）。
+    final rows = state.detailLoading ? const <ChartEntry>[] : entries;
+    final Widget header = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -94,36 +88,54 @@ class ChartDetailView extends ConsumerWidget {
             ),
           )
         else
-          for (var i = 0; i < entries.length; i++)
-            HMusicTrackRow(
-              leading: _isEntryPlaying(entries[i], playingTrack)
-                  ? const _PlayingRank()
-                  : _ChartRank(rank: entries[i].rank),
-              coverUrl: entries[i].coverUrl,
-              title: entries[i].title,
-              subtitle: entries[i].artist,
-              subtitleAccent: entries[i].playCount != null
-                  ? ' · ${entries[i].playCount} 次'
-                  : null,
-              showDivider: i != entries.length - 1,
-              actions: <Widget>[
-                HMusicIconButton(
-                  icon: Icons.play_arrow_rounded,
-                  tooltip: '播放',
-                  onPressed: state.actingRank == 0
-                      ? () => notifier.play(entries[i])
-                      : null,
-                ),
-                HMusicIconButton(
-                  icon: Icons.add_rounded,
-                  tooltip: '加入队列',
-                  onPressed: state.actingRank == 0
-                      ? () => notifier.enqueue(entries[i])
-                      : null,
-                ),
-              ],
-            ),
+          const SizedBox.shrink(),
       ],
+    );
+
+    return ListView.builder(
+      // 水平只留 4：曲目行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
+      // 排名数字左缘与页头/标题同压 16 基线（红线验收：返回/榜名/排名一条线）。
+      // 头部文字块自行补 12。底部累加环境 padding：iOS 26+ 原生 dock 悬浮时
+      // 让出 chrome 高度（Flutter 壳下为 0）。
+      padding: EdgeInsets.fromLTRB(
+        4,
+        12 + MediaQuery.paddingOf(context).top,
+        4,
+        32 + MediaQuery.paddingOf(context).bottom,
+      ),
+      itemCount: 1 + rows.length,
+      itemBuilder: (context, index) {
+        if (index == 0) return header;
+        final i = index - 1;
+        return HMusicTrackRow(
+          leading: _isEntryPlaying(rows[i], playingTrack)
+              ? const _PlayingRank()
+              : _ChartRank(rank: rows[i].rank),
+          coverUrl: rows[i].coverUrl,
+          title: rows[i].title,
+          subtitle: rows[i].artist,
+          subtitleAccent: rows[i].playCount != null
+              ? ' · ${rows[i].playCount} 次'
+              : null,
+          showDivider: i != rows.length - 1,
+          actions: <Widget>[
+            HMusicIconButton(
+              icon: Icons.play_arrow_rounded,
+              tooltip: '播放',
+              onPressed: state.actingRank == 0
+                  ? () => notifier.play(rows[i])
+                  : null,
+            ),
+            HMusicIconButton(
+              icon: Icons.add_rounded,
+              tooltip: '加入队列',
+              onPressed: state.actingRank == 0
+                  ? () => notifier.enqueue(rows[i])
+                  : null,
+            ),
+          ],
+        );
+      },
     );
   }
 }

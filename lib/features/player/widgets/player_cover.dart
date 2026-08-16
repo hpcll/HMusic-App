@@ -35,6 +35,16 @@ class PlayerCover extends StatelessWidget {
                   // 屏宽也低于此值；按 420 解码防原图全尺寸解码。
                   cacheWidth: (420 * MediaQuery.devicePixelRatioOf(context))
                       .round(),
+                  // 网络慢时首帧淡入，替代空白→硬切；同步缓存命中不动画。
+                  frameBuilder: (context, child, frame, syncLoaded) {
+                    if (syncLoaded) return child;
+                    return AnimatedOpacity(
+                      opacity: frame == null ? 0 : 1,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                      child: child,
+                    );
+                  },
                   errorBuilder: (_, __, ___) => _fallback(scheme),
                 ),
         ),

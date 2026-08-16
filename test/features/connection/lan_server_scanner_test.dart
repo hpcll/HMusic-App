@@ -90,7 +90,7 @@ void main() {
       final found = await scanner.scan().toList();
 
       expect(found, hasLength(1));
-      expect(found.single.base.toString(), 'http://192.168.31.1:8090');
+      expect(found.single.base.toString(), 'http://192.168.31.1:6650');
       expect(found.single.name, 'HMusic Server');
       expect(found.single.version, '0.1.0');
     });
@@ -100,8 +100,8 @@ void main() {
         sweepDelay: Duration.zero,
         // 假冒者 + 与扫段重叠的真身：验证身份过滤与按 base 去重。
         mdnsCandidates: () => Stream<Uri>.fromIterable(<Uri>[
-          Uri.parse('http://10.0.0.9:8090'),
-          Uri.parse('http://192.168.31.1:8090'),
+          Uri.parse('http://10.0.0.9:6650'),
+          Uri.parse('http://192.168.31.1:6650'),
         ]),
         localAddresses: () async => <String>['192.168.31.11'],
         probe: (base) async {
@@ -120,7 +120,7 @@ void main() {
       final found = await scanner.scan().toList();
 
       expect(found, hasLength(1));
-      expect(found.single.base.toString(), 'http://192.168.31.1:8090');
+      expect(found.single.base.toString(), 'http://192.168.31.1:6650');
     });
   });
 }

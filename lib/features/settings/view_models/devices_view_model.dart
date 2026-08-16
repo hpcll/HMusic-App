@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/hmusic_audio_handler.dart';
@@ -6,6 +8,7 @@ import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_devices_repository.dart';
 import '../models/hmusic_device.dart';
 import '../models/settings_section_states.dart';
+import 'settings_menu_view_model.dart';
 
 final NotifierProvider<DevicesViewModel, DevicesState>
 devicesViewModelProvider = NotifierProvider<DevicesViewModel, DevicesState>(
@@ -15,6 +18,19 @@ devicesViewModelProvider = NotifierProvider<DevicesViewModel, DevicesState>(
 class DevicesViewModel extends Notifier<DevicesState> {
   @override
   DevicesState build() => const DevicesState();
+
+  // 切默认/刷新设备后重拉设置页左栏摘要（「播放设备」标签），宽屏布局下
+  // 摘要不随子页动作自动刷新。尽力而为：刷不动不影响主流程。
+  void _refreshMenuSummary() {
+    try {
+      unawaited(
+        ref
+            .read(settingsMenuViewModelProvider.notifier)
+            .loadSummary()
+            .catchError((Object _) {}),
+      );
+    } catch (_) {}
+  }
 
   Future<void> load() async {
     try {
@@ -34,6 +50,7 @@ class DevicesViewModel extends Notifier<DevicesState> {
     try {
       final count = await ref.read(devicesRepositoryProvider).refresh();
       await load();
+      _refreshMenuSummary();
       state = state.copyWith(
         refreshing: false,
         notice: HMusicNotice.success('已刷新，共 $count 台设备'),
@@ -61,6 +78,7 @@ class DevicesViewModel extends Notifier<DevicesState> {
       // _applyServerState 内部会判断 deviceId：非本机则 stop player。
       await handler.applyRemotePlayback(playback, autoplay: false);
       await load();
+      _refreshMenuSummary();
       state = state.copyWith(
         notice: HMusicNotice.success('默认设备已切换为 ${device.name}'),
       );

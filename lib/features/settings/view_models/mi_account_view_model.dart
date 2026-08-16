@@ -8,6 +8,7 @@ import '../data/api_mi_account_repository.dart';
 import '../models/mi_account.dart';
 import '../models/mi_account_state.dart';
 import 'mi_session_watch_view_model.dart';
+import 'settings_menu_view_model.dart';
 
 final NotifierProvider<MiAccountViewModel, MiAccountState>
 miAccountViewModelProvider =
@@ -25,6 +26,20 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
   MiAccountState build() {
     ref.onDispose(_stopQrTimers);
     return const MiAccountState();
+  }
+
+  // 登录/退出这类改了服务端状态的动作后，重拉设置页左栏摘要——宽屏布局下
+  // 摘要只在进页时加载一次，不刷会一直挂着「未登录」旧快照。
+  // 尽力而为：摘要刷不动（依赖未挂载/网络抖动）不影响主流程。
+  void _refreshMenuSummary() {
+    try {
+      unawaited(
+        ref
+            .read(settingsMenuViewModelProvider.notifier)
+            .loadSummary()
+            .catchError((Object _) {}),
+      );
+    } catch (_) {}
   }
 
   Future<void> loadStatus() async {
@@ -104,6 +119,7 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
           _stopQrTimers();
           state = state.copyWith(qrStage: MiQrStage.success);
           await loadStatus();
+          _refreshMenuSummary();
           state = state.copyWith(notice: const HMusicNotice.success('小米账号已登录'));
         case MiQrPollStatus.failed:
           _stopQrTimers();
@@ -162,6 +178,7 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
       if (result.loggedIn) {
         state = state.copyWith(busy: false, clearChallenge: true);
         await loadStatus();
+        _refreshMenuSummary();
         state = state.copyWith(
           notice: HMusicNotice.success(
             '登录成功，发现 ${result.deviceCount ?? 0} 台设备',
@@ -196,6 +213,7 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
           );
       state = state.copyWith(busy: false, clearChallenge: true);
       await loadStatus();
+      _refreshMenuSummary();
       state = state.copyWith(
         notice: HMusicNotice.success('登录成功，发现 ${result.deviceCount ?? 0} 台设备'),
       );
@@ -260,6 +278,7 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
           );
       state = state.copyWith(busy: false);
       await loadStatus();
+      _refreshMenuSummary();
       state = state.copyWith(
         notice: HMusicNotice.success('导入成功，发现 ${result.deviceCount ?? 0} 台设备'),
       );
@@ -275,6 +294,7 @@ class MiAccountViewModel extends Notifier<MiAccountState> {
     try {
       await ref.read(miAccountRepositoryProvider).logout();
       await loadStatus();
+      _refreshMenuSummary();
       state = state.copyWith(notice: const HMusicNotice.success('已退出小米账号'));
     } on ApiFailure catch (failure) {
       state = state.copyWith(notice: HMusicNotice.error(failure.message));

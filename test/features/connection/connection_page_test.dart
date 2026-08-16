@@ -149,14 +149,14 @@ void main() {
     await tester.pumpAndSettle();
 
     // 层级翻转：有发现结果时表单收起，只留「手动输入地址」链接。
-    expect(find.text('192.168.31.11:8090'), findsOneWidget);
+    expect(find.text('192.168.31.11:6650'), findsOneWidget);
     expect(find.text('连接服务器'), findsNothing);
     expect(find.text('手动输入地址'), findsOneWidget);
 
-    await tester.tap(find.text('192.168.31.11:8090'));
+    await tester.tap(find.text('192.168.31.11:6650'));
     await tester.pumpAndSettle();
 
-    expect(repository.connectInputs, <String>['http://192.168.31.11:8090']);
+    expect(repository.connectInputs, <String>['http://192.168.31.11:6650']);
     expect(find.text('auth destination'), findsOneWidget);
   });
 

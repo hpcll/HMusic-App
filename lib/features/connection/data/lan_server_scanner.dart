@@ -11,10 +11,11 @@ import 'mdns_discovery.dart';
 
 // 局域网自动发现，两级候选源 + 统一确认管线：
 //   1. mDNS 订阅（主路径）：Server 自广播 _hmusic._tcp，秒级、任意端口；
-//   2. HTTP 扫段（兜底）：mDNS 静默 2s 才启动，按 /24 并发探默认端口 8090
+//   2. HTTP 扫段（兜底）：mDNS 静默 2s 才启动，按 /24 并发探默认端口 6650
 //      ——路由器禁 mDNS、Linux 无 Avahi 等场景仍可用。
 // 候选一律过 /system/info 身份确认（name + apiVersion）再算数。
-const int _serverPort = 8090;
+// Server 默认端口（HMUSIC_PORT，见 Server env.ts）；此前误写 8090 导致兜底全扫空。
+const int _serverPort = 6650;
 const int _probeConcurrency = 32;
 
 class DiscoveredServer {

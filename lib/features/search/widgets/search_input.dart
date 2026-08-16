@@ -37,26 +37,41 @@ class SearchInput extends StatelessWidget {
       padding: EdgeInsets.zero,
       borderRadius: radius,
       shadow: false,
-      child: TextField(
-        controller: controller,
-        autofocus: autofocus,
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: '搜索歌曲或歌手',
-          prefixIcon: Icon(Icons.search_rounded, color: palette.muted),
-          filled: true,
-          fillColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 13,
+      // 监听输入内容切换清除键：有字出 ×，一键清空重来（不触发搜索）。
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) => TextField(
+          controller: controller,
+          autofocus: autofocus,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: '搜索歌曲或歌手',
+            prefixIcon: Icon(Icons.search_rounded, color: palette.muted),
+            suffixIcon: value.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: '清空',
+                    icon: Icon(
+                      Icons.cancel_rounded,
+                      size: 18,
+                      color: palette.muted,
+                    ),
+                    onPressed: controller.clear,
+                  ),
+            filled: true,
+            fillColor: Colors.transparent,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 13,
+            ),
+            border: capsule,
+            enabledBorder: capsule,
+            focusedBorder: capsule,
           ),
-          border: capsule,
-          enabledBorder: capsule,
-          focusedBorder: capsule,
+          onSubmitted: (_) {
+            if (!isSearching) onSearch();
+          },
         ),
-        onSubmitted: (_) {
-          if (!isSearching) onSearch();
-        },
       ),
     );
   }

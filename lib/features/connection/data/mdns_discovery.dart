@@ -41,9 +41,12 @@ Future<void> _pumpDiscovery(StreamController<Uri> controller) async {
         final host = service.host;
         if (host == null || host.isEmpty) return;
         // 平台可能给带尾点的 mDNS 主机名（Mac.local.），去掉再进 Uri。
-        final normalized = host.endsWith('.')
+        var normalized = host.endsWith('.')
             ? host.substring(0, host.length - 1)
             : host;
+        // macOS 可能只给单标签主机名（LEDE.）：裸名走不了普通 DNS，
+        // 补 .local 交给系统 mDNS 解析（IP 或带点 FQDN 原样保留）。
+        if (!normalized.contains('.')) normalized = '$normalized.local';
         controller.add(
           Uri(scheme: 'http', host: normalized, port: service.port),
         );

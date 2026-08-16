@@ -40,7 +40,7 @@ class ServerAddressForm extends StatelessWidget {
           textInputAction: TextInputAction.done,
           autocorrect: false,
           decoration: const InputDecoration(
-            hintText: 'http://192.168.1.10:8090',
+            hintText: 'http://192.168.1.10:6650',
             contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 15),
           ),
           onSubmitted: (_) => onSubmit(),

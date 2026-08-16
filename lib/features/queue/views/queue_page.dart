@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -77,7 +78,7 @@ class _QueuePageState extends ConsumerState<QueuePage> {
                 ),
                 if (state.items.isNotEmpty)
                   TextButton(
-                    onPressed: notifier.clear,
+                    onPressed: state.isMutating ? null : notifier.clear,
                     child: const Text('清空'),
                   ),
               ],
@@ -93,7 +94,10 @@ class _QueuePageState extends ConsumerState<QueuePage> {
         title: Text('播放队列 (${state.items.length})'),
         actions: <Widget>[
           if (state.items.isNotEmpty)
-            TextButton(onPressed: notifier.clear, child: const Text('清空')),
+            TextButton(
+              onPressed: state.isMutating ? null : notifier.clear,
+              child: const Text('清空'),
+            ),
         ],
       ),
       body: SafeArea(child: _body(context, state, notifier)),
@@ -137,28 +141,65 @@ class _QueuePageState extends ConsumerState<QueuePage> {
     QueueViewState state,
     QueueViewModel notifier,
   ) {
+    final Widget list;
     if (state.items.isEmpty) {
-      return const Center(child: Text('队列是空的，去搜索里加几首歌吧'));
+      // 空态也可下拉刷新：别的端可能刚灌了队列。撑满视口保持文案居中。
+      list = LayoutBuilder(
+        builder: (context, constraints) => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: <Widget>[
+            SizedBox(
+              height: constraints.maxHeight,
+              child: const Center(child: Text('队列是空的，去搜索里加几首歌吧')),
+            ),
+          ],
+        ),
+      );
+    } else {
+      list = ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        // 底部让位：桌面悬浮 mini 之下仍可滚到最后一行（窄屏 push 形态在
+        // SafeArea 内，环境 padding 为 0，只剩基础 12）。
+        padding: EdgeInsets.only(
+          bottom: 12 + MediaQuery.paddingOf(context).bottom,
+        ),
+        itemCount: state.items.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final item = state.items[index];
+          return Dismissible(
+            key: ValueKey<String>('queue-${item.id}'),
+            direction: DismissDirection.endToStart,
+            // 成功走滑出移除动画（权威响应随即重建列表）；失败或互斥中回弹。
+            confirmDismiss: (_) {
+              unawaited(HapticFeedback.mediumImpact());
+              return notifier.removeAt(index);
+            },
+            background: ColoredBox(
+              color: Theme.of(context).colorScheme.error,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 20),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    color: Theme.of(context).colorScheme.onError,
+                  ),
+                ),
+              ),
+            ),
+            child: QueueTrackTile(
+              item: item,
+              index: index,
+              isCurrent: index == state.currentIndex,
+              isBusy: state.busyItemId == item.id,
+              onPlay: () => notifier.playAt(index),
+              onRemove: () => notifier.removeAt(index),
+            ),
+          );
+        },
+      );
     }
-    return ListView.separated(
-      // 底部让位：桌面悬浮 mini 之下仍可滚到最后一行（窄屏 push 形态在
-      // SafeArea 内，环境 padding 为 0，只剩基础 12）。
-      padding: EdgeInsets.only(
-        bottom: 12 + MediaQuery.paddingOf(context).bottom,
-      ),
-      itemCount: state.items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final item = state.items[index];
-        return QueueTrackTile(
-          item: item,
-          index: index,
-          isCurrent: index == state.currentIndex,
-          isBusy: state.busyItemId == item.id,
-          onPlay: () => notifier.playAt(index),
-          onRemove: () => notifier.removeAt(index),
-        );
-      },
-    );
+    return RefreshIndicator.adaptive(onRefresh: notifier.load, child: list);
   }
 }

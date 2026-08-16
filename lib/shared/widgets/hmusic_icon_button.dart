@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/hmusic_palette.dart';
 
@@ -36,7 +39,14 @@ class HMusicIconButton extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onPressed,
+          // 收藏/加队列这类小操作统一轻触感（桌面平台是 no-op），
+          // 让「按到了」有物理回执。
+          onTap: enabled
+              ? () {
+                  unawaited(HapticFeedback.selectionClick());
+                  onPressed!();
+                }
+              : null,
           child: Opacity(
             opacity: enabled ? 1 : 0.5,
             child: Icon(

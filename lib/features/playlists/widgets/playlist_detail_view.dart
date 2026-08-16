@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
@@ -23,16 +26,9 @@ class PlaylistDetailView extends ConsumerWidget {
 
     final items = detail.items;
 
-    return ListView(
-      // 水平只留 4：曲目行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
-      // 序号左缘与页头/标题同压 16 基线；头部文字块自行补 12。
-      // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度。
-      padding: EdgeInsets.fromLTRB(
-        4,
-        12 + MediaQuery.paddingOf(context).top,
-        4,
-        32 + MediaQuery.paddingOf(context).bottom,
-      ),
+    // 头部 + 空态占位；曲目行走 builder 懒建，500 首的导入歌单首帧不再全量 build。
+    final Widget header = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -74,11 +70,38 @@ class PlaylistDetailView extends ConsumerWidget {
                 style: TextStyle(color: palette.muted),
               ),
             ),
-          )
-        else
-          for (var i = 0; i < items.length; i++)
-            _row(context, notifier, detail, items[i], i, i == items.length - 1),
+          ),
       ],
+    );
+
+    // 下拉刷新重拉本单详情（docs/05 列表下拉手势）。
+    return RefreshIndicator.adaptive(
+      onRefresh: () => notifier.openPlaylist(detail.id),
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        // 水平只留 4：曲目行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
+        // 序号左缘与页头/标题同压 16 基线；头部文字块自行补 12。
+        // 底部累加环境 padding：iOS 26+ 原生 dock 悬浮时让出 chrome 高度。
+        padding: EdgeInsets.fromLTRB(
+          4,
+          12 + MediaQuery.paddingOf(context).top,
+          4,
+          32 + MediaQuery.paddingOf(context).bottom,
+        ),
+        itemCount: 1 + items.length,
+        itemBuilder: (context, index) {
+          if (index == 0) return header;
+          final i = index - 1;
+          return _row(
+            context,
+            notifier,
+            detail,
+            items[i],
+            i,
+            i == items.length - 1,
+          );
+        },
+      ),
     );
   }
 
@@ -91,6 +114,40 @@ class PlaylistDetailView extends ConsumerWidget {
     bool isLast,
   ) {
     final palette = context.palette;
+    // 行左滑移除（docs/05 手势表）：成功走滑出动画（权威详情随即重建），
+    // 失败或 busy 中回弹；与行尾移除键同走 removeItem。
+    return Dismissible(
+      key: ValueKey<String>('playlist-item-${item.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) {
+        unawaited(HapticFeedback.mediumImpact());
+        return notifier.removeItem(item.id);
+      },
+      background: ColoredBox(
+        color: Theme.of(context).colorScheme.error,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: Icon(
+              Icons.delete_outline_rounded,
+              color: Theme.of(context).colorScheme.onError,
+            ),
+          ),
+        ),
+      ),
+      child: _trackRow(notifier, detail, item, index, isLast, palette),
+    );
+  }
+
+  Widget _trackRow(
+    PlaylistsViewModel notifier,
+    PlaylistDetail detail,
+    PlaylistItem item,
+    int index,
+    bool isLast,
+    HMusicPalette palette,
+  ) {
     return HMusicTrackRow(
       // 序号左对齐压 16 基线（与返回/歌单名一条左轨），定宽保证封面列不漂移。
       leading: SizedBox(

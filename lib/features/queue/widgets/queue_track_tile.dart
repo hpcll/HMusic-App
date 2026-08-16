@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/queue/models/hmusic_queue.dart';
+import '../../../shared/widgets/hmusic_icon_button.dart';
+import '../../../shared/widgets/hmusic_track_row.dart';
 
+// 队列曲目行：复用全站曲目行原子（对齐 .queue-current 语义）。
+// 当前曲序号位换青绿均衡器图标、标题转青绿（青绿=「正在发生的事」，同榜单行）；
+// 分隔线由外层 ListView.separated 提供，这里关掉自带的。
 class QueueTrackTile extends StatelessWidget {
   const QueueTrackTile({
     required this.item,
@@ -22,55 +28,56 @@ class QueueTrackTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final accent = theme.colorScheme.primary;
+    final palette = context.palette;
     final track = item.track;
-    return ListTile(
-      // 16 对齐页头基线：外层 ListView 无水平 padding，序号/音符左缘直接压线。
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+    return HMusicTrackRow(
+      // 16 对齐页头基线：外层 ListView 无水平 padding，序号左缘直接压线。
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       leading: SizedBox(
         width: 28,
         child: Align(
           alignment: Alignment.centerLeft,
           child: isCurrent
-              ? Icon(Icons.music_note, size: 18, color: accent)
-              : Text('${index + 1}', style: theme.textTheme.bodySmall),
+              ? Icon(
+                  Icons.graphic_eq_rounded,
+                  size: 18,
+                  color: palette.accent,
+                )
+              : Text(
+                  '${index + 1}',
+                  style: TextStyle(fontSize: 12.5, color: palette.muted),
+                ),
         ),
       ),
-      title: Text(
-        track.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: isCurrent
-            ? theme.textTheme.titleMedium?.copyWith(color: accent)
-            : theme.textTheme.titleMedium,
-      ),
-      subtitle: Text(
-        track.artist,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      coverUrl: track.coverUrl,
+      title: track.title,
+      subtitle: track.artist,
+      highlight: isCurrent,
+      showDivider: false,
       onTap: isBusy ? null : onPlay,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          IconButton(
+      actions: <Widget>[
+        if (isBusy)
+          const SizedBox.square(
+            dimension: 34,
+            child: Center(
+              child: SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else
+          HMusicIconButton(
+            icon: Icons.play_arrow_rounded,
             tooltip: '播放',
-            onPressed: isBusy ? null : onPlay,
-            icon: isBusy
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.play_arrow_rounded),
+            onPressed: onPlay,
           ),
-          IconButton(
-            tooltip: '移除',
-            onPressed: isBusy ? null : onRemove,
-            icon: const Icon(Icons.close_rounded),
-          ),
-        ],
-      ),
+        HMusicIconButton(
+          icon: Icons.close_rounded,
+          tooltip: '移除',
+          onPressed: isBusy ? null : onRemove,
+        ),
+      ],
     );
   }
 }

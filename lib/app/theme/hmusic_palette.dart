@@ -22,8 +22,9 @@ class HMusicPalette extends ThemeExtension<HMusicPalette> {
     panelSecondary: Color(0xFFF0F0F1),
     text: Color(0xFF333333),
     textStrong: Color(0xFF1A1A1A),
-    muted: Color(0xFF999999),
-    mutedStrong: Color(0xFF777777),
+    // muted 在 #F7F7F8 底上需 ≥4.2:1（原 #999 只有 2.8，副标题/时间戳不达标）。
+    muted: Color(0xFF767676),
+    mutedStrong: Color(0xFF5F5F5F),
     line: Color(0xFFE3E3E5),
     lineSoft: Color(0xFFECECEE),
     accent: Color(0xFF21B0A5),

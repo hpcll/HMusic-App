@@ -106,7 +106,9 @@ class _BannerCapsule extends ConsumerWidget {
                   onTap: () =>
                       ref.read(miSessionWatchProvider.notifier).dismiss(),
                   child: Padding(
-                    padding: const EdgeInsets.all(4),
+                    // 9 而非 4：把关闭键命中区从 23px 扩到 33px，仍低于
+                    // 文案行高（9+17+9），不撑高胶囊。
+                    padding: const EdgeInsets.all(9),
                     child: Icon(
                       Icons.close_rounded,
                       size: 15,
