@@ -7,10 +7,10 @@ import 'api_failure.dart';
 
 typedef UnauthorizedHandler = Future<void> Function();
 
-// 服务端以 403 APP_VERSION_TOO_OLD 拒绝老版本时回调，参数是它要求的最低版本。
+// 服务端按版本门槛拒绝服务时回调（403 APP_VERSION_TOO_OLD），参数是它要求的最低版本。
 typedef VersionRejectedHandler = void Function(String minAppVersion);
 
-// 每个请求自报 App 版本，供服务端做老版本门禁（Server 侧
+// 每个请求自报 App 版本，供服务端做客户端版本门禁（Server 侧
 // shared/app-version-guard.ts）。不带此头的客户端（web 端、音箱、兼容层）放行。
 const String kAppVersionHeader = 'X-HMusic-App-Version';
 
@@ -229,8 +229,8 @@ class ApiClient {
     final nestedError = _tryMap(payload?['error']);
     final code = nestedError?['code'] as String?;
     final message = nestedError?['message'] as String?;
-    // 服务端拒绝老版本：当场关强升门（不等下一轮门控自检），并把要求的版本
-    // 透出去。这条门改客户端 UI 绕不掉——业务接口全部 403。
+    // 服务端按版本门槛拒绝服务：当场关强升门（不等门控下一轮自检），并把它
+    // 要求的版本透出去。门槛由部署者掌握（见 Server shared/version.ts）。
     if (statusCode == 403 && code == 'APP_VERSION_TOO_OLD') {
       final details = _tryMap(nestedError?['details']);
       final required = '${details?['minAppVersion'] ?? ''}';

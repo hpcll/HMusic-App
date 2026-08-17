@@ -8,10 +8,12 @@ import '../app_version.dart';
 import 'upgrade_config_store.dart';
 
 // 强制升级门：两路准入判定，任一要求高于当前版本即封锁进壳。
-//   1. 服务端 /system/info 的 minAppVersion——配合服务端大改动（如 API v2），
-//      新服务端一声明，老 App 连上即被拦；
-//   2. App 仓库 app-config.json 的 minVersion——不发服务端新版也能全局强制
-//      （GitHub raw + jsDelivr 多镜像，见 repository）。
+//   1. 已连接服务端要求的 minAppVersion（/system/info 下发，请求层 403 兜底）
+//      ——门槛由部署者掌握，用于挡住会写坏其数据的 App 版本、统一多客户端版本、
+//      或声明不兼容的 API 改动；换一台兼容的服务端即可解除（强升页留了逃生口）。
+//   2. App 仓库 app-config.json 的 minVersion——发版方（我方）的全局开关，
+//      不发服务端新版也能召回坏版本（Gitee/raw/jsDelivr 多镜像 + 服务端中转，
+//      取到即落盘做粘性执行，见 repository 与 upgrade_config_store）。
 // 判定失败（探测不到/无配置）一律放行——门只在明确要求时关。
 class UpgradeGateState {
   const UpgradeGateState({
@@ -69,8 +71,8 @@ class UpgradeGate extends Notifier<UpgradeGateState> {
     state = const UpgradeGateState();
   }
 
-  // 服务端以 403 APP_VERSION_TOO_OLD 拒绝服务时当场关门（由 ApiClient 回调）。
-  // 与 check() 的区别：这条不靠自觉轮询，任何业务请求撞上即生效。
+  // 服务端按版本门槛拒绝服务时当场关门（403，由 ApiClient 回调）。
+  // 与 check() 的分工：check 在进壳时主动探一次，这条在任何业务请求撞上时兜底。
   void rejectedByServer(String minAppVersion) {
     final required = minAppVersion.isEmpty ? '更高版本' : minAppVersion;
     if (state.required && state.requiredVersion == required) return;
