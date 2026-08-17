@@ -55,6 +55,7 @@ DownloadRecord { id;trackKey;source;title;artist;album?;coverUrl?;track;quality?
 | GET | `/system/update` | 查 GitHub Release 最新版（5min 缓存）→ `{current,latest,hasUpdate,notes,publishedAt,url,deployMode,canSelfUpdate,updating}` |
 | POST | `/system/update` | 一键升级：native 后台执行 `install.sh --update`；docker 经 hmusic-updater 守护容器（watchtower HTTP API）拉新镜像重建。→ `{started:true}`；缺守护/不支持 409（`UPDATE_DOCKER_MODE`/`UPDATE_NOT_SUPPORTED`，message 带手动命令） |
 | GET | `/system/update/log` | → `{updating,log}`，`data/update.log` 尾部 8KB，升级失败排查用 |
+| GET | `/system/app-config` | 公开。中转 App 仓库 app-config.json（强升/公告全局开关；30min 缓存 + 旧值兜底）→ `{available,config}`；App 优先走此中转，`available=false` 或不可达再直连 raw/jsDelivr 镜像 |
 
 触发后 Server 会短暂停止并以新版重启；客户端应轮询公开的 `/system/info` 直到 `version`
 变化（成功）或超时（引导看 log）。GitHub 不可达时 GET 返回 502 `UPDATE_CHECK_FAILED`。

@@ -112,6 +112,25 @@ class ApiUpdateRepository implements UpdateRepository {
 
   @override
   Future<AppRemoteConfig?> remoteAppConfig() async {
+    // 两级配合：优先走已连接服务端的中转 /system/app-config（NAS 网络通常
+    // 比手机直连 GitHub 稳，且服务端有 30min 缓存 + 旧值兜底）；未连接/
+    // 旧服务端（404）/中转自己也拉不到（available=false）时退直连镜像。
+    try {
+      final relay = await _apiClient.getMap(
+        '/system/app-config',
+        authenticated: false,
+      );
+      if (relay['available'] == true) {
+        final config = relay['config'];
+        if (config is Map) {
+          return AppRemoteConfig.fromJson(
+            config.map((k, v) => MapEntry('$k', v as Object?)),
+          );
+        }
+      }
+    } catch (_) {
+      // 没配 server base / 服务端太旧 / 不可达：直连镜像兜底。
+    }
     for (final url in _remoteConfigMirrors) {
       try {
         final response = await _github.get<Object?>(url);
