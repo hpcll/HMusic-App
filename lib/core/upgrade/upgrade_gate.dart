@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/settings/data/api_update_repository.dart';
 import '../../features/settings/models/app_update.dart';
 import '../app_version.dart';
+import 'upgrade_config_store.dart';
 
 // 强制升级门：两路准入判定，任一要求高于当前版本即封锁进壳。
 //   1. 服务端 /system/info 的 minAppVersion——配合服务端大改动（如 API v2），
@@ -86,7 +87,20 @@ class UpgradeGate extends Notifier<UpgradeGateState> {
 
   Future<UpgradeGateState?> _checkRemote(UpdateRepository repository) async {
     try {
-      final config = await repository.remoteAppConfig();
+      final store = ref.read(upgradeConfigStoreProvider);
+      // 在线取到就落盘（粘性执行的来源）；取不到用上次落盘的旧配置——
+      // 强制指令到达过一次就一直有效，断网/屏蔽源站躲不掉。
+      // 落盘/读盘自身失败不影响判定（宁可少粘性，不丢在线结果）。
+      var config = await repository.remoteAppConfig();
+      if (config != null) {
+        try {
+          await store.write(config);
+        } catch (_) {}
+      } else {
+        try {
+          config = await store.read();
+        } catch (_) {}
+      }
       if (config == null || config.minVersion.isEmpty) return null;
       if (!isNewerVersion(config.minVersion, kAppVersion)) return null;
       return UpgradeGateState(

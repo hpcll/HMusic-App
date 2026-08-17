@@ -103,9 +103,11 @@ class ApiUpdateRepository implements UpdateRepository {
     }
   }
 
-  // 远程配置镜像序列：GitHub raw 主源 + jsDelivr CDN 兜底（大陆网络下
-  // raw 常不可达）。任一成功即用，全部失败按无配置处理（门控放行）。
+  // 远程配置镜像序列：Gitee 国内主源（大陆免翻墙；镜像仓库建好后生效，
+  // 未建时 404 秒过）→ GitHub raw → jsDelivr CDN。任一成功即用，
+  // 全部失败按无配置处理（配合本地粘性缓存，见 upgrade_config_store）。
   static const List<String> _remoteConfigMirrors = <String>[
+    'https://gitee.com/$kAppReleaseRepo/raw/main/app-config.json',
     'https://raw.githubusercontent.com/$kAppReleaseRepo/main/app-config.json',
     'https://fastly.jsdelivr.net/gh/$kAppReleaseRepo@main/app-config.json',
   ];

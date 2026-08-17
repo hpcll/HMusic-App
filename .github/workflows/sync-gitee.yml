@@ -1,0 +1,30 @@
+name: Sync to Gitee
+
+# 推送 main 时把整仓镜像到 Gitee（app-config.json 的国内主源）。
+# 需要仓库 Secrets：GITEE_USERNAME（Gitee 用户名）、GITEE_TOKEN（Gitee 私人令牌，
+# 需 projects 权限）。未配置 secrets 时静默跳过，不红 CI。
+# Gitee 侧需先建同名仓库 hpcll/HMusic-App 并公开。
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Push to Gitee
+        env:
+          GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          if [ -z "$GITEE_USERNAME" ] || [ -z "$GITEE_TOKEN" ]; then
+            echo "未配置 GITEE_USERNAME/GITEE_TOKEN，跳过同步。"
+            exit 0
+          fi
+          git push --force \
+            "https://${GITEE_USERNAME}:${GITEE_TOKEN}@gitee.com/hpcll/HMusic-App.git" \
+            HEAD:main

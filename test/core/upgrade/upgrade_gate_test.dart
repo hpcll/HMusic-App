@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/models/server_info.dart';
+import 'package:hmusic/core/upgrade/upgrade_config_store.dart';
 import 'package:hmusic/core/upgrade/upgrade_gate.dart';
 import 'package:hmusic/features/settings/data/api_update_repository.dart';
 import 'package:hmusic/features/settings/models/app_update.dart';
@@ -32,6 +33,16 @@ class _FakeUpdateRepository implements UpdateRepository {
   Future<AppReleaseInfo?> latestAppRelease() async => null;
 }
 
+class _MemoryUpgradeConfigStore implements UpgradeConfigStore {
+  AppRemoteConfig? saved;
+
+  @override
+  Future<AppRemoteConfig?> read() async => saved;
+
+  @override
+  Future<void> write(AppRemoteConfig config) async => saved = config;
+}
+
 ServerInfo _info(String minAppVersion) => ServerInfo(
   name: 'HMusic Server',
   version: '0.1.0',
@@ -39,9 +50,17 @@ ServerInfo _info(String minAppVersion) => ServerInfo(
   minAppVersion: minAppVersion,
 );
 
-ProviderContainer _container(_FakeUpdateRepository repository) {
+ProviderContainer _container(
+  _FakeUpdateRepository repository, {
+  _MemoryUpgradeConfigStore? store,
+}) {
   final container = ProviderContainer(
-    overrides: [updateRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      updateRepositoryProvider.overrideWithValue(repository),
+      upgradeConfigStoreProvider.overrideWithValue(
+        store ?? _MemoryUpgradeConfigStore(),
+      ),
+    ],
   );
   addTearDown(container.dispose);
   return container;
@@ -109,5 +128,52 @@ void main() {
     final state = container.read(upgradeGateProvider);
     expect(state.required, isFalse);
     expect(state.checked, isFalse);
+  });
+
+  test('远程配置在线取到即落盘（粘性执行的来源）', () async {
+    final store = _MemoryUpgradeConfigStore();
+    final repository = _FakeUpdateRepository()
+      ..info = _info('')
+      ..remoteConfig = const AppRemoteConfig(minVersion: '99.0.0');
+    final container = _container(repository, store: store);
+
+    await container.read(upgradeGateProvider.notifier).check();
+    expect(store.saved?.minVersion, '99.0.0');
+  });
+
+  test('拉不到配置但本地有旧配置：照样执行强制（断网躲不掉）', () async {
+    final store = _MemoryUpgradeConfigStore()
+      ..saved = const AppRemoteConfig(
+        minVersion: '99.0.0',
+        notice: '此前下发的强制升级',
+      );
+    final repository = _FakeUpdateRepository()..info = _info('');
+    final container = _container(repository, store: store);
+
+    await container.read(upgradeGateProvider.notifier).check();
+    final state = container.read(upgradeGateProvider);
+    expect(state.required, isTrue);
+    expect(state.notice, contains('此前下发'));
+  });
+
+  test('拉不到配置且本地无缓存：放行（只影响从未收到过配置的安装）', () async {
+    final repository = _FakeUpdateRepository()..info = _info('');
+    final container = _container(repository);
+
+    await container.read(upgradeGateProvider.notifier).check();
+    expect(container.read(upgradeGateProvider).required, isFalse);
+  });
+
+  test('新配置覆盖旧缓存：下发更低 minVersion 可解除历史强制', () async {
+    final store = _MemoryUpgradeConfigStore()
+      ..saved = const AppRemoteConfig(minVersion: '99.0.0');
+    final repository = _FakeUpdateRepository()
+      ..info = _info('')
+      ..remoteConfig = const AppRemoteConfig(minVersion: '0.0.0');
+    final container = _container(repository, store: store);
+
+    await container.read(upgradeGateProvider.notifier).check();
+    expect(container.read(upgradeGateProvider).required, isFalse);
+    expect(store.saved?.minVersion, '0.0.0');
   });
 }
