@@ -26,5 +26,5 @@ jobs:
             exit 0
           fi
           git push --force \
-            "https://${GITEE_USERNAME}:${GITEE_TOKEN}@gitee.com/hpcll/HMusic-App.git" \
+            "https://${GITEE_USERNAME}:${GITEE_TOKEN}@gitee.com/hpc1997/HMusic-App.git" \
             HEAD:main

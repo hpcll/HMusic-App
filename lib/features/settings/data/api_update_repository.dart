@@ -107,7 +107,7 @@ class ApiUpdateRepository implements UpdateRepository {
   // 未建时 404 秒过）→ GitHub raw → jsDelivr CDN。任一成功即用，
   // 全部失败按无配置处理（配合本地粘性缓存，见 upgrade_config_store）。
   static const List<String> _remoteConfigMirrors = <String>[
-    'https://gitee.com/$kAppReleaseRepo/raw/main/app-config.json',
+    'https://gitee.com/$kAppGiteeRepo/raw/main/app-config.json',
     'https://raw.githubusercontent.com/$kAppReleaseRepo/main/app-config.json',
     'https://fastly.jsdelivr.net/gh/$kAppReleaseRepo@main/app-config.json',
   ];
