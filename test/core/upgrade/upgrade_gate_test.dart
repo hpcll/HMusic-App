@@ -176,4 +176,29 @@ void main() {
     expect(container.read(upgradeGateProvider).required, isFalse);
     expect(store.saved?.minVersion, '0.0.0');
   });
+
+  test('服务端 403 拒绝老版本：当场关门，不等下一轮自检', () async {
+    final repository = _FakeUpdateRepository()..info = _info('0.0.0');
+    final container = _container(repository);
+    final gate = container.read(upgradeGateProvider.notifier);
+
+    await gate.check();
+    expect(container.read(upgradeGateProvider).required, isFalse);
+
+    gate.rejectedByServer('9.0.0');
+    final state = container.read(upgradeGateProvider);
+    expect(state.required, isTrue);
+    expect(state.fromServer, isTrue);
+    expect(state.requiredVersion, '9.0.0');
+  });
+
+  test('403 未带版本号也能关门（展示退化为「更高版本」）', () async {
+    final repository = _FakeUpdateRepository()..info = _info('0.0.0');
+    final container = _container(repository);
+
+    container.read(upgradeGateProvider.notifier).rejectedByServer('');
+    final state = container.read(upgradeGateProvider);
+    expect(state.required, isTrue);
+    expect(state.requiredVersion, '更高版本');
+  });
 }

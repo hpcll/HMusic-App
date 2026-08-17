@@ -69,6 +69,19 @@ class UpgradeGate extends Notifier<UpgradeGateState> {
     state = const UpgradeGateState();
   }
 
+  // 服务端以 403 APP_VERSION_TOO_OLD 拒绝服务时当场关门（由 ApiClient 回调）。
+  // 与 check() 的区别：这条不靠自觉轮询，任何业务请求撞上即生效。
+  void rejectedByServer(String minAppVersion) {
+    final required = minAppVersion.isEmpty ? '更高版本' : minAppVersion;
+    if (state.required && state.requiredVersion == required) return;
+    state = UpgradeGateState(
+      required: true,
+      requiredVersion: required,
+      fromServer: true,
+      checked: true,
+    );
+  }
+
   Future<UpgradeGateState?> _checkServer(UpdateRepository repository) async {
     try {
       final info = await repository.serverInfo();

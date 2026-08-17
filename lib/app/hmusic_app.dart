@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/session/session_providers.dart';
+import '../core/upgrade/app_version_guard.dart';
 import 'app_providers.dart';
 import 'theme/hmusic_theme.dart';
 
@@ -15,6 +16,8 @@ class HMusicApp extends ConsumerWidget {
     // 会话失效副作用（停本机音频）在 app 根激活。不能由 apiClient 拉起：
     // guard 会进 audioHandler 的依赖链，其监听器反读 audioHandler 即成环。
     ref.watch(sessionGuardProvider);
+    // 服务端 403 拒绝老版本 → 立即关强升门（同上，不能由 apiClient 拉起）。
+    ref.watch(appVersionGuardProvider);
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'HMusic',

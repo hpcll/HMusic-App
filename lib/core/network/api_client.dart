@@ -1,10 +1,18 @@
 import 'package:dio/dio.dart';
 
+import '../app_version.dart';
 import '../config/server_config_store.dart';
 import '../security/token_store.dart';
 import 'api_failure.dart';
 
 typedef UnauthorizedHandler = Future<void> Function();
+
+// 服务端以 403 APP_VERSION_TOO_OLD 拒绝老版本时回调，参数是它要求的最低版本。
+typedef VersionRejectedHandler = void Function(String minAppVersion);
+
+// 每个请求自报 App 版本，供服务端做老版本门禁（Server 侧
+// shared/app-version-guard.ts）。不带此头的客户端（web 端、音箱、兼容层）放行。
+const String kAppVersionHeader = 'X-HMusic-App-Version';
 
 class ApiClient {
   ApiClient({
@@ -21,10 +29,17 @@ class ApiClient {
   final ServerConfigStore _serverConfigStore;
   final TokenStore _tokenStore;
   UnauthorizedHandler? _onUnauthorized;
+  VersionRejectedHandler? _onVersionRejected;
 
   // 由 SessionGuard 注入：401 时触发停本机音频，并经 SessionController 单飞跳登录页。
   void registerUnauthorizedHandler(UnauthorizedHandler handler) {
     _onUnauthorized = handler;
+  }
+
+  // 由 appVersionGuard 注入：403 APP_VERSION_TOO_OLD 时当场关强升门。
+  // 走注册而非构造注入，避免 apiClient ←→ upgradeGate 形成 provider 依赖环。
+  void registerVersionRejectedHandler(VersionRejectedHandler handler) {
+    _onVersionRejected = handler;
   }
 
   Future<Map<String, Object?>> getMap(
@@ -94,7 +109,7 @@ class ApiClient {
           message: '尚未配置 HMusic Server',
         );
       }
-      final headers = <String, Object?>{};
+      final headers = <String, Object?>{kAppVersionHeader: kAppVersion};
       final token = await _tokenStore.read();
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
@@ -142,7 +157,7 @@ class ApiClient {
         );
       }
 
-      final headers = <String, Object?>{};
+      final headers = <String, Object?>{kAppVersionHeader: kAppVersion};
       if (authenticated) {
         final token = await _tokenStore.read();
         if (token != null && token.isNotEmpty) {
@@ -214,6 +229,20 @@ class ApiClient {
     final nestedError = _tryMap(payload?['error']);
     final code = nestedError?['code'] as String?;
     final message = nestedError?['message'] as String?;
+    // 服务端拒绝老版本：当场关强升门（不等下一轮门控自检），并把要求的版本
+    // 透出去。这条门改客户端 UI 绕不掉——业务接口全部 403。
+    if (statusCode == 403 && code == 'APP_VERSION_TOO_OLD') {
+      final details = _tryMap(nestedError?['details']);
+      final required = '${details?['minAppVersion'] ?? ''}';
+      _onVersionRejected?.call(required);
+      return ApiFailure(
+        kind: ApiFailureKind.server,
+        message: message ?? '当前 App 版本过旧，请升级后使用',
+        code: code,
+        statusCode: statusCode,
+        details: nestedError?['details'],
+      );
+    }
     if (statusCode == 401) {
       // 只有带凭据的请求收到 401 才意味着「本会话失效」。未认证探测
       //（连接页探活、局域网扫描）撞上陌生设备的 401 不能清 token 登出。

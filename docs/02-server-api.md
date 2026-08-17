@@ -60,6 +60,16 @@ DownloadRecord { id;trackKey;source;title;artist;album?;coverUrl?;track;quality?
 触发后 Server 会短暂停止并以新版重启；客户端应轮询公开的 `/system/info` 直到 `version`
 变化（成功）或超时（引导看 log）。GitHub 不可达时 GET 返回 502 `UPDATE_CHECK_FAILED`。
 
+### 1.2 老版本请求门禁（2026-08-17）
+
+所有请求必带 `X-HMusic-App-Version: <kAppVersion>`（`ApiClient` 统一注入）。服务端
+`minAppVersion` 非 0.0.0 时，自报版本低于门槛的请求一律 **403 `APP_VERSION_TOO_OLD`**
+（details 带 `minAppVersion`），App 收到即当场进强升页——与 `/system/info` 那条自觉
+判定互补，改客户端 UI 绕不掉。豁免：`/system/info`、`/system/app-config`、
+`/system/test-tone*`（否则老 App 拿不到升级信息会死锁）。**不带此头的客户端一律放行**
+（web 端、小爱音箱拉流、xiaomusic 兼容层、curl 诊断）。服务端可用
+`HMUSIC_MIN_APP_VERSION` 环境变量临时抬高门槛，不必改代码发版。
+
 ## 2. Auth `/auth`
 
 | 方法 | 路径 | 认证 | 入参 | 出参 |
