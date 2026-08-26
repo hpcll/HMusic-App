@@ -12,7 +12,8 @@ final Provider<void> appVersionGuardProvider = Provider<void>((ref) {
   ref
       .watch(apiClientProvider)
       .registerVersionRejectedHandler(
-        (minAppVersion) =>
-            ref.read(upgradeGateProvider.notifier).rejectedByServer(minAppVersion),
+        (minAppVersion) => ref
+            .read(upgradeGateProvider.notifier)
+            .rejectedByServer(minAppVersion),
       );
 });

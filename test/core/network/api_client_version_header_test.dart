@@ -119,7 +119,10 @@ void main() {
     );
     client.registerVersionRejectedHandler(rejected.add);
 
-    await expectLater(client.getMap('/playback/state'), throwsA(isA<ApiFailure>()));
+    await expectLater(
+      client.getMap('/playback/state'),
+      throwsA(isA<ApiFailure>()),
+    );
     expect(rejected, isEmpty);
   });
 }

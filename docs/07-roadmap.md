@@ -108,8 +108,8 @@
 
 ## P5 - 分发
 
-- [ ] CI：Android/iOS/macOS/Windows/Linux 构建矩阵
-- [ ] Android AAB、iOS archive、桌面安装包
+- [~] CI：Android 已有静态门禁与 release 构建 workflow；iOS/macOS/Windows/Linux 矩阵待补
+- [~] Android APK/AAB 已有可复现构建脚本；iOS archive、桌面安装包待补
 - [ ] 签名、公证、隐私说明、局域网权限说明
 - [ ] HTTPS 审核 Demo Server、审核账号、公版测试音频和 Review Notes
 - [ ] 隐私政策、支持 URL、App Privacy/Data Safety、SDK privacy manifest
@@ -121,7 +121,7 @@
       Releases 跳浏览器下载。2026-08-17：强制升级门——Server `minAppVersion`
       + 仓库 `app-config.json`（raw/jsDelivr 双镜像）双通道，命中押全屏强升页。
       剩余：各平台安装包内下载安装、iOS App Store 通道）
-- [ ] README 安装、连接和故障排查
+- [x] README 安装、连接和故障排查（2026-08-26：App/Server 快速开始、部署、升级和常见问题已公开）
 
 ## P6 - NAS 曲库与语音接管
 

@@ -239,7 +239,10 @@ class _NavItem extends StatelessWidget {
     final palette = context.palette;
     final color = active ? palette.textStrong : palette.muted;
     final content = compact
-        ? Center(widthFactor: 1, child: Icon(spec.icon, size: kDockIconSize, color: color))
+        ? Center(
+            widthFactor: 1,
+            child: Icon(spec.icon, size: kDockIconSize, color: color),
+          )
         : Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[

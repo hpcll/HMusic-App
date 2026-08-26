@@ -45,9 +45,7 @@ class UpdateViewModel extends Notifier<UpdateState> {
         checkingServer: false,
         serverUpdate: info,
         serverVersion: info.current,
-        notice: info.hasUpdate
-            ? null
-            : const HMusicNotice.success('服务端已是最新版本'),
+        notice: info.hasUpdate ? null : const HMusicNotice.success('服务端已是最新版本'),
       );
     } on ApiFailure catch (failure) {
       state = state.copyWith(

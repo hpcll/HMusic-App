@@ -6,6 +6,7 @@
 .pub/
 .pub-cache/
 build/
+dist/
 coverage/
 
 # IDE

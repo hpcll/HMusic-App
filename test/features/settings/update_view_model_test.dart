@@ -45,11 +45,8 @@ class _FakeUpdateRepository implements UpdateRepository {
   Future<AppReleaseInfo?> latestAppRelease() async => appRelease;
 
   @override
-  Future<ServerInfo> serverInfo() async => ServerInfo(
-    name: 'HMusic Server',
-    version: version,
-    apiVersion: 'v1',
-  );
+  Future<ServerInfo> serverInfo() async =>
+      ServerInfo(name: 'HMusic Server', version: version, apiVersion: 'v1');
 
   @override
   Future<AppRemoteConfig?> remoteAppConfig() async => null;

@@ -1,18 +1,61 @@
 # HMusic App
 
-HMusic 是 NAS/家庭服务器个人音乐库的官方跨平台客户端，面向 Android、iOS、macOS、Windows 与 Linux，
-连接 [HMusic-Server](../HMusic-Server) 提供搜索、歌单、榜单、音箱遥控与本机播放。
+HMusic 是连接自建 [HMusic-Server](https://github.com/hpcll/HMusic-Server) 的跨平台音乐库客户端，
+面向 Android、iOS、macOS、Windows 与 Linux。服务端保存曲库、队列和账号状态，客户端负责内容展示、
+本机播放、后台播放和家庭音箱控制。
 
-视觉采用平台自适应方案：内容层延续现有 HMusic 网页的暖纸、墨色和衬线风格；iOS 27
-由 Swift/SwiftUI 提供原生液态玻璃导航与控制层，Android 用 Flutter 实现接近且可降级的玻璃效果。
+## 快速开始
 
-当前处于 **P0：最小纵切实现**。Flutter 工程、连接、鉴权、搜索和本机播放基础代码已经建立；
-继续实现前先以 [`docs/09-p0-audit.md`](docs/09-p0-audit.md) 和
-[`docs/12-server-compatibility.md`](docs/12-server-compatibility.md) 核对当前契约状态。
+### 1. 部署 Server
 
-AI 编码代理进入仓库后必须先读 [`AGENTS.md`](AGENTS.md)，再按其中顺序读取架构、API、
-路线图和任务专项文档。Claude、Gemini、Cursor、GitHub Copilot 的仓库入口文件均指向该规则，
-避免维护多套指令。
+在 NAS、Linux 服务器或长期开机的电脑上执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hpcll/HMusic-Server/main/bootstrap.sh | bash
+```
+
+安装器会自动选择 Docker 或原生模式，并打印访问地址。打开 `/app/` 创建管理员账号，完成服务端初始化。
+Linux NAS 推荐 Docker host network；macOS 和 Windows Docker Desktop 推荐原生模式。完整说明见
+[Server 部署文档](https://github.com/hpcll/HMusic-Server/blob/main/docs/DEPLOYMENT.md)。
+
+### 2. 安装 App
+
+从 [Releases](https://github.com/hpcll/HMusic-App/releases) 下载对应平台的构建包。首次启动输入 Server 地址，
+例如 `http://192.168.1.20:6650`，然后使用刚创建的账号登录。
+
+公网部署必须使用有效 HTTPS；局域网 HTTP 只适合可信网络。iOS 首次连接时允许“本地网络”权限，Android
+需要确保手机和 Server 在同一网络且端口 `6650` 未被防火墙拦截。
+
+## 当前支持范围
+
+| 平台 | 当前状态 | 发布形式 |
+| --- | --- | --- |
+| Android | 本机播放、后台播放、锁屏控制 | APK / Google Play AAB |
+| iOS | 本机播放、后台播放、锁屏控制 | TestFlight / App Store |
+| macOS | 本机播放能力随音频后端提供 | unsigned App / 后续签名包 |
+| Windows | 主要用于服务端和音箱遥控 | 后续安装包 |
+| Linux | 主要用于服务端和音箱遥控 | 后续安装包 |
+
+桌面端完整本机音频、托盘和系统媒体集成仍在路线图中，请以每次 Release 的说明为准。
+
+## 开发
+
+需要 Flutter stable、Dart SDK `^3.9.2` 和可用的 Android/iOS/macOS 工具链：
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+```
+
+Android 发布包：
+
+```bash
+bash tool/build_release.sh android
+```
+
+输出位于 `dist/`，同时生成 APK、AAB 和 SHA-256 校验文件。正式商店发布仍需要维护者配置签名密钥，
+详见 [贡献指南](CONTRIBUTING.md) 和 [发布说明](RELEASING.md)。
 
 ## 文档入口
 
@@ -29,6 +72,9 @@ AI 编码代理进入仓库后必须先读 [`AGENTS.md`](AGENTS.md)，再按其�
 11. [10 工程规范](docs/10-engineering-standards.md) - MVVM、文件拆分、复用和依赖准入
 12. [11 上架合规](docs/11-release-compliance.md) - App Store/Google Play、隐私、审核和签名门禁
 13. [12 Server 兼容](docs/12-server-compatibility.md) - 契约缺口、兼容调用和重试规则
+
+安装、连接或播放异常时，先查看 [故障排查](docs/DEPLOYMENT.md)。参与开发请阅读
+[CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按 [SECURITY.md](SECURITY.md) 报告。
 
 ## 工程原则
 

@@ -38,11 +38,7 @@ class QueueTrackTile extends StatelessWidget {
         child: Align(
           alignment: Alignment.centerLeft,
           child: isCurrent
-              ? Icon(
-                  Icons.graphic_eq_rounded,
-                  size: 18,
-                  color: palette.accent,
-                )
+              ? Icon(Icons.graphic_eq_rounded, size: 18, color: palette.accent)
               : Text(
                   '${index + 1}',
                   style: TextStyle(fontSize: 12.5, color: palette.muted),

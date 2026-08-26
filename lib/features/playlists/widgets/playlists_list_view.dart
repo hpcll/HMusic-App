@@ -138,7 +138,9 @@ class PlaylistsListView extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('删除歌单'),
-        content: Text('确定删除「${playlist.name}」吗？共 ${playlist.trackCount} 首，删除后无法恢复。'),
+        content: Text(
+          '确定删除「${playlist.name}」吗？共 ${playlist.trackCount} 首，删除后无法恢复。',
+        ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),

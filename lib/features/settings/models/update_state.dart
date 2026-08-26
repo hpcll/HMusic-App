@@ -41,7 +41,9 @@ class UpdateState {
   }) {
     return UpdateState(
       serverVersion: serverVersion ?? this.serverVersion,
-      serverUpdate: clearServerUpdate ? null : (serverUpdate ?? this.serverUpdate),
+      serverUpdate: clearServerUpdate
+          ? null
+          : (serverUpdate ?? this.serverUpdate),
       appRelease: clearAppRelease ? null : (appRelease ?? this.appRelease),
       appReleaseChecked: appReleaseChecked ?? this.appReleaseChecked,
       checkingServer: checkingServer ?? this.checkingServer,

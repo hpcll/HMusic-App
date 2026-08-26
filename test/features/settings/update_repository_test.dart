@@ -25,10 +25,7 @@ void main() {
     ).thenAnswer(
       (_) async => <String, Object?>{
         'available': true,
-        'config': <String, Object?>{
-          'minVersion': '9.9.9',
-          'notice': '大版本升级',
-        },
+        'config': <String, Object?>{'minVersion': '9.9.9', 'notice': '大版本升级'},
       },
     );
 
@@ -60,9 +57,9 @@ void main() {
     when(
       () => apiClient.getMap('/system/app-config', authenticated: false),
     ).thenThrow(Exception('no server'));
-    when(() => github.get<Object?>(any())).thenThrow(
-      DioException(requestOptions: RequestOptions(path: '')),
-    );
+    when(
+      () => github.get<Object?>(any()),
+    ).thenThrow(DioException(requestOptions: RequestOptions(path: '')));
 
     // 两级都失败：按无配置放行（返回 null）。
     expect(await repository.remoteAppConfig(), isNull);

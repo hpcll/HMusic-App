@@ -109,8 +109,8 @@ class ForceUpgradePage extends ConsumerWidget {
     var url = gate.downloadUrl;
     if (url == null || url.isEmpty) {
       try {
-        url = (await ref.read(updateRepositoryProvider).latestAppRelease())
-            ?.url;
+        url =
+            (await ref.read(updateRepositoryProvider).latestAppRelease())?.url;
       } catch (_) {
         url = null;
       }
