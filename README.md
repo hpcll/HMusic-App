@@ -1,12 +1,16 @@
 # HMusic App
 
-HMusic 是连接自建 [HMusic-Server](https://github.com/hpcll/HMusic-Server) 的跨平台音乐库客户端，
-面向 Android、iOS、macOS、Windows 与 Linux。服务端保存曲库、队列和账号状态，客户端负责内容展示、
-本机播放、后台播放和家庭音箱控制。
+HMusic App 是连接自建 [HMusic-Server](https://github.com/hpcll/HMusic-Server) 的跨平台音乐客户端。
+Server 管理曲库、搜索解析、队列和小爱音箱，App 负责搜索、播放、歌词、歌单和移动端后台播放。
 
-## 快速开始
+它不是一个依赖开发者云账号的在线音乐服务：你在自己的 NAS、家庭服务器或电脑上部署一个 HMusic-Server，
+然后让手机、平板和桌面端 App 连接它。音乐来源账号、播放队列、歌单、下载文件和播放历史都留在你自己的 Server 上。
+同一个 Server 可以供家里的多个 App 使用，队列和小爱音箱状态是共享的；播放目标可以是手机本机，也可以是 Server 管理的小爱音箱。
+同一时间使用“本机”播放时，建议只让一个 App 控制本机目标，避免多个客户端互相覆盖状态。
 
-### 1. 部署 Server
+## 五分钟开始
+
+### 1. 部署 HMusic-Server
 
 在 NAS、Linux 服务器或长期开机的电脑上执行：
 
@@ -14,101 +18,81 @@ HMusic 是连接自建 [HMusic-Server](https://github.com/hpcll/HMusic-Server) �
 curl -fsSL https://raw.githubusercontent.com/hpcll/HMusic-Server/main/bootstrap.sh | bash
 ```
 
-安装器会自动选择 Docker 或原生模式，并打印访问地址。打开 `/app/` 创建管理员账号，完成服务端初始化。
-Linux NAS 推荐 Docker host network；macOS 和 Windows Docker Desktop 推荐原生模式。完整说明见
-[Server 部署文档](https://github.com/hpcll/HMusic-Server/blob/main/docs/DEPLOYMENT.md)。
+安装器会自动选择 Docker 或原生模式，启动后打印访问地址。用浏览器打开地址后面的 `/app/`，创建管理员账号，
+然后在“设置 → 小米账号”登录并选择默认播放设备。完整的平台选择、升级和备份说明见
+[Server 部署指南](https://github.com/hpcll/HMusic-Server/blob/main/docs/DEPLOYMENT.md)。
 
 ### 2. 安装 App
 
-从 [Releases](https://github.com/hpcll/HMusic-App/releases) 下载对应平台的构建包。首次启动输入 Server 地址，
-例如 `http://192.168.1.20:6650`，然后使用刚创建的账号登录。
+从 [HMusic App Releases](https://github.com/hpcll/HMusic-App/releases) 下载对应平台的包：
 
-公网部署必须使用有效 HTTPS；局域网 HTTP 只适合可信网络。iOS 首次连接时允许“本地网络”权限，Android
-需要确保手机和 Server 在同一网络且端口 `6650` 未被防火墙拦截。
-
-## 当前支持范围
-
-| 平台 | 当前状态 | 发布形式 |
+| 平台 | 下载文件 | 说明 |
 | --- | --- | --- |
-| Android | 本机播放、后台播放、锁屏控制 | APK / Google Play AAB |
-| iOS | 本机播放、后台播放、锁屏控制 | 可自签 IPA / TestFlight / App Store |
-| macOS | 本机播放、系统媒体控制；未做托盘/关窗驻留 | universal ad-hoc ZIP |
-| Windows | 服务端和音箱遥控；本机音频/SMTC 未完成 | x64 便携 ZIP |
-| Linux | 服务端和音箱遥控；本机音频/MPRIS 未完成 | x64 便携 tar.gz |
+| Android | APK | 可直接安装；AAB 用于 Google Play |
+| iOS | `ios-unsigned.ipa` | 需要用自己的 Apple ID 或证书重签后安装 |
+| macOS | `macos-universal-adhoc.zip` | 同时支持 Apple Silicon 和 Intel |
+| Windows | `windows-x64.zip` | 解压后运行便携版 |
+| Linux | `linux-x64.tar.gz` | x86_64 便携版 |
 
-Windows/Linux 的本机音频、托盘和系统媒体集成仍在路线图中；macOS 已支持本机播放和系统媒体控制，请以每次
-Release 的说明为准。
+iOS 自签和桌面端的完整步骤见[安装与故障排查](docs/DEPLOYMENT.md)。每个 Release 同时提供 SHA-256 校验文件。
 
-## 开发
+### 3. 连接并登录
 
-需要 Flutter stable、Dart SDK `^3.9.2` 和可用的 Android/iOS/macOS 工具链：
+Server 部署完成后，App 首次启动会自动查找同一局域网内的 HMusic-Server。正常情况下你只需要点发现到的 Server，
+不需要手工填写 IP。自动发现分两步进行：先使用局域网服务广播快速发现，未发现时再扫描本机网段的 `6650` 端口，
+并通过 Server 身份接口确认结果。
 
-```bash
-flutter pub get
-flutter analyze
-flutter test
+如果列表为空，确认设备在同一局域网后点“重新扫描”；仍找不到时点“手动输入地址”，填写 Server 基础地址，例如：
+
+```text
+http://192.168.1.20:6650
 ```
 
-Android 发布包：
+不要填写 `/app/`，也不要把地址写成某个 API 路径。公网地址必须使用有效 HTTPS，局域网 HTTP 只适合可信网络。
+连接后使用 Server 管理员账号登录；Server 尚未初始化时，App 会显示“创建并登录”。
 
-```bash
-bash tool/build_release.sh android
-```
+换了 Wi-Fi 或 Server 的局域网地址后，重新打开连接页即可再次自动发现；也可以在“设置”中切换已保存的 Server。
+iOS 首次使用必须允许 HMusic 访问“本地网络”，否则自动发现和局域网连接可能被系统拦截。
 
-输出位于 `dist/`，同时生成 APK、AAB 和 SHA-256 校验文件。正式商店发布仍需要维护者配置签名密钥，
-详见 [贡献指南](CONTRIBUTING.md) 和 [发布说明](RELEASING.md)。
+## 怎么用
 
-iOS 自签 IPA（需要 macOS 和 Xcode，只构建不签名）：
+1. **搜索歌曲**：进入“搜索”，输入歌名或歌手并提交。点击结果行的播放按钮立即播放，或加入队列/歌单。
+2. **选择播放目标**：播放页的设备按钮可以选择“本机”或 Server 已配置的小爱音箱。选择音箱后，手机不会再占用本机音频会话。
+3. **控制播放**：播放页支持播放/暂停、上一首/下一首、拖动进度、音量和播放模式；返回其他页面后可用底部 mini player 控制。
+4. **看歌词**：有歌词的歌曲可从播放页进入歌词视图；歌词由 Server 按曲目来源获取并缓存。
+5. **管理队列和歌单**：在队列页调整顺序和播放模式；歌单页可以创建、导入、播放歌单，也可以打开“NAS 曲库”浏览服务器上的本地音乐。
+6. **下载到 Server**：搜索结果中的下载按钮会把有权限处理的音乐保存到 Server，完成后可在“设置 → 本地下载/NAS 曲库”中播放和管理。
+7. **切换 Server 或设备**：在“设置”中切换已保存的 Server、刷新小米设备、修改默认播放设备和运行配置。
 
-```bash
-bash tool/build_release.sh ios-unsigned
-```
+移动端支持后台播放、锁屏控制和播放结束后自动衔接下一曲。收到“登录已失效”提示时重新登录即可；这表示 Server 会话已过期，
+不是本机音频故障。
 
-输出 `dist/hmusic-<版本>-ios-unsigned.ipa`。该包没有 Apple 描述文件，不能直接安装；使用自己的 Apple ID
-或开发者证书导入 AltStore、SideStore、Sideloadly 等工具重签后再安装。完整步骤见
-[安装与故障排查](docs/DEPLOYMENT.md)。
+## 当前平台边界
 
-macOS 与 Linux 发布包：
+| 平台 | 已支持 | 当前限制 |
+| --- | --- | --- |
+| Android | 本机播放、后台播放、锁屏控制、小爱音箱遥控 | 正式商店包需要维护者配置 release 签名 |
+| iOS | 本机播放、后台播放、锁屏控制、小爱音箱遥控 | Release 提供未签名 IPA；必须自行重签，不能直接安装 |
+| macOS | 本机播放、系统媒体控制、小爱音箱遥控 | ad-hoc 包未做 Developer ID 公证；暂无托盘、关窗驻留和自动更新 |
+| Windows | 连接 Server、管理内容、小爱音箱遥控 | 本机音频、SMTC、托盘和自动更新尚未完成 |
+| Linux | 连接 Server、管理内容、小爱音箱遥控 | 本机音频、MPRIS、托盘和自动更新尚未完成 |
 
-```bash
-bash tool/build_release.sh macos-adhoc  # 仅 macOS
-bash tool/build_release.sh linux        # 仅 Linux x64
-```
+Windows/Linux 当前定位是桌面管理和远程控制端，不要把它们当作本机音乐播放器使用。平台能力和安装包以每个 Release 的说明为准。
 
-Windows x64 发布包在 PowerShell 中构建：
+## 网络与安全
 
-```powershell
-./tool/build_windows_release.ps1
-```
+- App 只连接你自己配置的 HMusic-Server；账号、播放历史和音乐数据由你的 Server 保存。
+- iOS 首次连接需要允许“本地网络”权限；Android 请确认手机和 Server 在同一网络，且 TCP `6650` 未被防火墙拦截。
+- 公网部署请使用 HTTPS 和反向代理；不要关闭证书校验，也不要把管理员密码、token 或小米会话发给第三方。
+- Server 的 `.env`、`data/`、下载文件和音源插件是持久化数据，升级前请先备份。
 
-macOS 产物同时包含 Apple Silicon 与 Intel 架构，使用 ad-hoc 签名但未做 Developer ID 公证。Windows/Linux
-当前是完整 UI 和远端控制便携包，本机音频与系统媒体面板仍在 P4 范围内。
+## 文档与反馈
 
-## 文档入口
+- [Server 项目与部署指南](https://github.com/hpcll/HMusic-Server)
+- [安装与故障排查](docs/DEPLOYMENT.md)
+- [最新发布包](https://github.com/hpcll/HMusic-App/releases)
+- [安全问题报告](SECURITY.md)
 
-1. [00 总览](docs/00-overview.md) - 产品边界、技术栈与当前状态
-2. [01 架构](docs/01-architecture.md) - Flutter 分层、状态所有权和目录
-3. [02 API 契约](docs/02-server-api.md) - 服务端接口与客户端接入约束
-4. [03 设计系统](docs/03-design-system.md) - HMusic 内容风格与 iOS/Android 玻璃材质规则
-5. [04 逐屏说明](docs/04-screens.md) - 页面结构和交互
-6. [05 交互动画](docs/05-interactions-animations.md) - 动效、快捷键和手势
-7. [06 平台能力](docs/06-platform-native.md) - Flutter + Swift 平台壳、后台音频与系统配置
-8. [07 路线图](docs/07-roadmap.md) - P0-P5 验收清单
-9. [08 音频架构](docs/08-audio-plugin.md) - `audio_service` + `just_audio` 实现契约
-10. [09 P0 审计](docs/09-p0-audit.md) - Server/App 事实核对、阻塞项和开工门禁
-11. [10 工程规范](docs/10-engineering-standards.md) - MVVM、文件拆分、复用和依赖准入
-12. [11 上架合规](docs/11-release-compliance.md) - App Store/Google Play、隐私、审核和签名门禁
-13. [12 Server 兼容](docs/12-server-compatibility.md) - 契约缺口、兼容调用和重试规则
+## 许可证
 
-安装、连接或播放异常时，先查看 [故障排查](docs/DEPLOYMENT.md)。参与开发请阅读
-[CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按 [SECURITY.md](SECURITY.md) 报告。
-
-## 工程原则
-
-- HMusic-Server 的 TypeScript 路由与共享 schema 是 API 事实源，文档不能替代运行契约。
-- HMusic-Server/web 是产品行为和视觉参考，不再复制或嵌入客户端。
-- Flutter 原生重写 UI；服务端是队列与语义播放状态的事实源，本机播放器是实时进度的事实源。
-- 主架构冻结为 Feature-first MVVM；View、ViewModel、Repository 单向依赖，禁止巨型文件和万能层。
-- 优先复用标准能力、现有代码和成熟依赖，不重复实现通用基础设施。
-- 移动端后台播放是交付硬需求，不接受 WebView `<audio>` 或“仅遥控器”作为终态。
-- 决策先更新文档，里程碑完成后回填状态。
+HMusic App 采用 [Apache License 2.0](LICENSE)。第三方依赖和声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
