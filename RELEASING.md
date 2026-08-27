@@ -58,13 +58,19 @@ bash tool/build_release.sh macos-adhoc
 bash tool/build_release.sh linux
 ```
 
-Windows 在 PowerShell 中执行：
+Windows 在 PowerShell 中执行（需要安装 Inno Setup 6，并确保 `ISCC.exe` 在 PATH 中）：
 
 ```powershell
 ./tool/build_windows_release.ps1
 ```
 
-产物分别是 macOS universal ad-hoc ZIP、Windows x64 ZIP 和 Linux x64 tar.gz。macOS 包未经 Developer ID
-签名与公证，Windows 包未经 Authenticode 签名；Release 必须提示系统安全警告和当前桌面功能边界。
+Windows 构建会同时生成便携 ZIP 和真正的安装向导 EXE：
+
+- `hmusic-<版本>-windows-x64-setup.exe`：中文安装向导，默认按当前用户安装到
+  `%LocalAppData%\Programs\HMusic`，创建开始菜单入口，可选桌面快捷方式，并提供卸载入口。
+- `hmusic-<版本>-windows-x64.zip`：无需安装的便携包，适合临时使用或受限环境。
+
+产物还会带对应的 SHA-256 文件。macOS 包未经 Developer ID 签名与公证，Windows 安装包和便携包均未经
+Authenticode 签名；Release 必须提示系统安全警告和当前桌面功能边界。
 
 Windows/Linux 当前仍按路线图逐步补齐本机音频和系统集成，Release 说明不得承诺尚未实现的能力。

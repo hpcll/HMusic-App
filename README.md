@@ -31,8 +31,8 @@ curl -fsSL https://raw.githubusercontent.com/hpcll/HMusic-Server/main/bootstrap.
 | Android | APK | 可直接安装；AAB 用于 Google Play |
 | iOS | `ios-unsigned.ipa` | 需要用自己的 Apple ID 或证书重签后安装 |
 | macOS | `macos-universal-adhoc.zip` | 同时支持 Apple Silicon 和 Intel |
-| Windows | `windows-x64.zip` | 解压后运行便携版 |
-| Linux | `linux-x64.tar.gz` | x86_64 便携版 |
+| Windows | `windows-x64-setup.exe`（推荐）或 `windows-x64.zip` | 安装版带中文向导；ZIP 为便携版 |
+| Linux | `linux-x64.tar.gz` | x86_64 便携版，内含应用图标 |
 
 iOS 自签和桌面端的完整步骤见[安装与故障排查](docs/DEPLOYMENT.md)。每个 Release 同时提供 SHA-256 校验文件。
 

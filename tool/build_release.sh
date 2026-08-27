@@ -105,6 +105,13 @@ if [ "$TARGET" = "linux" ]; then
   mkdir -p "$STAGING_DIR/HMusic"
   cp -R "$BUNDLE_PATH/." "$STAGING_DIR/HMusic/"
 
+  # Flutter Linux 不会把桌面启动图标放进 bundle；复用已生成的 macOS 方形图标，
+  # 让便携包运行时也能显示品牌图标。
+  LINUX_ICON="$ROOT_DIR/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png"
+  [ -f "$LINUX_ICON" ] || { echo "Linux 包图标不存在: $LINUX_ICON" >&2; exit 1; }
+  cp "$LINUX_ICON" "$STAGING_DIR/HMusic/hmusic.png"
+  cp "$ROOT_DIR/linux/packaging/hmusic.desktop" "$STAGING_DIR/HMusic/hmusic.desktop"
+
   ARCHIVE="$DIST_DIR/hmusic-${VERSION}-linux-x64.tar.gz"
   rm -f "$ARCHIVE"
   tar -C "$STAGING_DIR" -czf "$ARCHIVE" HMusic

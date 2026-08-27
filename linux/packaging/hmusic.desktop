@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=HMusic
+Comment=HMusic music client
+Exec=hmusic
+Icon=hmusic
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=com.hupc.hmusic

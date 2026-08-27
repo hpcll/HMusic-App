@@ -45,8 +45,12 @@ xattr -dr com.apple.quarantine "/Applications/HMusic.app"
 
 ### Windows
 
-下载 `hmusic-<版本>-windows-x64.zip`，完整解压后运行 `HMusic/hmusic.exe`，不要只把 exe 单独复制出来。
-该包未做 Authenticode 签名，SmartScreen 可能需要用户确认“更多信息 > 仍要运行”。
+优先下载 `hmusic-<版本>-windows-x64-setup.exe`，运行后按中文安装向导完成安装。安装器默认只为当前用户
+安装到 `%LocalAppData%\Programs\HMusic`，会创建开始菜单入口，并可在向导中选择创建桌面快捷方式；以后可
+从 Windows“应用和功能”或安装目录中的卸载程序移除。
+
+安装包未做 Authenticode 签名，SmartScreen 可能需要用户确认“更多信息 > 仍要运行”。受限环境也可以下载
+`hmusic-<版本>-windows-x64.zip`，完整解压后运行 `HMusic/hmusic.exe`，不要只把 exe 单独复制出来。
 
 ### Linux
 
@@ -56,7 +60,9 @@ xattr -dr com.apple.quarantine "/Applications/HMusic.app"
 ./HMusic/hmusic
 ```
 
-系统需要 GTK 3 和 libsecret 运行库。当前 Linux 包面向 x86_64 桌面环境，未提供 ARM64 构建。
+包内包含 `HMusic/hmusic.png` 和 `HMusic/hmusic.desktop`，运行时窗口会使用 HMusic 图标；当前仍是便携包，
+不会自动注册系统菜单。系统需要 GTK 3 和 libsecret 运行库。当前 Linux 包面向 x86_64 桌面环境，未提供
+ARM64 构建。
 
 Windows/Linux 当前可用于连接 Server、管理内容和遥控服务端/音箱；本机音频、Windows SMTC 与 Linux
 MPRIS 尚未完成。macOS 已支持本机播放和系统媒体控制，但三端托盘、关窗驻留和自动更新仍在后续范围。

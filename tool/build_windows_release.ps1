@@ -44,6 +44,39 @@ try {
   $digest = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
   Set-Content -Path "$archive.sha256" -Value "$digest  $archiveName" -Encoding ascii
   Write-Host "Windows x64 便携包已写入 $archive"
+
+  $installerScript = Join-Path $rootDir "tool/windows-installer.iss"
+  $iconFile = Join-Path $rootDir "windows/runner/resources/app_icon.ico"
+  if (-not (Test-Path $installerScript)) {
+    throw "Windows 安装向导脚本不存在: $installerScript"
+  }
+  if (-not (Test-Path $iconFile)) {
+    throw "Windows 安装包图标不存在: $iconFile"
+  }
+
+  $iscc = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
+  if (-not $iscc) {
+    throw "未找到 Inno Setup 编译器 ISCC.exe。请先安装 Inno Setup 6，或在 GitHub Actions 中使用已配置的安装步骤。"
+  }
+
+  $installerArgs = @(
+    "/DAppVersion=$version",
+    "/DSourceDir=$bundlePath",
+    "/DOutputDir=$distDir",
+    "/DIconFile=$iconFile",
+    $installerScript
+  )
+  & $iscc.Source @installerArgs
+  if ($LASTEXITCODE -ne 0) { throw "Windows 安装包编译失败" }
+
+  $installer = Join-Path $distDir "hmusic-$version-windows-x64-setup.exe"
+  if (-not (Test-Path $installer)) {
+    throw "Inno Setup 未生成安装包: $installer"
+  }
+  $installerName = Split-Path $installer -Leaf
+  $installerDigest = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
+  Set-Content -Path "$installer.sha256" -Value "$installerDigest  $installerName" -Encoding ascii
+  Write-Host "Windows x64 安装包已写入 $installer"
 } finally {
   if (Test-Path $stagingDir) {
     Remove-Item $stagingDir -Recurse -Force

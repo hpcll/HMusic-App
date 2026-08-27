@@ -160,6 +160,10 @@ jobs:
           flutter-version: 3.35.4
           cache: true
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
       - name: Build Windows x64 app
         shell: pwsh
         run: ./tool/build_windows_release.ps1
@@ -171,6 +175,8 @@ jobs:
           path: |
             dist/*-windows-x64.zip
             dist/*-windows-x64.zip.sha256
+            dist/*-windows-x64-setup.exe
+            dist/*-windows-x64-setup.exe.sha256
           if-no-files-found: error
 
       - name: Append Windows package to GitHub Release
@@ -181,6 +187,8 @@ jobs:
           files: |
             dist/*-windows-x64.zip
             dist/*-windows-x64.zip.sha256
+            dist/*-windows-x64-setup.exe
+            dist/*-windows-x64-setup.exe.sha256
 
   linux:
     needs: android

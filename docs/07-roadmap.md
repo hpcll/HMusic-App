@@ -110,6 +110,7 @@
 
 - [x] CI：Android、iOS 未签名 IPA、macOS、Windows、Linux 发布矩阵已接入 release workflow
 - [x] Android APK/AAB、iOS unsigned IPA、macOS universal ad-hoc、Windows/Linux x64 便携包已有可复现脚本
+- [~] Windows x64 安装向导已接入 Inno Setup（下一次 Windows Release 需完成 CI 产物与安装/卸载验收）
 - [ ] 签名、公证、隐私说明、局域网权限说明
 - [ ] HTTPS 审核 Demo Server、审核账号、公版测试音频和 Review Notes
 - [ ] 隐私政策、支持 URL、App Privacy/Data Safety、SDK privacy manifest
