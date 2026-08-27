@@ -30,6 +30,36 @@ shasum -a 256 dist/hmusic-*-ios-unsigned.ipa
 
 脚本会验证主 App 没有签名或 `embedded.mobileprovision`，并将 App 放入标准 `Payload/HMusic.app` 目录。
 
+## 桌面端安装
+
+### macOS
+
+下载 `hmusic-<版本>-macos-universal-adhoc.zip`，解压后将 `HMusic.app` 移入“应用程序”。该包同时支持
+Apple Silicon 与 Intel，使用 ad-hoc 签名但没有 Developer ID 公证。首次打开优先在 Finder 中右键选择
+“打开”；若系统仍因下载隔离阻止启动，可执行：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/HMusic.app"
+```
+
+### Windows
+
+下载 `hmusic-<版本>-windows-x64.zip`，完整解压后运行 `HMusic/hmusic.exe`，不要只把 exe 单独复制出来。
+该包未做 Authenticode 签名，SmartScreen 可能需要用户确认“更多信息 > 仍要运行”。
+
+### Linux
+
+下载 `hmusic-<版本>-linux-x64.tar.gz`，解压后运行：
+
+```bash
+./HMusic/hmusic
+```
+
+系统需要 GTK 3 和 libsecret 运行库。当前 Linux 包面向 x86_64 桌面环境，未提供 ARM64 构建。
+
+Windows/Linux 当前可用于连接 Server、管理内容和遥控服务端/音箱；本机音频、Windows SMTC 与 Linux
+MPRIS 尚未完成。macOS 已支持本机播放和系统媒体控制，但三端托盘、关窗驻留和自动更新仍在后续范围。
+
 ## 常见问题
 
 ### 找不到 Server

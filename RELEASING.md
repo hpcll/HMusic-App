@@ -51,4 +51,20 @@ iOS/macOS 的 archive、签名、公证和 TestFlight/App Store 上传需要 App
 App Store Connect 权限，不能在没有密钥的公开 CI 中完成。发布时应使用专用 CI secrets，并在签名机器上
 验证后台音频、本地网络权限和系统媒体控制。
 
+桌面便携包：
+
+```bash
+bash tool/build_release.sh macos-adhoc
+bash tool/build_release.sh linux
+```
+
+Windows 在 PowerShell 中执行：
+
+```powershell
+./tool/build_windows_release.ps1
+```
+
+产物分别是 macOS universal ad-hoc ZIP、Windows x64 ZIP 和 Linux x64 tar.gz。macOS 包未经 Developer ID
+签名与公证，Windows 包未经 Authenticode 签名；Release 必须提示系统安全警告和当前桌面功能边界。
+
 Windows/Linux 当前仍按路线图逐步补齐本机音频和安装包，未发布的平台不要在 Release 说明中承诺完整能力。

@@ -18,7 +18,8 @@ flutter analyze
 flutter test
 ```
 
-提交前四条命令都应通过。需要构建 Android 发布包时执行 `bash tool/build_release.sh android`。
+提交前四条命令都应通过。发布包使用 `tool/build_release.sh` 的 `android`、`ios-unsigned`、
+`macos-adhoc`、`linux` 目标；Windows 使用 `tool/build_windows_release.ps1`。每个目标都必须在对应操作系统上构建。
 
 不要提交 `.dart_tool/`、`build/`、密钥、证书、`android/key.properties` 或 Flutter 生成的插件注册文件。
 问题报告请附目标平台、Flutter 版本、复现步骤和脱敏日志；不要上传 token、密码或完整签名 URL。

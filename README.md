@@ -32,9 +32,9 @@ Linux NAS 推荐 Docker host network；macOS 和 Windows Docker Desktop 推荐�
 | --- | --- | --- |
 | Android | 本机播放、后台播放、锁屏控制 | APK / Google Play AAB |
 | iOS | 本机播放、后台播放、锁屏控制 | 可自签 IPA / TestFlight / App Store |
-| macOS | 本机播放能力随音频后端提供 | unsigned App / 后续签名包 |
-| Windows | 主要用于服务端和音箱遥控 | 后续安装包 |
-| Linux | 主要用于服务端和音箱遥控 | 后续安装包 |
+| macOS | 本机播放、系统媒体控制；未做托盘/关窗驻留 | universal ad-hoc ZIP |
+| Windows | 服务端和音箱遥控；本机音频/SMTC 未完成 | x64 便携 ZIP |
+| Linux | 服务端和音箱遥控；本机音频/MPRIS 未完成 | x64 便携 tar.gz |
 
 桌面端完整本机音频、托盘和系统媒体集成仍在路线图中，请以每次 Release 的说明为准。
 
@@ -66,6 +66,22 @@ bash tool/build_release.sh ios-unsigned
 输出 `dist/hmusic-<版本>-ios-unsigned.ipa`。该包没有 Apple 描述文件，不能直接安装；使用自己的 Apple ID
 或开发者证书导入 AltStore、SideStore、Sideloadly 等工具重签后再安装。完整步骤见
 [安装与故障排查](docs/DEPLOYMENT.md)。
+
+macOS 与 Linux 发布包：
+
+```bash
+bash tool/build_release.sh macos-adhoc  # 仅 macOS
+bash tool/build_release.sh linux        # 仅 Linux x64
+```
+
+Windows x64 发布包在 PowerShell 中构建：
+
+```powershell
+./tool/build_windows_release.ps1
+```
+
+macOS 产物同时包含 Apple Silicon 与 Intel 架构，使用 ad-hoc 签名但未做 Developer ID 公证。Windows/Linux
+当前是完整 UI 和远端控制便携包，本机音频与系统媒体面板仍在 P4 范围内。
 
 ## 文档入口
 
