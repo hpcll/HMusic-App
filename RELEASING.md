@@ -67,4 +67,4 @@ Windows 在 PowerShell 中执行：
 产物分别是 macOS universal ad-hoc ZIP、Windows x64 ZIP 和 Linux x64 tar.gz。macOS 包未经 Developer ID
 签名与公证，Windows 包未经 Authenticode 签名；Release 必须提示系统安全警告和当前桌面功能边界。
 
-Windows/Linux 当前仍按路线图逐步补齐本机音频和安装包，未发布的平台不要在 Release 说明中承诺完整能力。
+Windows/Linux 当前仍按路线图逐步补齐本机音频和系统集成，Release 说明不得承诺尚未实现的能力。

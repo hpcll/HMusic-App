@@ -36,7 +36,8 @@ Linux NAS 推荐 Docker host network；macOS 和 Windows Docker Desktop 推荐�
 | Windows | 服务端和音箱遥控；本机音频/SMTC 未完成 | x64 便携 ZIP |
 | Linux | 服务端和音箱遥控；本机音频/MPRIS 未完成 | x64 便携 tar.gz |
 
-桌面端完整本机音频、托盘和系统媒体集成仍在路线图中，请以每次 Release 的说明为准。
+Windows/Linux 的本机音频、托盘和系统媒体集成仍在路线图中；macOS 已支持本机播放和系统媒体控制，请以每次
+Release 的说明为准。
 
 ## 开发
 
