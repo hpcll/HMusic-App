@@ -31,7 +31,7 @@ Linux NAS 推荐 Docker host network；macOS 和 Windows Docker Desktop 推荐�
 | 平台 | 当前状态 | 发布形式 |
 | --- | --- | --- |
 | Android | 本机播放、后台播放、锁屏控制 | APK / Google Play AAB |
-| iOS | 本机播放、后台播放、锁屏控制 | TestFlight / App Store |
+| iOS | 本机播放、后台播放、锁屏控制 | 可自签 IPA / TestFlight / App Store |
 | macOS | 本机播放能力随音频后端提供 | unsigned App / 后续签名包 |
 | Windows | 主要用于服务端和音箱遥控 | 后续安装包 |
 | Linux | 主要用于服务端和音箱遥控 | 后续安装包 |
@@ -56,6 +56,16 @@ bash tool/build_release.sh android
 
 输出位于 `dist/`，同时生成 APK、AAB 和 SHA-256 校验文件。正式商店发布仍需要维护者配置签名密钥，
 详见 [贡献指南](CONTRIBUTING.md) 和 [发布说明](RELEASING.md)。
+
+iOS 自签 IPA（需要 macOS 和 Xcode，只构建不签名）：
+
+```bash
+bash tool/build_release.sh ios-unsigned
+```
+
+输出 `dist/hmusic-<版本>-ios-unsigned.ipa`。该包没有 Apple 描述文件，不能直接安装；使用自己的 Apple ID
+或开发者证书导入 AltStore、SideStore、Sideloadly 等工具重签后再安装。完整步骤见
+[安装与故障排查](docs/DEPLOYMENT.md)。
 
 ## 文档入口
 

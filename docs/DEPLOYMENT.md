@@ -9,6 +9,27 @@
 
 Server 默认端口为 `6650`。例如 Server 地址是 `http://192.168.1.20:6650`，App 中也填写这个地址。
 
+## iOS 自签安装
+
+Release 中的 `hmusic-<版本>-ios-unsigned.ipa` 是面向自签的未签名包，不能在 iPhone 上直接点开安装。请准备
+自己的 Apple ID 或 Apple Developer 证书，并使用 AltStore、SideStore、Sideloadly 等重签工具：
+
+1. 将 IPA 导入工具，选择自己的 Apple ID/签名证书和目标 iPhone。
+2. 让工具完成重签并安装；首次安装若出现信任提示，在“设置 > 通用 > VPN 与设备管理”中信任对应开发者。
+3. 打开 HMusic，填入自己的 HMusic-Server 地址并登录。
+
+自签应用受 Apple 证书有效期和设备数量限制，过期后需要用同一工具重新签名；这不是 HMusic 的应用内更新机制。
+IPA 的 Bundle ID 为 `com.hupc.hmusic`，重签工具通常会自动处理嵌套 Flutter framework 的签名。
+
+维护者在 macOS 上生成同类包：
+
+```bash
+bash tool/build_release.sh ios-unsigned
+shasum -a 256 dist/hmusic-*-ios-unsigned.ipa
+```
+
+脚本会验证主 App 没有签名或 `embedded.mobileprovision`，并将 App 放入标准 `Payload/HMusic.app` 目录。
+
 ## 常见问题
 
 ### 找不到 Server

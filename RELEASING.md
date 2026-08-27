@@ -37,6 +37,16 @@ bash tool/build_release.sh android
 
 ## Apple 与桌面平台
 
+iOS 自签分发可以生成不含 Apple 签名的 IPA，供用户使用自己的 Apple ID/证书重签：
+
+```bash
+bash tool/build_release.sh ios-unsigned
+```
+
+产物为 `dist/hmusic-<版本>-ios-unsigned.ipa` 和对应的 SHA-256 文件。该包只能先导入自签工具重签，不能
+直接安装，也不能替代 TestFlight/App Store 的正式签名包。发布说明必须明确这一点，并注明用户需要自行承担
+证书有效期、设备注册和重新签名成本。
+
 iOS/macOS 的 archive、签名、公证和 TestFlight/App Store 上传需要 Apple Developer 证书、profiles 和
 App Store Connect 权限，不能在没有密钥的公开 CI 中完成。发布时应使用专用 CI secrets，并在签名机器上
 验证后台音频、本地网络权限和系统媒体控制。
