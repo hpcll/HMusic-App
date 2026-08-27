@@ -64,6 +64,9 @@ Windows 在 PowerShell 中执行（需要安装 Inno Setup 6，并确保 `ISCC.e
 ./tool/build_windows_release.ps1
 ```
 
+脚本会从 Inno Setup 官方仓库的固定提交获取简体中文语言文件，并在编译前校验 SHA-256；构建机需要能访问
+`raw.githubusercontent.com`。
+
 Windows 构建会同时生成便携 ZIP 和真正的安装向导 EXE：
 
 - `hmusic-<版本>-windows-x64-setup.exe`：中文安装向导，默认按当前用户安装到

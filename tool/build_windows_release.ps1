@@ -59,11 +59,27 @@ try {
     throw "未找到 Inno Setup 编译器 ISCC.exe。请先安装 Inno Setup 6，或在 GitHub Actions 中使用已配置的安装步骤。"
   }
 
+  $languageFile = Join-Path $stagingDir "ChineseSimplified.isl"
+  $languageUrl = "https://raw.githubusercontent.com/jrsoftware/issrc/1ae7bf81dc0d2013235dfe4bb0b6f4e4a0b6b25c/Files/Languages/ChineseSimplified.isl"
+  $expectedLanguageDigest = "e0b0b350e2245f3c5e65586dfe43d574f6e7f06f2261149aba284954b3fc9a8d"
+  $previousProgressPreference = $ProgressPreference
+  try {
+    $ProgressPreference = "SilentlyContinue"
+    Invoke-WebRequest -Uri $languageUrl -OutFile $languageFile
+  } finally {
+    $ProgressPreference = $previousProgressPreference
+  }
+  $languageDigest = (Get-FileHash -Algorithm SHA256 $languageFile).Hash.ToLowerInvariant()
+  if ($languageDigest -ne $expectedLanguageDigest) {
+    throw "Inno Setup 简体中文语言文件校验失败"
+  }
+
   $installerArgs = @(
     "/DAppVersion=$version",
     "/DSourceDir=$bundlePath",
     "/DOutputDir=$distDir",
     "/DIconFile=$iconFile",
+    "/DLanguageFile=$languageFile",
     $installerScript
   )
   & $iscc.Source @installerArgs

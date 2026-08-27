@@ -14,6 +14,10 @@
 #define IconFile "..\windows\runner\resources\app_icon.ico"
 #endif
 
+#ifndef LanguageFile
+#define LanguageFile "ChineseSimplified.isl"
+#endif
+
 #define AppName "HMusic"
 #define AppPublisher "HMusic"
 #define AppExeName "hmusic.exe"
@@ -46,7 +50,7 @@ VersionInfoVersion={#AppVersion}
 VersionInfoDescription=HMusic 安装程序
 
 [Languages]
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "{#LanguageFile}"
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加快捷方式:"; Flags: unchecked
