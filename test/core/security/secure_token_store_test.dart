@@ -67,4 +67,57 @@ void main() {
     expect(await store.read(), isNull);
     verify(() => storage.delete(key: any(named: 'key'))).called(1);
   });
+
+  // 平台通道整条失效的机型（与 preferences 的 channel-error 同源）：写不进钥匙串
+  // 不能把异常抛给调用方，否则登录页的提交态永久停在「处理中…」。
+  test('write 撞上平台故障不冒泡，本次会话仍能用内存里的 token', () async {
+    when(
+      () => storage.write(
+        key: any(named: 'key'),
+        value: any(named: 'value'),
+      ),
+    ).thenThrow(
+      PlatformException(code: 'channel-error', message: 'no handler'),
+    );
+
+    await store.write('tok-4');
+
+    expect(await store.read(), 'tok-4');
+  });
+
+  test('read 撞上平台故障按未登录处理', () async {
+    when(
+      () => storage.read(key: any(named: 'key')),
+    ).thenThrow(MissingPluginException('no impl'));
+
+    expect(await store.read(), isNull);
+  });
+
+  test('clear 撞上平台故障不冒泡，内存仍被清掉', () async {
+    when(
+      () => storage.write(
+        key: any(named: 'key'),
+        value: any(named: 'value'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => storage.delete(key: any(named: 'key')),
+    ).thenThrow(PlatformException(code: 'channel-error'));
+
+    await store.write('tok-5');
+    await store.clear();
+
+    expect(await store.read(), isNull);
+  });
+
+  test('非平台故障照原样抛出，不吞业务错误', () async {
+    when(
+      () => storage.write(
+        key: any(named: 'key'),
+        value: any(named: 'value'),
+      ),
+    ).thenThrow(FormatException('坏值'));
+
+    await expectLater(store.write('tok-6'), throwsFormatException);
+  });
 }

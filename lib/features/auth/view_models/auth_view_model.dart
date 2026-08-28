@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
@@ -32,6 +33,13 @@ class AuthViewModel extends Notifier<AuthViewState> {
       state = state.copyWith(
         status: AuthSubmissionStatus.idle,
         errorMessage: failure.message,
+      );
+    } catch (error) {
+      // 同 submit：状态探测卡住会让整页停在加载态，宁可报错也不能不动。
+      debugPrint('[AuthViewModel] 读取登录状态出现意外失败：$error');
+      state = state.copyWith(
+        status: AuthSubmissionStatus.idle,
+        errorMessage: '无法获取登录状态：$error',
       );
     }
   }
@@ -72,6 +80,16 @@ class AuthViewModel extends Notifier<AuthViewState> {
       state = state.copyWith(
         status: AuthSubmissionStatus.idle,
         errorMessage: failure.message,
+      );
+      return false;
+    } catch (error) {
+      // 兜底：非 ApiFailure 的意外（平台存储通道失效、响应结构不符…）也必须把
+      // 提交态放下来。否则按钮永久停在「处理中…」，用户既看不到原因也无法重试——
+      // 曾有机型的钥匙串写入异常从这里逃出去，正是这个症状。
+      debugPrint('[AuthViewModel] 登录出现意外失败：$error');
+      state = state.copyWith(
+        status: AuthSubmissionStatus.idle,
+        errorMessage: '登录失败：$error',
       );
       return false;
     }

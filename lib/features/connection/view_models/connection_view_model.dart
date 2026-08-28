@@ -73,6 +73,13 @@ class ConnectionViewModel extends Notifier<ConnectionViewState> {
         status: ConnectionStatus.idle,
         errorMessage: error.toString(),
       );
+    } catch (error) {
+      // Error（类型错误、断言…）不是 Exception，不兜住就会把状态永久留在
+      // connecting，表现为按钮一直转、点不动也不报错。宁可报得难看也不能卡死。
+      state = state.copyWith(
+        status: ConnectionStatus.idle,
+        errorMessage: '连接失败：$error',
+      );
     }
     return false;
   }
