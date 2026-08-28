@@ -1,14 +1,14 @@
-import 'package:shared_preferences/shared_preferences.dart';
-
+import '../storage/key_value_store.dart';
+import '../storage/preferences_key_value_store.dart';
 import 'local_volume_store.dart';
 
 class SharedPreferencesLocalVolumeStore implements LocalVolumeStore {
-  SharedPreferencesLocalVolumeStore({SharedPreferencesAsync? preferences})
-    : _preferences = preferences ?? SharedPreferencesAsync();
+  SharedPreferencesLocalVolumeStore({KeyValueStore? preferences})
+    : _preferences = preferences ?? createPreferencesKeyValueStore();
 
   static const String _key = 'hmusic.localVolume';
 
-  final SharedPreferencesAsync _preferences;
+  final KeyValueStore _preferences;
 
   @override
   Future<double> read() async {

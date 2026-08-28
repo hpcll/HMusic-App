@@ -1,16 +1,20 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/settings/models/app_update.dart';
+import '../providers/infrastructure_providers.dart';
+import '../storage/key_value_store.dart';
+import '../storage/preferences_key_value_store.dart';
 
 // 远程配置的本地粘性缓存：强制升级指令一旦到达过一次就落盘，之后断网/
 // 屏蔽 GitHub 也照样执行——「拉不到就放行」只对从未收到过配置的全新安装
 // 成立。解除强制同样靠下发更低的 minVersion 覆盖缓存。
 final Provider<UpgradeConfigStore> upgradeConfigStoreProvider =
     Provider<UpgradeConfigStore>(
-      (ref) => SharedPreferencesUpgradeConfigStore(),
+      (ref) => SharedPreferencesUpgradeConfigStore(
+        preferences: ref.watch(keyValueStoreProvider),
+      ),
     );
 
 abstract class UpgradeConfigStore {
@@ -20,12 +24,12 @@ abstract class UpgradeConfigStore {
 }
 
 class SharedPreferencesUpgradeConfigStore implements UpgradeConfigStore {
-  SharedPreferencesUpgradeConfigStore({SharedPreferencesAsync? preferences})
-    : _preferences = preferences ?? SharedPreferencesAsync();
+  SharedPreferencesUpgradeConfigStore({KeyValueStore? preferences})
+    : _preferences = preferences ?? createPreferencesKeyValueStore();
 
   static const _key = 'hmusic.upgrade.remoteConfig';
 
-  final SharedPreferencesAsync _preferences;
+  final KeyValueStore _preferences;
 
   @override
   Future<AppRemoteConfig?> read() async {

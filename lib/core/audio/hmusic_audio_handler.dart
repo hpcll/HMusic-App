@@ -18,7 +18,11 @@ import 'shared_preferences_local_volume_store.dart';
 import 'stream_url_rebaser.dart';
 
 final Provider<LocalVolumeStore> localVolumeStoreProvider =
-    Provider<LocalVolumeStore>((ref) => SharedPreferencesLocalVolumeStore());
+    Provider<LocalVolumeStore>(
+      (ref) => SharedPreferencesLocalVolumeStore(
+        preferences: ref.watch(keyValueStoreProvider),
+      ),
+    );
 
 // 音源装载最终失败（重解析自救也没救回来）：携带用户可读文案冒泡，前台点播
 // VM 的兜底 catch 直接把它拼进错误提示，不再露 just_audio 的原始错误码。

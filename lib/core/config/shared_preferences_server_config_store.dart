@@ -1,14 +1,14 @@
-import 'package:shared_preferences/shared_preferences.dart';
-
+import '../storage/key_value_store.dart';
+import '../storage/preferences_key_value_store.dart';
 import 'server_config_store.dart';
 
 class SharedPreferencesServerConfigStore implements ServerConfigStore {
-  SharedPreferencesServerConfigStore({SharedPreferencesAsync? preferences})
-    : _preferences = preferences ?? SharedPreferencesAsync();
+  SharedPreferencesServerConfigStore({KeyValueStore? preferences})
+    : _preferences = preferences ?? createPreferencesKeyValueStore();
 
   static const _serverBaseKey = 'hmusic.serverBase';
 
-  final SharedPreferencesAsync _preferences;
+  final KeyValueStore _preferences;
 
   @override
   Future<void> clear() => _preferences.remove(_serverBaseKey);

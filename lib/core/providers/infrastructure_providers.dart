@@ -7,6 +7,8 @@ import '../network/api_client.dart';
 import '../security/secure_token_store.dart';
 import '../security/token_store.dart';
 import '../session/session_providers.dart';
+import '../storage/key_value_store.dart';
+import '../storage/preferences_key_value_store.dart';
 
 final Provider<Dio> dioProvider = Provider<Dio>((ref) {
   return Dio(
@@ -19,9 +21,19 @@ final Provider<Dio> dioProvider = Provider<Dio>((ref) {
   );
 });
 
+// 全 App 共用一个键值存储：降级状态（DataStore → legacy → 内存）也因此只需
+// 发现一次，服务器地址、升级缓存、本机音量三处不必各踩一遍坏通道。
+final Provider<KeyValueStore> keyValueStoreProvider = Provider<KeyValueStore>((
+  ref,
+) {
+  return createPreferencesKeyValueStore();
+});
+
 final Provider<ServerConfigStore> serverConfigStoreProvider =
     Provider<ServerConfigStore>((ref) {
-      return SharedPreferencesServerConfigStore();
+      return SharedPreferencesServerConfigStore(
+        preferences: ref.watch(keyValueStoreProvider),
+      );
     });
 
 final Provider<TokenStore> tokenStoreProvider = Provider<TokenStore>((ref) {
