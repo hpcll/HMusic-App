@@ -34,7 +34,16 @@ curl -fsSL https://raw.githubusercontent.com/hpcll/HMusic-Server/main/bootstrap.
 | Windows | `windows-x64-setup.exe`（推荐）或 `windows-x64.zip` | 安装版带中文向导；ZIP 为便携版 |
 | Linux | `linux-x64.tar.gz` | x86_64 便携版，内含应用图标 |
 
-iOS 自签和桌面端的完整步骤见[安装与故障排查](docs/DEPLOYMENT.md)。每个 Release 同时提供 SHA-256 校验文件。
+桌面端的包没有 Apple / 微软的付费签名，**首次打开一定会被系统拦一次，这是正常的**：
+
+- macOS 提示“已损坏，应移到废纸篓”或“无法验证开发者”时，文件并没有坏。先双击一次，再到
+  **系统设置 → 隐私与安全性** 点 **“仍要打开”**；或执行
+  `xattr -dr com.apple.quarantine "/Applications/HMusic.app"`。macOS 15 起“右键打开”不再有效。
+- Windows 弹“Windows 已保护你的电脑”时，点 **“更多信息 → 仍要运行”**；Edge 若在下载时就提示
+  “已阻止不安全下载”，在下载列表里选择保留。
+
+放行步骤、误报处理和 iOS 自签的完整说明见[安装与故障排查](docs/DEPLOYMENT.md)。每个 Release 同时提供
+SHA-256 校验文件，介意来源的话先核对再安装。
 
 ### 3. 连接并登录
 

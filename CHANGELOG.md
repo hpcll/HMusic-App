@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- README 与安装文档补齐 macOS/Windows 未签名包的放行步骤：说明“已损坏，应移到废纸篓”只是 Gatekeeper
+  的措辞，并纠正 macOS 15 起“右键打开”已失效、须走系统设置的变化。
+
 ## 0.1.2 - 2026-08-28
 
 - 修复部分 Android 机型「能发现服务端但连接报错」：本地键值存储在 `SharedPreferencesAsync`

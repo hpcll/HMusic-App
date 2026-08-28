@@ -36,12 +36,25 @@ shasum -a 256 dist/hmusic-*-ios-unsigned.ipa
 ### macOS
 
 下载 `hmusic-<版本>-macos-universal-adhoc.zip`，解压后将 `HMusic.app` 移入“应用程序”。该包同时支持
-Apple Silicon 与 Intel，使用 ad-hoc 签名但没有 Developer ID 公证。首次打开优先在 Finder 中右键选择
-“打开”；若系统仍因下载隔离阻止启动，可执行：
+Apple Silicon 与 Intel，使用 ad-hoc 签名但没有 Developer ID 公证，所以首次打开一定会被系统拦下，
+提示“无法验证开发者”，或者——**从浏览器下载时更常见的——“已损坏，应移到废纸篓”**。这句话是
+Gatekeeper 对“未公证 + 带下载隔离标记”的措辞，文件本身没有损坏，可以对照 Release 里的 SHA-256 自行确认。
 
-```bash
-xattr -dr com.apple.quarantine "/Applications/HMusic.app"
-```
+放行方式（任选其一）：
+
+1. 打开一次被拦下的 `HMusic.app`，然后到 **系统设置 → 隐私与安全性**，在底部的提示里点 **“仍要打开”**，
+   再确认一次即可。之后每次启动都不会再拦。
+2. 命令行直接去掉下载隔离标记：
+
+   ```bash
+   xattr -dr com.apple.quarantine "/Applications/HMusic.app"
+   ```
+
+macOS 15（Sequoia）起，旧办法“在 Finder 里右键选择打开”已经不能再绕过 Gatekeeper，必须走上面的
+系统设置或命令行方式。
+
+另外，ad-hoc 签名没有稳定的签名身份，而 macOS 钥匙串条目的访问权限是绑签名身份的：升级到新版本后
+可能需要重新登录一次 Server。这不是故障，等有 Developer ID 正式签名后会消失。
 
 ### Windows
 
@@ -49,8 +62,14 @@ xattr -dr com.apple.quarantine "/Applications/HMusic.app"
 安装到 `%LocalAppData%\Programs\HMusic`，会创建开始菜单入口，并可在向导中选择创建桌面快捷方式；以后可
 从 Windows“应用和功能”或安装目录中的卸载程序移除。
 
-安装包未做 Authenticode 签名，SmartScreen 可能需要用户确认“更多信息 > 仍要运行”。受限环境也可以下载
-`hmusic-<版本>-windows-x64.zip`，完整解压后运行 `HMusic/hmusic.exe`，不要只把 exe 单独复制出来。
+安装包未做 Authenticode 签名，因此会遇到两道拦截：浏览器（尤其 Edge）下载时可能提示“已阻止不安全下载”，
+需要在下载列表里选择保留；运行时 SmartScreen 会弹出“Windows 已保护你的电脑”，点 **“更多信息 → 仍要运行”**
+即可。SmartScreen 依据文件声誉判断，未签名的包每发一个新版本都要重新积累声誉，所以这个提示短期内不会消失。
+少数国产安全软件也可能对未签名的安装器误报，必要时把安装目录加入信任。建议安装前用 Release 附带的
+SHA-256 校验文件核对下载完整性。
+
+受限环境也可以下载 `hmusic-<版本>-windows-x64.zip`，完整解压后运行 `HMusic/hmusic.exe`，不要只把 exe
+单独复制出来。
 
 ### Linux
 
