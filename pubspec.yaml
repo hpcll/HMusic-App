@@ -1,7 +1,7 @@
 name: hmusic
 description: "HMusic client for self-hosted personal music libraries."
 publish_to: 'none'
-version: 0.1.1
+version: 0.1.2+2
 
 environment:
   sdk: ^3.9.2

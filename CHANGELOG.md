@@ -2,10 +2,14 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-08-28
+
 - 修复部分 Android 机型「能发现服务端但连接报错」：本地键值存储在 `SharedPreferencesAsync`
   的 DataStore 通道失效（`PlatformException: channel-error`）时自动降级到 legacy
   SharedPreferences，两级都不可用则退到进程内内存。保存服务器地址、升级缓存和本机音量
   不再因为本地存储故障中断连接流程。
+- Android 构建号（versionCode）开始随发版递增：`pubspec.yaml` 的版本改为 `0.1.2+2`，
+  此前所有包的 versionCode 都固定是 1。
 
 ## 0.1.1 - 2026-08-28
 
