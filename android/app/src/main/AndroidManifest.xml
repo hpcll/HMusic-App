@@ -39,6 +39,21 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Android 端退回 Skia：Impeller(Vulkan) 在部分 Adreno 驱动上进入/离开
+             榜单详情时会整屏花屏一下——画面在状态栏以下被横向重复约 4 次，是
+             帧缓冲级的 stride/scale 错误，约 100ms 后自愈。已实测定位：同一份
+             代码只关掉 shader 渐进模糊仍然花，关掉 Impeller 就干净（iQOO Z10
+             Turbo Pro / 骁龙 8s Gen 4 / Android 16 / OriginOS 6，来回切 10 次
+             零复现），所以问题在后端本身，不在我们的 shader。
+             代价：ImageFilter.isShaderFilterSupported 只在 Impeller 下为真，
+             Android 的 TopEdgeScrim 因此固定走纯纱帘回退——同样零缝，只是没有
+             磨砂。可读性与稳定优先于这层材质。
+             这是权宜之计：根因大概率在引擎/驱动侧，升级 Flutter 引擎后应重新
+             实测这台设备，能不花就把这行删掉换回 Impeller。 -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
+
         <!-- audio_service：媒体前台服务与耳机/蓝牙媒体按钮接收器 -->
         <service
             android:name="com.ryanheise.audioservice.AudioService"
