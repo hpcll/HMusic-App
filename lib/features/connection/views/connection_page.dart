@@ -38,10 +38,15 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
   void initState() {
     super.initState();
     unawaited(
-      Future<void>.microtask(() {
+      Future<void>.microtask(() async {
         final notifier = ref.read(connectionViewModelProvider.notifier);
-        unawaited(notifier.loadSavedAddress());
-        // 开屏即自动扫描本网段：换网后不知道新地址时，点选结果即可连上。
+        // 先尝试接续上次的服务器：成功就直接进登录页（token 有效会再自动放行到
+        // 首页），用户开 App 不需要每次重新点服务器、更不该重新登录。
+        if (await notifier.resumeSaved()) {
+          if (mounted) context.go(AuthPage.path);
+          return;
+        }
+        // 没存过地址或连不上（换网、服务端没开）：开屏自动扫描本网段，点选即连。
         unawaited(notifier.discover());
       }),
     );
@@ -99,54 +104,85 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
                     ),
                   ),
                   const SizedBox(height: 52),
-                  DiscoveredServerList(
-                    discovering: scanning,
-                    servers: state.discovered,
-                    enabled: !state.isConnecting,
-                    connectingBase: state.isConnecting ? _connectingBase : null,
-                    onConnect: _connectDiscovered,
-                    onRescan: () => ref
-                        .read(connectionViewModelProvider.notifier)
-                        .discover(),
-                  ),
-                  if (state.errorMessage != null) ...<Widget>[
-                    const SizedBox(height: 14),
-                    Text(
-                      state.errorMessage!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 28),
-                  // 手动区显隐走 220ms easeOut 尺寸过渡（docs/05 chrome 同词汇）。
-                  AnimatedSize(
-                    duration: MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : const Duration(milliseconds: 220),
-                    curve: Curves.easeOut,
-                    alignment: Alignment.topCenter,
-                    child: showForm
-                        ? ServerAddressForm(
-                            controller: _addressController,
-                            isConnecting: state.isConnecting,
-                            onSubmit: _connect,
-                          )
-                        : Center(
-                            child: TextButton(
-                              onPressed: state.isConnecting
-                                  ? null
-                                  : () =>
-                                        setState(() => _manualExpanded = true),
-                              style: TextButton.styleFrom(
-                                foregroundColor: palette.muted,
-                                textStyle: const TextStyle(fontSize: 12.5),
-                              ),
-                              child: const Text('手动输入地址'),
+                  if (state.restoring)
+                    // 接续上次服务器的过场：只留一句话 + 菊花。这里若照常渲染
+                    // 发现卡片/手动表单，开屏就会闪一下「附近的服务器」再跳走。
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: palette.mutedStrong,
                             ),
                           ),
-                  ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '正在连接上次的服务器…',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: palette.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...<Widget>[
+                    DiscoveredServerList(
+                      discovering: scanning,
+                      servers: state.discovered,
+                      enabled: !state.isConnecting,
+                      connectingBase: state.isConnecting
+                          ? _connectingBase
+                          : null,
+                      onConnect: _connectDiscovered,
+                      onRescan: () => ref
+                          .read(connectionViewModelProvider.notifier)
+                          .discover(),
+                    ),
+                    if (state.errorMessage != null) ...<Widget>[
+                      const SizedBox(height: 14),
+                      Text(
+                        state.errorMessage!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 28),
+                    // 手动区显隐走 220ms easeOut 尺寸过渡（docs/05 chrome 同词汇）。
+                    AnimatedSize(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                      alignment: Alignment.topCenter,
+                      child: showForm
+                          ? ServerAddressForm(
+                              controller: _addressController,
+                              isConnecting: state.isConnecting,
+                              onSubmit: _connect,
+                            )
+                          : Center(
+                              child: TextButton(
+                                onPressed: state.isConnecting
+                                    ? null
+                                    : () => setState(
+                                        () => _manualExpanded = true,
+                                      ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: palette.muted,
+                                  textStyle: const TextStyle(fontSize: 12.5),
+                                ),
+                                child: const Text('手动输入地址'),
+                              ),
+                            ),
+                    ),
+                  ],
                 ],
               ),
             ),

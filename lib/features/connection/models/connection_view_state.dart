@@ -12,6 +12,7 @@ class ConnectionViewState {
     this.discovering = false,
     this.discoverCompleted = false,
     this.discovered = const <DiscoveredServer>[],
+    this.restoring = false,
   });
 
   final ConnectionStatus status;
@@ -28,6 +29,10 @@ class ConnectionViewState {
   final bool discoverCompleted;
   final List<DiscoveredServer> discovered;
 
+  // 冷启动接续上次服务器中：这一小段既不该闪发现卡片也不该闪手动表单，
+  // 更不能让扫描结果先落地——否则每次开 App 都像是「重新连一次」。
+  final bool restoring;
+
   bool get isConnecting => status == ConnectionStatus.connecting;
 
   ConnectionViewState copyWith({
@@ -40,6 +45,7 @@ class ConnectionViewState {
     bool? discovering,
     bool? discoverCompleted,
     List<DiscoveredServer>? discovered,
+    bool? restoring,
   }) {
     return ConnectionViewState(
       status: status ?? this.status,
@@ -50,6 +56,7 @@ class ConnectionViewState {
       discovering: discovering ?? this.discovering,
       discoverCompleted: discoverCompleted ?? this.discoverCompleted,
       discovered: discovered ?? this.discovered,
+      restoring: restoring ?? this.restoring,
     );
   }
 }

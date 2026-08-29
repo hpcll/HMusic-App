@@ -23,6 +23,23 @@ class ConnectionViewModel extends Notifier<ConnectionViewState> {
     if (address != null) state = state.copyWith(suggestedAddress: address);
   }
 
+  // 冷启动接续：存过地址就先原样连回去，成功即直奔登录页（token 还在就自动放行）。
+  // 用户抱怨的「每次打开都要重新登录」有一半是这里缺失造成的——每次开屏都得从
+  // 发现列表点一台，而点到的地址形态（mDNS 给 host.local、扫段给 IP）和上次存的
+  // 不一致时 connect() 会当成换服务器清掉 token，于是又要输一遍账号密码。
+  // 失败不报错：静默回落到自动发现（换网/服务端没开机就是这条路）。
+  Future<bool> resumeSaved() async {
+    await loadSavedAddress();
+    final saved = state.suggestedAddress;
+    if (saved.isEmpty) return false;
+    state = state.copyWith(restoring: true, clearError: true);
+    try {
+      return await connect(saved);
+    } finally {
+      state = state.copyWith(restoring: false, clearError: true);
+    }
+  }
+
   // 局域网自动发现：连接页开屏即调，结果逐台追加。扫描失败静默收尾——
   // errorMessage 留给「连接」动作本身，扫不到只是回到手输路径。
   Future<void> discover() async {
