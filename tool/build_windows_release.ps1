@@ -14,12 +14,9 @@ flutter clean
 flutter pub get
 if ($LASTEXITCODE -ne 0) { throw "flutter pub get 失败" }
 
-$generatedRegistrant = "android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java"
-if (Test-Path $generatedRegistrant) {
-  Remove-Item $generatedRegistrant -Force
-}
-
-flutter build windows --release --no-pub
+# 不能带 --no-pub：插件注册文件只在 pub 步骤重新生成（release 模式下顺带剔除
+# integration_test 这类 dev 依赖插件），跳过 pub 就会拿旧的甚至没有注册表。
+flutter build windows --release
 if ($LASTEXITCODE -ne 0) { throw "Windows Release 构建失败" }
 
 $bundlePath = Join-Path $rootDir "build/windows/x64/runner/Release"
