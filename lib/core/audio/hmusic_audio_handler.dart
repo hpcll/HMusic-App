@@ -188,7 +188,7 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
       await _recoverOrFail(track, state);
       return;
     }
-    await _player.play();
+    _startPlayback();
     _startReporting();
     _publishPlaybackState();
   }
@@ -367,7 +367,7 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
       _publishPlaybackState();
       return;
     }
-    if (autoplay && _loadedUri != null) await _player.play();
+    if (autoplay && _loadedUri != null) _startPlayback();
     _startReporting();
     _publishPlaybackState();
   }
@@ -456,6 +456,21 @@ class HMusicAudioHandler extends BaseAudioHandler with SeekHandler {
       initialPosition: Duration(milliseconds: positionMs),
     );
     _loadedUri = uri;
+  }
+
+  // 本机开播的唯一出口，绝不能 await：just_audio 的 play() 要等到「播完 /
+  // 被暂停 / 被停」才 complete（已在播时才立即返回）。await 它会把整条播放
+  // 命令挂到歌曲结束——前台点播 VM 的互斥锁一直不放（列表所有播放键变灰，
+  // 症状就是「只有暂停上一首才能播下一首」）、成功 toast 延到暂停那一刻才
+  // 弹（「暂停了却提示正在播放」），_handleEnded 的重入守卫也会整首歌不复位
+  // 而掐断自动连播。只发出开播指令，装载错误由 setAudioSource 那边负责，
+  // 播放期异常经全局通知流报出。
+  void _startPlayback() {
+    unawaited(
+      _player.play().catchError((Object error) {
+        reportNotice('播放失败：$error');
+      }),
+    );
   }
 
   void _startReporting() {
