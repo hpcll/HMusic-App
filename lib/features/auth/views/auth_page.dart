@@ -25,9 +25,19 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  // 读登录状态慢了才转菊花。冷启动接续成功后会路过这一页，token 有效时它只停留
+  // 一两百毫秒就跳首页——那一闪的菊花正好夹在连接页和首页之间，开 App 的观感
+  // 就是「闪了两下才进去」。门槛内不出声，品牌块在整段开场里看着是定住的。
+  static const Duration _spinnerDelay = Duration(milliseconds: 700);
+  Timer? _spinnerTimer;
+  bool _showSpinner = false;
+
   @override
   void initState() {
     super.initState();
+    _spinnerTimer = Timer(_spinnerDelay, () {
+      if (mounted) setState(() => _showSpinner = true);
+    });
     unawaited(
       Future<void>.microtask(
         () => ref.read(authViewModelProvider.notifier).loadStatus(),
@@ -37,6 +47,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   @override
   void dispose() {
+    _spinnerTimer?.cancel();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -83,9 +94,18 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 380),
                   child: isLoadingStatus
-                      ? const Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: Center(child: CircularProgressIndicator()),
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Center(
+                            child: AnimatedOpacity(
+                              opacity: _showSpinner ? 1 : 0,
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 260),
+                              curve: Curves.easeOut,
+                              child: const CircularProgressIndicator(),
+                            ),
+                          ),
                         )
                       : AuthForm(
                           usernameController: _usernameController,

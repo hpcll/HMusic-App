@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 暗色对应 HMusicPalette.dark 的 background。系统暗色主题
+         （Theme.Black.NoTitleBar）的 colorBackground 是纯黑 #000000，
+         和 App 的 #131315 差得看得出来。 -->
+    <color name="hmusic_launch_background">#131315</color>
+</resources>

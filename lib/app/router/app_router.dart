@@ -69,13 +69,16 @@ GoRouter buildAppRouter(Ref ref) {
         // 只有冷启动落在这条路由上才接续上次的服务器；「更换服务器」入口走
         // ConnectionPage.switchPath（?switch=1），接续必须关掉，否则原样连回
         // 上一台再跳走，用户永远换不成。
-        builder: (context, state) => ConnectionPage(
-          autoResume: state.uri.queryParameters['switch'] != '1',
+        pageBuilder: (context, state) => _fadePage(
+          state,
+          ConnectionPage(
+            autoResume: state.uri.queryParameters['switch'] != '1',
+          ),
         ),
       ),
       GoRoute(
         path: AuthPage.path,
-        builder: (context, state) => const AuthPage(),
+        pageBuilder: (context, state) => _fadePage(state, const AuthPage()),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -156,6 +159,23 @@ GoRouter buildAppRouter(Ref ref) {
         builder: (context, state) => const LyricsPage(),
       ),
     ],
+  );
+}
+
+// 开场三连跳（连接页 →登录页 →token 有效则首页）用淡入淡出，不用平台默认的
+// 滑入：两页的品牌块位置、尺寸完全一致，淡入淡出下字标看着是定在原地的，整段
+// 读作一次开场；滑入则把它演成三次翻页，正是「开 App 先闪一下找服务器」的观感
+// 来源之一。减动效环境直接给结果，不做过渡。
+CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+        MediaQuery.disableAnimationsOf(context)
+        ? child
+        : FadeTransition(opacity: animation, child: child),
   );
 }
 

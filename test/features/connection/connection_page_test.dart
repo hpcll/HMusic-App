@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -26,6 +27,7 @@ class _FakeConnectionRepository implements ConnectionRepository {
   _FakeConnectionRepository({
     this.savedAddress,
     this.unreachable = const <String>{},
+    this.connectGate,
   });
 
   static const String storedAddress = 'http://192.168.1.10:8090';
@@ -35,11 +37,16 @@ class _FakeConnectionRepository implements ConnectionRepository {
 
   // 连不通的地址：模拟「存过地址但服务端没开/换了网」，接续应静默回落到自动发现。
   final Set<String> unreachable;
+
+  // 连接挂起不返回：复刻「接续还在路上」的那段时间窗，用来验开场的分帧表现。
+  final Future<void>? connectGate;
+
   final List<String> connectInputs = <String>[];
 
   @override
   Future<ConnectionResult> connect(String input) async {
     connectInputs.add(input);
+    if (connectGate != null) await connectGate;
     if (unreachable.contains(input)) {
       throw const ApiFailure(kind: ApiFailureKind.offline, message: '无法连接到服务器');
     }
@@ -133,6 +140,65 @@ void main() {
     expect(find.text('连接服务器'), findsOneWidget);
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller?.text, _FakeConnectionRepository.storedAddress);
+  });
+
+  // 用户反馈：开 App 时不管登没登录，都要先闪一下「查找服务器」那页，体验不好。
+  // 冷启动这一程必须只有品牌：发现卡片、手输框一个都不许在首帧出现；品牌自己
+  // 渐显浮上来；接续的那句说明要等 700ms 才淡入——局域网通常几百毫秒就连上了，
+  // 一闪而过的菊花反而像出错。
+  testWidgets('冷启动开场只显示品牌：不闪查找服务器，说明延迟才出现', (tester) async {
+    final Completer<void> gate = Completer<void>();
+    final repository = _FakeConnectionRepository(
+      savedAddress: _FakeConnectionRepository.storedAddress,
+      connectGate: gate.future,
+    );
+    final router = _connectRouter();
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(repository),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    // 首帧：品牌在，且是从透明浮上来的；查找服务器的任何痕迹都不许有。
+    expect(find.byType(BrandWordmark), findsOneWidget);
+    final Finder brandFade = find
+        .ancestor(
+          of: find.byType(BrandWordmark),
+          matching: find.byType(Opacity),
+        )
+        .first;
+    expect(tester.widget<Opacity>(brandFade).opacity, lessThan(1));
+    expect(find.textContaining('正在寻找局域网内'), findsNothing);
+    expect(find.text('连接服务器'), findsNothing);
+    expect(find.text('手动输入地址'), findsNothing);
+
+    // 渐显走完（520ms）：品牌到位，说明那一行仍然不出声。
+    await tester.pump(const Duration(milliseconds: 560));
+    expect(tester.widget<Opacity>(brandFade).opacity, 1);
+    expect(find.byType(AnimatedOpacity), findsOneWidget);
+    expect(
+      tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
+      0,
+    );
+
+    // 过了 700ms 还没连上，才开口解释在等什么。
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
+      1,
+    );
+    expect(find.text('正在连接上次的服务器…'), findsOneWidget);
+
+    // 放行接续，收干净计时器与动画（否则测试结束会报未完成的 timer）。
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('auth destination'), findsOneWidget);
   });
 
   testWidgets('shows server connection form and restores address', (

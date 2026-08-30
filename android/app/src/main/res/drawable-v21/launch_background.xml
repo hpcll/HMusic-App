@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
-
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+    <!-- 底色对齐 App 自己的背景色（values/colors.xml，暗色见 values-night），
+         不要用 ?android:colorBackground：亮色纯白、暗色纯黑，和 App 底色差一档，
+         首帧交接会闪一下色阶。 -->
+    <item android:drawable="@color/hmusic_launch_background" />
 </layer-list>

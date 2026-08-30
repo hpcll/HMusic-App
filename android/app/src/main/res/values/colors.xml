@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 开屏窗口底色，必须等于 HMusicPalette.light 的 background
+         （lib/app/theme/hmusic_palette.dart）。系统主题给的 ?android:colorBackground
+         亮色是纯白、暗色是纯黑，和 App 底色差一档——Flutter 画出首帧的那一瞬会闪
+         一下色阶，品牌渐显的开场就被这一下破了功。 -->
+    <color name="hmusic_launch_background">#F7F7F8</color>
+</resources>
