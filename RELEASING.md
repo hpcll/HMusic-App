@@ -32,8 +32,9 @@ storeFile=/absolute/path/to/upload-keystore.jks
 bash tool/build_release.sh android
 ```
 
-`dist/` 会包含 APK、AAB 及各自的 SHA-256 文件。Google Play 使用 AAB，并启用 Play App Signing；APK
-只用于可信渠道的直接安装或测试。
+`dist/` 会包含 APK、AAB，以及一个汇总所有产物校验值的 `hmusic-<版本>-SHA256SUMS.txt`（一版一个文件，
+同一台机器上再构建别的平台会把新行 upsert 进去，不再是每个包各带一个 `.sha256`）。Google Play 使用 AAB，
+并启用 Play App Signing；APK 只用于可信渠道的直接安装或测试。
 
 ## Apple 与桌面平台
 
@@ -43,7 +44,7 @@ iOS 自签分发可以生成不含 Apple 签名的 IPA，供用户使用自己�
 bash tool/build_release.sh ios-unsigned
 ```
 
-产物为 `dist/hmusic-<版本>-ios-unsigned.ipa` 和对应的 SHA-256 文件。该包只能先导入自签工具重签，不能
+产物为 `dist/hmusic-<版本>-ios-unsigned.ipa`，校验值写入同目录的 `hmusic-<版本>-SHA256SUMS.txt`。该包只能先导入自签工具重签，不能
 直接安装，也不能替代 TestFlight/App Store 的正式签名包。发布说明必须明确这一点，并注明用户需要自行承担
 证书有效期、设备注册和重新签名成本。
 
@@ -51,12 +52,15 @@ iOS/macOS 的 archive、签名、公证和 TestFlight/App Store 上传需要 App
 App Store Connect 权限，不能在没有密钥的公开 CI 中完成。发布时应使用专用 CI secrets，并在签名机器上
 验证后台音频、本地网络权限和系统媒体控制。
 
-桌面便携包：
+桌面包：
 
 ```bash
 bash tool/build_release.sh macos-adhoc
 bash tool/build_release.sh linux
 ```
+
+macOS 产物是 `hmusic-<版本>-macos-universal.dmg`：ad-hoc 签名的 universal `HMusic.app` 加一个
+“应用程序”软链，用户挂载后拖过去即可安装（0.1.5 起取代原来的 `-macos-universal-adhoc.zip`）。
 
 Windows 在 PowerShell 中执行（需要安装 Inno Setup 6，并确保 `ISCC.exe` 在 PATH 中）：
 
@@ -73,7 +77,11 @@ Windows 构建会同时生成便携 ZIP 和真正的安装向导 EXE：
   `%LocalAppData%\Programs\HMusic`，创建开始菜单入口，可选桌面快捷方式，并提供卸载入口。
 - `hmusic-<版本>-windows-x64.zip`：无需安装的便携包，适合临时使用或受限环境。
 
-产物还会带对应的 SHA-256 文件。macOS 包未经 Developer ID 签名与公证，Windows 安装包和便携包均未经
+校验值统一进 `hmusic-<版本>-SHA256SUMS.txt`：各平台的构建脚本在本机 `dist/` 里 upsert 自己那几行，
+CI 里则由 `checksums` job 汇总所有平台的包重新生成一份，并与 Release 上已有的同名文件合并——所以
+`scope: desktop` 之类的局部重跑不会抹掉其他平台的校验值。最终 Release 是 7 个包 + 1 个校验文件。
+
+macOS 包未经 Developer ID 签名与公证，Windows 安装包和便携包均未经
 Authenticode 签名；Release 必须提示系统安全警告和当前桌面功能边界。
 
 Windows/Linux 当前仍按路线图逐步补齐本机音频和系统集成，Release 说明不得承诺尚未实现的能力。

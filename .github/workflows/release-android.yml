@@ -21,6 +21,8 @@ on:
 
 permissions:
   contents: write
+  # 汇总 job 要跨 job 取回各平台的构建产物。
+  actions: read
 
 jobs:
   android:
@@ -64,7 +66,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hmusic-android
-          path: dist/*
+          path: |
+            dist/*-android*.apk
+            dist/*-android*.aab
           if-no-files-found: error
 
       - name: Publish GitHub Release assets
@@ -73,7 +77,9 @@ jobs:
         with:
           generate_release_notes: true
           tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
-          files: dist/*
+          files: |
+            dist/*-android*.apk
+            dist/*-android*.aab
 
   ios-unsigned:
     needs: android
@@ -96,9 +102,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hmusic-ios-unsigned
-          path: |
-            dist/*-ios-unsigned.ipa
-            dist/*-ios-unsigned.ipa.sha256
+          path: dist/*-ios-unsigned.ipa
           if-no-files-found: error
 
       - name: Append IPA to GitHub Release
@@ -106,9 +110,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
-          files: |
-            dist/*-ios-unsigned.ipa
-            dist/*-ios-unsigned.ipa.sha256
+          files: dist/*-ios-unsigned.ipa
 
   macos:
     needs: android
@@ -131,9 +133,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hmusic-macos
-          path: |
-            dist/*-macos-universal-adhoc.zip
-            dist/*-macos-universal-adhoc.zip.sha256
+          path: dist/*-macos-universal.dmg
           if-no-files-found: error
 
       - name: Append macOS package to GitHub Release
@@ -141,9 +141,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
-          files: |
-            dist/*-macos-universal-adhoc.zip
-            dist/*-macos-universal-adhoc.zip.sha256
+          files: dist/*-macos-universal.dmg
 
   windows:
     needs: android
@@ -174,9 +172,7 @@ jobs:
           name: hmusic-windows
           path: |
             dist/*-windows-x64.zip
-            dist/*-windows-x64.zip.sha256
             dist/*-windows-x64-setup.exe
-            dist/*-windows-x64-setup.exe.sha256
           if-no-files-found: error
 
       - name: Append Windows package to GitHub Release
@@ -186,9 +182,7 @@ jobs:
           tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
           files: |
             dist/*-windows-x64.zip
-            dist/*-windows-x64.zip.sha256
             dist/*-windows-x64-setup.exe
-            dist/*-windows-x64-setup.exe.sha256
 
   linux:
     needs: android
@@ -214,9 +208,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hmusic-linux
-          path: |
-            dist/*-linux-x64.tar.gz
-            dist/*-linux-x64.tar.gz.sha256
+          path: dist/*-linux-x64.tar.gz
           if-no-files-found: error
 
       - name: Append Linux package to GitHub Release
@@ -224,6 +216,55 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
-          files: |
-            dist/*-linux-x64.tar.gz
-            dist/*-linux-x64.tar.gz.sha256
+          files: dist/*-linux-x64.tar.gz
+
+  # 各平台的包由各自的 job 直接追加到 Release，校验值只在这里汇总成一个文件——
+  # 五个 job 各写一份同名 SHA256SUMS 会互相覆盖，只有汇总 job 能看到全部产物。
+  checksums:
+    needs: [android, ios-unsigned, macos, windows, linux]
+    # always()：某个平台失败时其余平台的包已经上了 Release，校验文件必须覆盖到它们，
+    # 不能因为一个 job 红了就整版没有校验值。
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+          pattern: hmusic-*
+          merge-multiple: true
+
+      - name: Build combined SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # 这个 job 没有 checkout，gh 只认 GH_REPO，不会去读 GITHUB_REPOSITORY。
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          SUMS="hmusic-${VERSION}-SHA256SUMS.txt"
+          cd packages
+          ls -l
+          find . -maxdepth 1 -type f -name "hmusic-${VERSION}-*" \
+            ! -name '*-SHA256SUMS.txt' -printf '%f\n' | LC_ALL=C sort > names.txt
+          [ -s names.txt ] || { echo "没有下载到 hmusic-${VERSION}-* 产物，tag 与 pubspec 版本不一致？" >&2; exit 1; }
+          : > fresh.txt
+          while IFS= read -r name; do sha256sum "$name" >> fresh.txt; done < names.txt
+          # scope=desktop / release_tag 这类局部重跑只带部分平台的包，Release 上已有的
+          # 校验文件里还留着其余平台的行：先拉下来，让本次的行覆盖同名项、其余行保留，
+          # 否则补传一个平台会把另外几个平台的校验值抹掉。
+          mkdir -p old
+          gh release download "$TAG" --pattern "$SUMS" --dir old --clobber || true
+          if [ -f "old/$SUMS" ]; then
+            awk 'NR==FNR {seen[$0]; next} !($NF in seen)' names.txt "old/$SUMS" >> fresh.txt
+          fi
+          LC_ALL=C sort -k 2 fresh.txt > "$SUMS"
+          rm -rf old names.txt fresh.txt
+          cat "$SUMS"
+
+      - name: Append checksums to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
+          files: packages/hmusic-*-SHA256SUMS.txt

@@ -19,15 +19,28 @@ flutter pub get
 DIST_DIR="$ROOT_DIR/dist"
 mkdir -p "$DIST_DIR"
 
+SUMS_FILE="$DIST_DIR/hmusic-${VERSION}-SHA256SUMS.txt"
+
+# 一版一个校验文件，不再给每个包配一个 .sha256 边车（Release 资产从 14 条降到 8 条）。
+# 同一次构建会依次登记多个产物，所以按文件名 upsert：先剔掉同名旧行再追加，重跑不留
+# 重复行。行格式与 sha256sum 一致，用户可以直接 `sha256sum -c` / `shasum -a 256 -c`。
 hash_file() {
-  local input="$1"
   local name
-  name="$(basename "$input")"
+  name="$(basename "$1")"
+  local line
   if command -v sha256sum >/dev/null 2>&1; then
-    (cd "$DIST_DIR" && sha256sum "$name" > "$name.sha256")
+    line="$(cd "$DIST_DIR" && sha256sum "$name")"
   else
-    (cd "$DIST_DIR" && shasum -a 256 "$name" > "$name.sha256")
+    line="$(cd "$DIST_DIR" && shasum -a 256 "$name")"
   fi
+  local tmp
+  tmp="$(mktemp "${TMPDIR:-/tmp}/hmusic-sums.XXXXXX")"
+  if [ -f "$SUMS_FILE" ]; then
+    awk -v drop="$name" '$NF != drop' "$SUMS_FILE" > "$tmp"
+  fi
+  printf '%s\n' "$line" >> "$tmp"
+  LC_ALL=C sort -k 2 "$tmp" > "$SUMS_FILE"
+  rm -f "$tmp"
 }
 
 if [ "$TARGET" = "ios-unsigned" ]; then
@@ -85,11 +98,18 @@ if [ "$TARGET" = "macos-adhoc" ]; then
   codesign --force --deep --sign - "$STAGING_DIR/HMusic.app"
   codesign --verify --deep --strict "$STAGING_DIR/HMusic.app"
 
-  ARCHIVE="$DIST_DIR/hmusic-${VERSION}-macos-universal-adhoc.zip"
+  ARCHIVE="$DIST_DIR/hmusic-${VERSION}-macos-universal.dmg"
   rm -f "$ARCHIVE"
-  ditto -c -k --sequesterRsrc --keepParent "$STAGING_DIR/HMusic.app" "$ARCHIVE"
+  # dmg 根目录里放一个「应用程序」软链：用户挂载后把 HMusic.app 拖过去就装好了。
+  # 软链和 App 同级、不在包内，codesign --deep 不会顺着它走出去。
+  ln -s /Applications "$STAGING_DIR/Applications"
+  # 显式指定 HFS+：hdiutil 的默认文件系统跟着 macOS 版本变（新系统上是 APFS），
+  # 而 HFS+ 映像在所有还能跑本 App 的系统上都挂得开，别让构建机版本决定这件事。
+  hdiutil create -volname "HMusic ${VERSION}" -srcfolder "$STAGING_DIR" \
+    -fs HFS+ -ov -format UDZO "$ARCHIVE"
+  hdiutil verify "$ARCHIVE"
   hash_file "$ARCHIVE"
-  printf 'macOS universal ad-hoc 包已写入 %s\n' "$ARCHIVE"
+  printf 'macOS universal ad-hoc dmg 已写入 %s\n' "$ARCHIVE"
   exit 0
 fi
 

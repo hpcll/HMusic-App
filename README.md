@@ -30,7 +30,7 @@ curl -fsSL https://raw.githubusercontent.com/hpcll/HMusic-Server/main/bootstrap.
 | --- | --- | --- |
 | Android | APK | 可直接安装；AAB 用于 Google Play |
 | iOS | `ios-unsigned.ipa` | 需要用自己的 Apple ID 或证书重签后安装 |
-| macOS | `macos-universal-adhoc.zip` | 同时支持 Apple Silicon 和 Intel |
+| macOS | `macos-universal.dmg` | 挂载后把 HMusic 拖进“应用程序”；同时支持 Apple Silicon 和 Intel |
 | Windows | `windows-x64-setup.exe`（推荐）或 `windows-x64.zip` | 安装版带中文向导；ZIP 为便携版 |
 | Linux | `linux-x64.tar.gz` | x86_64 便携版，内含应用图标 |
 
@@ -42,8 +42,13 @@ curl -fsSL https://raw.githubusercontent.com/hpcll/HMusic-Server/main/bootstrap.
 - Windows 弹“Windows 已保护你的电脑”时，点 **“更多信息 → 仍要运行”**；Edge 若在下载时就提示
   “已阻止不安全下载”，在下载列表里选择保留。
 
-放行步骤、误报处理和 iOS 自签的完整说明见[安装与故障排查](docs/DEPLOYMENT.md)。每个 Release 同时提供
-SHA-256 校验文件，介意来源的话先核对再安装。
+放行步骤、误报处理和 iOS 自签的完整说明见[安装与故障排查](docs/DEPLOYMENT.md)。每个 Release 附一个
+`hmusic-<版本>-SHA256SUMS.txt`（所有平台的校验值都在里面），介意来源的话先核对再安装：
+
+```bash
+# 与包放在同一个目录下执行；Windows 用 certutil -hashfile <文件> SHA256 逐个比对
+shasum -a 256 --ignore-missing -c hmusic-<版本>-SHA256SUMS.txt
+```
 
 ### 3. 连接并登录
 

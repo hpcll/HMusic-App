@@ -35,10 +35,12 @@ shasum -a 256 dist/hmusic-*-ios-unsigned.ipa
 
 ### macOS
 
-下载 `hmusic-<版本>-macos-universal-adhoc.zip`，解压后将 `HMusic.app` 移入“应用程序”。该包同时支持
+下载 `hmusic-<版本>-macos-universal.dmg`，双击挂载后把 `HMusic` 拖到窗口里的“应用程序”快捷方式上，
+然后推出磁盘映像即可删除 dmg。该包同时支持
 Apple Silicon 与 Intel，使用 ad-hoc 签名但没有 Developer ID 公证，所以首次打开一定会被系统拦下，
 提示“无法验证开发者”，或者——**从浏览器下载时更常见的——“已损坏，应移到废纸篓”**。这句话是
-Gatekeeper 对“未公证 + 带下载隔离标记”的措辞，文件本身没有损坏，可以对照 Release 里的 SHA-256 自行确认。
+Gatekeeper 对“未公证 + 带下载隔离标记”的措辞，文件本身没有损坏，可以对照 Release 里的
+`hmusic-<版本>-SHA256SUMS.txt` 自行确认。
 
 放行方式（任选其一）：
 
@@ -65,8 +67,9 @@ macOS 15（Sequoia）起，旧办法“在 Finder 里右键选择打开”已经
 安装包未做 Authenticode 签名，因此会遇到两道拦截：浏览器（尤其 Edge）下载时可能提示“已阻止不安全下载”，
 需要在下载列表里选择保留；运行时 SmartScreen 会弹出“Windows 已保护你的电脑”，点 **“更多信息 → 仍要运行”**
 即可。SmartScreen 依据文件声誉判断，未签名的包每发一个新版本都要重新积累声誉，所以这个提示短期内不会消失。
-少数国产安全软件也可能对未签名的安装器误报，必要时把安装目录加入信任。建议安装前用 Release 附带的
-SHA-256 校验文件核对下载完整性。
+少数国产安全软件也可能对未签名的安装器误报，必要时把安装目录加入信任。建议安装前用 Release 里的
+`hmusic-<版本>-SHA256SUMS.txt` 核对下载完整性（`certutil -hashfile <文件> SHA256`，再和文件里对应的
+那一行比一比）。
 
 受限环境也可以下载 `hmusic-<版本>-windows-x64.zip`，完整解压后运行 `HMusic/hmusic.exe`，不要只把 exe
 单独复制出来。

@@ -27,6 +27,25 @@ if (-not (Test-Path $executable)) {
 
 $distDir = Join-Path $rootDir "dist"
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+$sumsFile = Join-Path $distDir "hmusic-$version-SHA256SUMS.txt"
+
+# 一版一个校验文件，不再给每个包配一个 .sha256 边车。便携包和安装包分两次登记，
+# 所以按文件名 upsert：先剔掉同名旧行再追加。行格式和换行都对齐 sha256sum（小写摘要
+# + 两个空格 + 文件名 + LF），别让 Windows 的 CRLF 混进去——否则 Linux/macOS 上
+# sha256sum -c 会把行尾的 \r 当成文件名的一部分。
+function Update-Sums {
+  param([string]$Path)
+  $name = Split-Path $Path -Leaf
+  $digest = (Get-FileHash -Algorithm SHA256 $Path).Hash.ToLowerInvariant()
+  $lines = @()
+  if (Test-Path $sumsFile) {
+    $lines = @(Get-Content $sumsFile | Where-Object { $_ -and (($_ -split '\s+')[-1] -ne $name) })
+  }
+  $lines += "$digest  $name"
+  $sorted = $lines | Sort-Object { ($_ -split '\s+')[-1] }
+  [System.IO.File]::WriteAllText($sumsFile, (($sorted -join "`n") + "`n"))
+}
+
 $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) ("hmusic-windows-" + [Guid]::NewGuid().ToString("N"))
 $appDir = Join-Path $stagingDir "HMusic"
 New-Item -ItemType Directory -Force -Path $appDir | Out-Null
@@ -37,9 +56,7 @@ try {
   if (Test-Path $archive) { Remove-Item $archive -Force }
   Compress-Archive -Path $appDir -DestinationPath $archive -CompressionLevel Optimal
 
-  $archiveName = Split-Path $archive -Leaf
-  $digest = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
-  Set-Content -Path "$archive.sha256" -Value "$digest  $archiveName" -Encoding ascii
+  Update-Sums $archive
   Write-Host "Windows x64 便携包已写入 $archive"
 
   $installerScript = Join-Path $rootDir "tool/windows-installer.iss"
@@ -86,9 +103,7 @@ try {
   if (-not (Test-Path $installer)) {
     throw "Inno Setup 未生成安装包: $installer"
   }
-  $installerName = Split-Path $installer -Leaf
-  $installerDigest = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
-  Set-Content -Path "$installer.sha256" -Value "$installerDigest  $installerName" -Encoding ascii
+  Update-Sums $installer
   Write-Host "Windows x64 安装包已写入 $installer"
 } finally {
   if (Test-Path $stagingDir) {
