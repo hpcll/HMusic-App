@@ -31,17 +31,17 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   Timer? _spinnerTimer;
   bool _showSpinner = false;
 
-  // 品牌渐显的时长；表单要等它走完才出现，不和开场抢戏。用计时器而不是动画的
-  // onEnd 作准：onEnd 万一不触发，登录表单就永远出不来，那是死锁。
-  static const Duration _introDuration = Duration(milliseconds: 520);
-  Timer? _introTimer;
-  bool _introDone = false;
+  // 表单要等页面转场（连接页 → 这一页是 450ms 的淡入淡出）落定才出现，不在
+  // 交叉淡入的中途冒出来。品牌块本身不做动画，见 build 里的说明。
+  static const Duration _formDelay = Duration(milliseconds: 450);
+  Timer? _formTimer;
+  bool _settled = false;
 
   @override
   void initState() {
     super.initState();
-    _introTimer = Timer(_introDuration, () {
-      if (mounted) setState(() => _introDone = true);
+    _formTimer = Timer(_formDelay, () {
+      if (mounted) setState(() => _settled = true);
     });
     _spinnerTimer = Timer(_spinnerDelay, () {
       if (mounted) setState(() => _showSpinner = true);
@@ -55,7 +55,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   @override
   void dispose() {
-    _introTimer?.cancel();
+    _formTimer?.cancel();
     _spinnerTimer?.cancel();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -71,9 +71,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     final palette = context.palette;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     // 状态问清楚之前只留品牌：接续成功的用户根本不该看见登录页，问都没问就把
-    // 表单摆出来，就是他反馈的「还是闪一下登录页」。确认没登录、且品牌渐显走完
-    // 之后表单才淡入——首次打开的顺序是「字标浮上来，然后表单出现」。
-    final showForm = state.needsSignIn && (_introDone || reduceMotion);
+    // 表单摆出来，就是他反馈的「还是闪一下登录页」。确认没登录、且转场落定之后
+    // 表单才淡入——顺序是「字标（从上一页接过来的那个）稳住，然后表单出现」。
+    final showForm = state.needsSignIn && (_settled || reduceMotion);
     return Scaffold(
       backgroundColor: palette.background,
       body: SafeArea(
@@ -84,42 +84,25 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                // 品牌块渐显，与连接页同一条曲线同一段时长：两页的字标位置、尺寸
-                // 完全一致，配上路由的淡入淡出，整段开场里字标看着是定在原地的。
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0, end: 1),
-                  duration: reduceMotion ? Duration.zero : _introDuration,
-                  curve: Curves.easeOutCubic,
-                  builder: (context, t, child) => Opacity(
-                    opacity: t,
-                    child: Transform.translate(
-                      offset: Offset(0, (1 - t) * 10),
-                      child: child,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      // 与连接页同款居中构图：品牌块与表单块拉开大段距离，两页读作
-                      // 一个家族。完整字标（字形含 H + Music 连读），不再另写
-                      // "HMusic" 文字——图形与文字各报一遍 H 是之前「不协调」的病根。
-                      const BrandWordmark(size: 56),
-                      const SizedBox(height: 20),
-                      Text(
-                        // 常态用品牌 slogan（与连接页同一句同一声调，两页读作一个
-                        // 家族）；首次建号是关键指令，保留说明文案。
-                        state.initialized ? '今天想听点什么' : '首次使用，请创建管理员账号',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'NotoSerifSC',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          height: 1.4,
-                          letterSpacing: 3,
-                          color: palette.mutedStrong,
-                        ),
-                      ),
-                    ],
+                // 这一页的品牌块**不做入场动画**：它和连接页的字标位置、尺寸
+                // 完全相同，路由是淡入淡出——两边都静止时，交叉淡入看着就是同
+                // 一个字标定在原地。之前这里也跑一遍上浮，于是切页那 260ms 里
+                // 屏幕上有两个位置差 10px 的字标同时半透明，正是「最后一下出现
+                // 重影」。开场动画只属于连接页，这页只负责接住它。
+                const BrandWordmark(size: 56),
+                const SizedBox(height: 20),
+                Text(
+                  // 常态用品牌 slogan（与连接页同一句同一声调，两页读作一个
+                  // 家族）；首次建号是关键指令，保留说明文案。
+                  state.initialized ? '今天想听点什么' : '首次使用，请创建管理员账号',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'NotoSerifSC',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                    letterSpacing: 3,
+                    color: palette.mutedStrong,
                   ),
                 ),
                 const SizedBox(height: 52),

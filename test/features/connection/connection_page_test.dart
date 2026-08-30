@@ -81,6 +81,14 @@ GoRouter _connectRouter({String? initialLocation}) => GoRouter(
   ],
 );
 
+// 开场是一段要走完的过场：品牌渐显 900ms、最短停留 1400ms，之后控件才出现、
+// 接续成功也才跳页。pumpAndSettle 只在有帧调度时推进，渐显结束后它就停了，
+// 到不了 1400ms——所以这里显式把时钟推过开场。
+Future<void> _settleOpening(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 1500));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   // 冷启动接续：存过地址就直接连回去并进登录页，用户不必每次开 App 重新点服务器
   // ——地址形态和上次存的不一致时 connect() 会当成换服务器清 token，那就等于
@@ -101,7 +109,7 @@ void main() {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-    await tester.pumpAndSettle();
+    await _settleOpening(tester);
 
     // 没有任何点击：地址原样复用，直接落到登录页。
     expect(repository.connectInputs, <String>[
@@ -130,7 +138,7 @@ void main() {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-    await tester.pumpAndSettle();
+    await _settleOpening(tester);
 
     // 一次自动连接都不能发起，也不能被弹去登录页。
     expect(repository.connectInputs, isEmpty);
@@ -140,6 +148,37 @@ void main() {
     expect(find.text('连接服务器'), findsOneWidget);
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller?.text, _FakeConnectionRepository.storedAddress);
+  });
+
+  // 用户反馈：开场「好着急，最后一秒出现了重影」。重影来自半路切页——接续在
+  // 局域网里两三百毫秒就回来了，那时品牌还在上浮，上一页（已就位）和下一页
+  // （还在动）的字标叠着交叉淡入，就成了两个错开的影子。接续再快也要把开场
+  // 走完再跳，这条钉的就是「起码等动画完成」。
+  testWidgets('接续比开场快：也要等开场走完才跳页', (tester) async {
+    final repository = _FakeConnectionRepository(
+      savedAddress: _FakeConnectionRepository.storedAddress,
+    );
+    final router = _connectRouter();
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(repository),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    // 接续早就成功了（假仓库立即返回），但开场没走完，人还得留在这一页。
+    await tester.pump(const Duration(milliseconds: 900));
+    expect(repository.connectInputs, isNotEmpty);
+    expect(find.text('auth destination'), findsNothing);
+    expect(find.byType(ConnectionPage), findsOneWidget);
+
+    await _settleOpening(tester);
+    expect(find.text('auth destination'), findsOneWidget);
   });
 
   // 用户反馈：开 App 时不管登没登录，都要先闪一下「查找服务器」那页，体验不好。
@@ -178,17 +217,17 @@ void main() {
     expect(find.text('连接服务器'), findsNothing);
     expect(find.text('手动输入地址'), findsNothing);
 
-    // 渐显走完（520ms）：品牌到位，说明那一行仍然不出声。
-    await tester.pump(const Duration(milliseconds: 560));
-    expect(tester.widget<Opacity>(brandFade).opacity, 1);
+    // 说明那一行的门槛是 700ms，此前只有品牌在浮上来。
+    await tester.pump(const Duration(milliseconds: 600));
     expect(find.byType(AnimatedOpacity), findsOneWidget);
     expect(
       tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
       0,
     );
 
-    // 过了 700ms 还没连上，才开口解释在等什么。
+    // 过了 700ms 还没连上，才开口解释在等什么；渐显（900ms）此时也走完了。
     await tester.pump(const Duration(milliseconds: 400));
+    expect(tester.widget<Opacity>(brandFade).opacity, 1);
     expect(
       tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
       1,
@@ -197,7 +236,7 @@ void main() {
 
     // 放行接续，收干净计时器与动画（否则测试结束会报未完成的 timer）。
     gate.complete();
-    await tester.pumpAndSettle();
+    await _settleOpening(tester);
     expect(find.text('auth destination'), findsOneWidget);
   });
 
@@ -221,7 +260,7 @@ void main() {
         child: const MaterialApp(home: ConnectionPage()),
       ),
     );
-    await tester.pumpAndSettle();
+    await _settleOpening(tester);
 
     // 品牌位是完整字标图（字形含 H + Music），页面不再有 "HMusic" 文本。
     expect(find.byType(BrandWordmark), findsOneWidget);
@@ -303,7 +342,7 @@ void main() {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-    await tester.pumpAndSettle();
+    await _settleOpening(tester);
 
     // 层级翻转：有发现结果时表单收起，只留「手动输入地址」链接。
     expect(find.text('192.168.31.11:6650'), findsOneWidget);
@@ -341,7 +380,7 @@ void main() {
         child: const MaterialApp(home: ConnectionPage()),
       ),
     );
-    await tester.pumpAndSettle();
+    await _settleOpening(tester);
 
     expect(find.text('连接服务器'), findsNothing);
     await tester.tap(find.text('手动输入地址'));

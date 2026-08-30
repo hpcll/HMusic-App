@@ -163,19 +163,25 @@ GoRouter buildAppRouter(Ref ref) {
 }
 
 // 开场三连跳（连接页 →登录页 →token 有效则首页）用淡入淡出，不用平台默认的
-// 滑入：两页的品牌块位置、尺寸完全一致，淡入淡出下字标看着是定在原地的，整段
-// 读作一次开场；滑入则把它演成三次翻页，正是「开 App 先闪一下找服务器」的观感
-// 来源之一。减动效环境直接给结果，不做过渡。
+// 滑入：两页的品牌块位置、尺寸完全一致，且都处于静止态，淡入淡出下字标看着是
+// 定在原地的；滑入则把它演成三次翻页。450ms 对齐 clearshot 那套 600ms 级别的
+// 转场——260ms 那档太急，交叉淡入还没稳住就结束了。减动效环境直接给结果。
 CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 260),
-    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionDuration: const Duration(milliseconds: 450),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
     transitionsBuilder: (context, animation, secondaryAnimation, child) =>
         MediaQuery.disableAnimationsOf(context)
         ? child
-        : FadeTransition(opacity: animation, child: child),
+        : FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOut,
+            ),
+            child: child,
+          ),
   );
 }
 

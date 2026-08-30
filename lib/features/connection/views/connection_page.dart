@@ -55,18 +55,24 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
   Timer? _hintTimer;
   bool _showRestoreHint = false;
 
-  // 品牌渐显的时长；发现列表/手输框要等它走完才出现，不和开场抢戏（首次打开
-  // 没存过地址时接续会立刻返回 false，不挡一下就是一屏控件砸在渐显中途）。
-  // 用计时器而不是动画的 onEnd 作准：onEnd 万一不触发，这页就永远只有品牌。
-  static const Duration _introDuration = Duration(milliseconds: 520);
-  Timer? _introTimer;
-  bool _introDone = false;
+  // 品牌渐显的节奏。开场不是"尽快让路"，是一段要走完的过场：字标先浮上来，
+  // 标语错半拍跟上（对齐 clearshot 那套：1.8s 动画 + 分两拍 + 最短停留 2s）。
+  static const Duration _introDuration = Duration(milliseconds: 900);
+
+  // 开场最短停留。接续在局域网里往往两三百毫秒就回来了，回来就跳 = 动画跑到
+  // 一半被切页，上一页的字标（已就位）和下一页的字标（还在上浮）叠在一起淡入
+  // 淡出，看着就是"最后一下出现重影"。必须等这段走完再走人。
+  static const Duration _openingHold = Duration(milliseconds: 1400);
+  Timer? _openingTimer;
+  bool _openingDone = false;
+  late final DateTime _openedAt;
 
   @override
   void initState() {
     super.initState();
-    _introTimer = Timer(_introDuration, () {
-      if (mounted) setState(() => _introDone = true);
+    _openedAt = DateTime.now();
+    _openingTimer = Timer(_openingHold, () {
+      if (mounted) setState(() => _openingDone = true);
     });
     if (widget.autoResume) {
       _booting = true;
@@ -86,6 +92,8 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
         // 先尝试接续上次的服务器：成功就直接进登录页（token 有效会再自动放行到
         // 首页），用户开 App 不需要每次重新点服务器、更不该重新登录。
         if (await notifier.resumeSaved()) {
+          // 接续快过开场时也要把开场走完再跳：半路切页就是重影的来源。
+          await _awaitOpening();
           if (mounted) context.go(AuthPage.path);
           return;
         }
@@ -102,9 +110,31 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
     );
   }
 
+  // 补齐开场剩下的时间；已经走完就立即返回。
+  Future<void> _awaitOpening() async {
+    final Duration remaining =
+        _openingHold - DateTime.now().difference(_openedAt);
+    if (remaining > Duration.zero) {
+      await Future<void>.delayed(remaining);
+    }
+  }
+
+  // 把总进度 t 切成一段（begin~end），段外夹到 0/1——用来错开两拍。
+  double _stage(double t, double begin, double end) =>
+      ((t - begin) / (end - begin)).clamp(0.0, 1.0);
+
+  // 淡入 + 上浮收尾：纯淡入偏"贴纸"，带一点位移才像浮上来。
+  Widget _rise(double t, double distance, Widget child) => Opacity(
+    opacity: t,
+    child: Transform.translate(
+      offset: Offset(0, (1 - t) * distance),
+      child: child,
+    ),
+  );
+
   @override
   void dispose() {
-    _introTimer?.cancel();
+    _openingTimer?.cancel();
     _hintTimer?.cancel();
     _addressController.dispose();
     super.dispose();
@@ -126,7 +156,8 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
     final showForm = _manualExpanded || (!scanning && state.discovered.isEmpty);
     // 开场态：只有品牌 + （慢了才出现的）一行说明，不渲染任何发现/表单控件。
     // 品牌渐显没走完也算开场，控件不插队。
-    final splash = _booting || state.restoring || !(_introDone || reduceMotion);
+    final splash =
+        _booting || state.restoring || !(_openingDone || reduceMotion);
     return Scaffold(
       backgroundColor: palette.background,
       body: SafeArea(
@@ -140,47 +171,56 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  // 品牌块渐显：开 App 的第一眼是字标自己浮上来，而不是一屏
-                  // 控件同时砸出来。只在进页时跑一次（TweenAnimationBuilder
-                  // 挂载即从 0 走到 1，之后不再重放）。
+                  // 品牌块分两拍浮上来：字标先走，标语错半拍跟上（clearshot 的
+                  // 开场也是先文字后图标两拍，比一整块同时淡入更像"呼吸"）。
+                  // 只在进页时跑一次——TweenAnimationBuilder 挂载即从 0 走到 1，
+                  // 之后不再重放。
                   TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0, end: 1),
                     duration: reduceMotion ? Duration.zero : _introDuration,
-                    curve: Curves.easeOutCubic,
-                    builder: (context, t, child) => Opacity(
-                      opacity: t,
-                      // 上浮 10px 收尾：纯淡入偏"贴纸"，带一点位移才像浮上来。
-                      child: Transform.translate(
-                        offset: Offset(0, (1 - t) * 10),
-                        child: child,
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        // 居中构图：品牌块（完整字标 + 副标题）与内容块拉开大段
-                        // 距离，分组呼吸感是这页的关键——间距均匀就会「挤成一坨」。
-                        // 字标本身含 H（字形双竖笔）+ Music 连读，不再另写 "HMusic"。
-                        const Center(child: BrandWordmark(size: 56)),
-                        const SizedBox(height: 20),
-                        // 副标题是品牌 slogan：一句轻轻的搭话，不解释产品、不重复
-                        // 品牌名。衬线 + 加宽字距 = 扉页题句的声调；mutedStrong
-                        // 保证可读但不抢字标。
-                        Text(
-                          '今天想听点什么',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'NotoSerifSC',
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            height: 1.4,
-                            letterSpacing: 3,
-                            color: palette.mutedStrong,
+                    curve: Curves.easeInOut,
+                    builder: (context, t, child) {
+                      final double markT = Curves.easeOut.transform(
+                        _stage(t, 0, 0.7),
+                      );
+                      final double sloganT = Curves.easeOut.transform(
+                        _stage(t, 0.35, 1),
+                      );
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          // 居中构图：品牌块（完整字标 + 副标题）与内容块拉开大段
+                          // 距离，分组呼吸感是这页的关键——间距均匀就会「挤成一坨」。
+                          // 字标本身含 H（字形双竖笔）+ Music 连读，不另写 "HMusic"。
+                          _rise(
+                            markT,
+                            12,
+                            const Center(child: BrandWordmark(size: 56)),
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(height: 20),
+                          // 副标题是品牌 slogan：一句轻轻的搭话，不解释产品、不重复
+                          // 品牌名。衬线 + 加宽字距 = 扉页题句的声调；mutedStrong
+                          // 保证可读但不抢字标。
+                          _rise(
+                            sloganT,
+                            8,
+                            Text(
+                              '今天想听点什么',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'NotoSerifSC',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                height: 1.4,
+                                letterSpacing: 3,
+                                color: palette.mutedStrong,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 52),
                   // 开场 → 发现/手输的切换走淡入淡出：接续失败时控件不是「啪」

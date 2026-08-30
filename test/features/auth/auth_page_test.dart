@@ -89,8 +89,8 @@ void main() {
     expect(find.byType(AuthForm), findsNothing);
   });
 
-  // 需要登录时表单也不是一上来就在，而是问清楚状态后才淡入——首次打开的观感是
-  // 「品牌浮上来，然后表单出现」，不是一屏控件砸脸。
+  // 需要登录时表单也不是一上来就在，而是问清楚状态、且页面转场落定后才淡入
+  // ——观感是「字标（从连接页接过来的那个）先稳住，然后表单出现」。
   testWidgets('未登录：状态问清楚后表单才出现', (tester) async {
     final Completer<void> gate = Completer<void>();
     final router = _authRouter();
@@ -106,15 +106,16 @@ void main() {
     expect(find.byType(AuthForm), findsNothing);
 
     gate.complete();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
 
     expect(find.byType(AuthForm), findsOneWidget);
     expect(find.text('更换服务器'), findsOneWidget);
   });
 
-  // 他的原话：「如果第一次打开 那也是动画完成再显示登录页」。状态问得再快，
-  // 表单也要等品牌渐显（520ms）走完才出现，不能砸在动画中途。
-  testWidgets('未登录且状态秒回：表单仍要等品牌渐显走完才出现', (tester) async {
+  // 他的原话：「起码是等动画完成」。状态问得再快，表单也要等页面转场（450ms）
+  // 落定才出现，不能砸在交叉淡入的中途。
+  testWidgets('未登录且状态秒回：表单仍要等转场落定才出现', (tester) async {
     final router = _authRouter();
     addTearDown(router.dispose);
 
@@ -122,13 +123,13 @@ void main() {
       _app(_FakeAuthRepository(authenticated: false), router),
     );
 
-    // 状态已经问回来了（无 gate），但渐显还没走完 → 表单不许出现。
+    // 状态已经问回来了（无 gate），但转场还没落定 → 表单不许出现。
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(AuthForm), findsNothing);
 
-    // 过了 520ms 才轮到它。
-    await tester.pump(const Duration(milliseconds: 260));
+    // 过了 450ms 才轮到它。
+    await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
     expect(find.byType(AuthForm), findsOneWidget);
   });
