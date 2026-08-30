@@ -67,7 +67,7 @@ class SettingsAccountCard extends ConsumerWidget {
                     children: <Widget>[
                       // 更换服务器：文本按钮 + muted 灰弱化（次要操作）
                       TextButton.icon(
-                        onPressed: () => context.go(ConnectionPage.path),
+                        onPressed: () => context.go(ConnectionPage.switchPath),
                         icon: const Icon(Icons.lan_rounded, size: 16),
                         label: const Text('更换服务器'),
                         style: TextButton.styleFrom(

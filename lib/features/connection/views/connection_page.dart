@@ -17,9 +17,17 @@ import '../widgets/server_address_form.dart';
 // 时才自动展开（首次部署/mDNS 与扫段都不可达的场景）。错误行统一放两区之间，
 // 卡片连接失败和手动连接失败共用一个落点。
 class ConnectionPage extends ConsumerStatefulWidget {
-  const ConnectionPage({super.key});
+  const ConnectionPage({super.key, this.autoResume = true});
 
   static const String path = '/connect';
+
+  // 「更换服务器」入口专用的地址：带上它就关掉冷启动接续。用户是奔着换一台来的，
+  // 若照旧原样连回上一台并 go(AuthPage)，界面表现就是「转个圈又回到原来那页」，
+  // 服务器永远换不掉（退出登录后也一样，接续成功照样把人弹回登录页）。
+  static const String switchPath = '$path?switch=1';
+
+  // 只有冷启动（App 打开时的初始路由）才接续上次的服务器。
+  final bool autoResume;
 
   @override
   ConsumerState<ConnectionPage> createState() => _ConnectionPageState();
@@ -40,6 +48,12 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
     unawaited(
       Future<void>.microtask(() async {
         final notifier = ref.read(connectionViewModelProvider.notifier);
+        // 主动来换服务器：只把上次的地址回填进手输框供修改，绝不自动连回去。
+        if (!widget.autoResume) {
+          await notifier.loadSavedAddress();
+          unawaited(notifier.discover());
+          return;
+        }
         // 先尝试接续上次的服务器：成功就直接进登录页（token 有效会再自动放行到
         // 首页），用户开 App 不需要每次重新点服务器、更不该重新登录。
         if (await notifier.resumeSaved()) {

@@ -91,7 +91,7 @@ class ForceUpgradePage extends ConsumerWidget {
                   TextButton(
                     onPressed: () {
                       ref.read(upgradeGateProvider.notifier).reset();
-                      context.go(ConnectionPage.path);
+                      context.go(ConnectionPage.switchPath);
                     },
                     child: const Text('更换服务器'),
                   ),

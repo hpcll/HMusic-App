@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,12 +57,14 @@ class _FakeConnectionRepository implements ConnectionRepository {
   Future<String?> loadSavedAddress() async => savedAddress;
 }
 
-GoRouter _connectRouter() => GoRouter(
-  initialLocation: ConnectionPage.path,
+GoRouter _connectRouter({String? initialLocation}) => GoRouter(
+  initialLocation: initialLocation ?? ConnectionPage.path,
   routes: <RouteBase>[
     GoRoute(
       path: ConnectionPage.path,
-      builder: (context, state) => const ConnectionPage(),
+      builder: (context, state) => ConnectionPage(
+        autoResume: state.uri.queryParameters['switch'] != '1',
+      ),
     ),
     GoRoute(
       path: AuthPage.path,
@@ -97,6 +101,38 @@ void main() {
       _FakeConnectionRepository.storedAddress,
     ]);
     expect(find.text('auth destination'), findsOneWidget);
+  });
+
+  // 用户反馈：设置页点「更换服务器」只转个圈就回到原页面，服务器永远换不掉；
+  // 先退出登录再点也一样（接续成功会把人直接送回登录页）。根因是这页无论从哪
+  // 进来都做冷启动接续——原样连回上一台再 go(AuthPage)。换服务器入口带 ?switch=1，
+  // 接续必须关掉，人要留在连接页选新的那台。
+  testWidgets('从「更换服务器」进来不接续上次的服务器，停在连接页', (tester) async {
+    final repository = _FakeConnectionRepository(
+      savedAddress: _FakeConnectionRepository.storedAddress,
+    );
+    final router = _connectRouter(initialLocation: ConnectionPage.switchPath);
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(repository),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 一次自动连接都不能发起，也不能被弹去登录页。
+    expect(repository.connectInputs, isEmpty);
+    expect(find.text('auth destination'), findsNothing);
+    expect(find.byType(ConnectionPage), findsOneWidget);
+    // 扫不到东西就展开手输框，并把上次的地址回填进去供修改（只是建议值，不自动连）。
+    expect(find.text('连接服务器'), findsOneWidget);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller?.text, _FakeConnectionRepository.storedAddress);
   });
 
   testWidgets('shows server connection form and restores address', (
@@ -247,5 +283,29 @@ void main() {
 
     expect(find.text('连接服务器'), findsOneWidget);
     expect(find.text('手动输入地址'), findsNothing);
+  });
+
+  // 「更换服务器」有四个入口（窄屏账户卡、设置菜单行、登录页、强制升级页的逃生口）。
+  // 漏掉任何一处就是「转个圈又回到原页面」的老毛病在那条路径上复发，而且只有真机
+  // 点进去才看得出来。这里按源码机械守一层。
+  test('所有「更换服务器」入口都走 switchPath（关掉冷启动接续）', () {
+    const List<String> entries = <String>[
+      'lib/features/settings/widgets/account_card.dart',
+      'lib/features/settings/widgets/server_switch_row.dart',
+      'lib/features/auth/views/auth_page.dart',
+      'lib/core/upgrade/force_upgrade_page.dart',
+    ];
+    for (final String path in entries) {
+      final String source = File(path).readAsStringSync();
+      expect(source, contains('ConnectionPage.switchPath'), reason: path);
+      expect(source, isNot(contains('go(ConnectionPage.path)')), reason: path);
+    }
+
+    // 上面四处只是带上了参数，真正关掉接续的是路由：漏了这段等于四处白改。
+    final String router = File(
+      'lib/app/router/app_router.dart',
+    ).readAsStringSync();
+    expect(router, contains("queryParameters['switch']"));
+    expect(router, contains('autoResume:'));
   });
 }

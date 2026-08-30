@@ -15,7 +15,7 @@ class SettingsServerSwitchRow extends StatelessWidget {
       padding: const EdgeInsets.only(top: 16),
       child: Center(
         child: TextButton.icon(
-          onPressed: () => context.go(ConnectionPage.path),
+          onPressed: () => context.go(ConnectionPage.switchPath),
           icon: const Icon(Icons.lan_rounded, size: 16),
           label: const Text('更换服务器'),
           style: TextButton.styleFrom(foregroundColor: context.palette.muted),

@@ -99,7 +99,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 const SizedBox(height: 18),
                 // 静默出口：登错服务器时能回到连接页换地址，不困死在登录页。
                 TextButton(
-                  onPressed: () => context.go(ConnectionPage.path),
+                  onPressed: () => context.go(ConnectionPage.switchPath),
                   child: const Text('更换服务器'),
                 ),
               ],

@@ -66,7 +66,12 @@ GoRouter buildAppRouter(Ref ref) {
       ),
       GoRoute(
         path: ConnectionPage.path,
-        builder: (context, state) => const ConnectionPage(),
+        // 只有冷启动落在这条路由上才接续上次的服务器；「更换服务器」入口走
+        // ConnectionPage.switchPath（?switch=1），接续必须关掉，否则原样连回
+        // 上一台再跳走，用户永远换不成。
+        builder: (context, state) => ConnectionPage(
+          autoResume: state.uri.queryParameters['switch'] != '1',
+        ),
       ),
       GoRoute(
         path: AuthPage.path,
