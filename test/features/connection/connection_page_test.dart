@@ -13,6 +13,7 @@ import 'package:hmusic/features/connection/data/connection_repository.dart';
 import 'package:hmusic/features/connection/data/lan_server_scanner.dart';
 import 'package:hmusic/features/connection/models/connection_result.dart';
 import 'package:hmusic/features/connection/views/connection_page.dart';
+import 'package:hmusic/features/connection/widgets/discovered_server_list.dart';
 import 'package:hmusic/shared/widgets/brand_mark.dart';
 
 // 页面 initState 会自动扫描：测试必须注入假扫描器，绝不能碰真实网卡/mDNS/网络。
@@ -240,6 +241,43 @@ void main() {
     expect(find.text('auth destination'), findsOneWidget);
   });
 
+  // 用户反馈：「最后搜索的那个页面出来后，能看出来 icon 加文字往上位移了一点」。
+  // 原先整列是 Center 居中：开场时列很矮，发现卡片一出现列变高，居中重算就把
+  // 品牌块往上顶了一截。品牌钉在视口固定高度处之后，两个状态下它必须在同一位置。
+  testWidgets('发现区出现前后，品牌块位置不动', (tester) async {
+    final router = _connectRouter();
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(
+            _FakeConnectionRepository(
+              savedAddress: _FakeConnectionRepository.storedAddress,
+              unreachable: const <String>{
+                _FakeConnectionRepository.storedAddress,
+              },
+            ),
+          ),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    // 1000ms：渐显（900ms）已走完、位移归零，但开场（1400ms）还没结束 →
+    // 只有品牌。此时量到的就是它的最终位置。
+    await tester.pump(const Duration(milliseconds: 1000));
+    expect(find.byType(DiscoveredServerList), findsNothing);
+    final double splashTop = tester.getRect(find.byType(BrandWordmark)).top;
+
+    // 开场结束，发现区显形（假扫描器一无所获，落到空态卡片）。
+    await _settleOpening(tester);
+    expect(find.byType(DiscoveredServerList), findsOneWidget);
+    expect(find.text('没有发现服务器'), findsOneWidget);
+    expect(tester.getRect(find.byType(BrandWordmark)).top, splashTop);
+  });
+
   testWidgets('shows server connection form and restores address', (
     tester,
   ) async {
@@ -285,13 +323,17 @@ void main() {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-    // 扫描空手而归 → 表单经 AnimatedSize 展开，settle 走完再输入地址。
-    await tester.pumpAndSettle();
+    // 扫描空手而归 → 开场走完后表单经 AnimatedSize 展开，再输入地址。
+    await _settleOpening(tester);
 
     await tester.enterText(
       find.byType(TextField),
       _FakeConnectionRepository.storedAddress,
     );
+    // 品牌块钉在视口 30% 处后，800×600 的测试画布上按钮会落到折叠线以下
+    // （真机同理：矮屏/开键盘时这页是可滚的），先滚到可见再点。
+    await tester.ensureVisible(find.text('连接服务器'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('连接服务器'));
     await tester.pumpAndSettle();
 

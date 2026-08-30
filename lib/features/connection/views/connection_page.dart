@@ -161,175 +161,213 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
     return Scaffold(
       backgroundColor: palette.background,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            // 底边距大于顶边距：内容重心略高于几何中心（视觉居中），大窗不显下坠。
-            padding: const EdgeInsets.fromLTRB(40, 48, 40, 96),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 380),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  // 品牌块分两拍浮上来：字标先走，标语错半拍跟上（clearshot 的
-                  // 开场也是先文字后图标两拍，比一整块同时淡入更像"呼吸"）。
-                  // 只在进页时跑一次——TweenAnimationBuilder 挂载即从 0 走到 1，
-                  // 之后不再重放。
-                  TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0, end: 1),
-                    duration: reduceMotion ? Duration.zero : _introDuration,
-                    curve: Curves.easeInOut,
-                    builder: (context, t, child) {
-                      final double markT = Curves.easeOut.transform(
-                        _stage(t, 0, 0.7),
-                      );
-                      final double sloganT = Curves.easeOut.transform(
-                        _stage(t, 0.35, 1),
-                      );
-                      return Column(
+        // 品牌块钉在视口固定高度处，不跟着内容一起被重新居中——原先是整列
+        // Center，开场只有品牌时列很矮，发现卡片一出现列变高、居中重算，
+        // 字标就被顶着往上挪了一截（用户看到的「icon 加文字往上位移了一点」）。
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    40,
+                    // 视口 30% 处：只有品牌时读作"略高于中线"的开场，内容出现
+                    // 后它一动不动。夹在 24~260 之间——矮屏（横屏、开键盘）不
+                    // 把内容全顶到折叠线以下，大屏也不至于把品牌坠到半腰。
+                    // 内容再高也只是可滚，构图不变。
+                    (constraints.maxHeight * 0.30).clamp(24.0, 260.0),
+                    40,
+                    40,
+                  ),
+                  // 只横向居中，纵向必须顶对齐：用 Center 的话内容一变高，
+                  // 剩余空间的纵向居中又会把品牌块推上去，等于没改。
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 380),
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          // 居中构图：品牌块（完整字标 + 副标题）与内容块拉开大段
-                          // 距离，分组呼吸感是这页的关键——间距均匀就会「挤成一坨」。
-                          // 字标本身含 H（字形双竖笔）+ Music 连读，不另写 "HMusic"。
-                          _rise(
-                            markT,
-                            12,
-                            const Center(child: BrandWordmark(size: 56)),
-                          ),
-                          const SizedBox(height: 20),
-                          // 副标题是品牌 slogan：一句轻轻的搭话，不解释产品、不重复
-                          // 品牌名。衬线 + 加宽字距 = 扉页题句的声调；mutedStrong
-                          // 保证可读但不抢字标。
-                          _rise(
-                            sloganT,
-                            8,
-                            Text(
-                              '今天想听点什么',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontFamily: 'NotoSerifSC',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                height: 1.4,
-                                letterSpacing: 3,
-                                color: palette.mutedStrong,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 52),
-                  // 开场 → 发现/手输的切换走淡入淡出：接续失败时控件不是「啪」
-                  // 地出现，而是接着品牌浮上来的那口气显形。
-                  AnimatedSwitcher(
-                    duration: reduceMotion
-                        ? Duration.zero
-                        : const Duration(milliseconds: 260),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    child: splash
-                        ? Center(
-                            key: const ValueKey<String>('splash'),
-                            // 接续这一句始终占位、只改透明度：700ms 后淡入，
-                            // 布局不动——否则品牌块会在它出现时被顶着往上跳。
-                            child: AnimatedOpacity(
-                              opacity: _showRestoreHint ? 1 : 0,
-                              duration: reduceMotion
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 260),
-                              curve: Curves.easeOut,
-                              child: Column(
+                          // 品牌块分两拍浮上来：字标先走，标语错半拍跟上（clearshot 的
+                          // 开场也是先文字后图标两拍，比一整块同时淡入更像"呼吸"）。
+                          // 只在进页时跑一次——TweenAnimationBuilder 挂载即从 0 走到 1，
+                          // 之后不再重放。
+                          TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0, end: 1),
+                            duration: reduceMotion
+                                ? Duration.zero
+                                : _introDuration,
+                            curve: Curves.easeInOut,
+                            builder: (context, t, child) {
+                              final double markT = Curves.easeOut.transform(
+                                _stage(t, 0, 0.7),
+                              );
+                              final double sloganT = Curves.easeOut.transform(
+                                _stage(t, 0.35, 1),
+                              );
+                              return Column(
                                 mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: <Widget>[
-                                  SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: palette.mutedStrong,
+                                  // 居中构图：品牌块（完整字标 + 副标题）与内容块拉开大段
+                                  // 距离，分组呼吸感是这页的关键——间距均匀就会「挤成一坨」。
+                                  // 字标本身含 H（字形双竖笔）+ Music 连读，不另写 "HMusic"。
+                                  _rise(
+                                    markT,
+                                    12,
+                                    const Center(
+                                      child: BrandWordmark(size: 56),
                                     ),
                                   ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    '正在连接上次的服务器…',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: palette.muted,
+                                  const SizedBox(height: 20),
+                                  // 副标题是品牌 slogan：一句轻轻的搭话，不解释产品、不重复
+                                  // 品牌名。衬线 + 加宽字距 = 扉页题句的声调；mutedStrong
+                                  // 保证可读但不抢字标。
+                                  _rise(
+                                    sloganT,
+                                    8,
+                                    Text(
+                                      '今天想听点什么',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontFamily: 'NotoSerifSC',
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.4,
+                                        letterSpacing: 3,
+                                        color: palette.mutedStrong,
+                                      ),
                                     ),
                                   ),
                                 ],
-                              ),
-                            ),
-                          )
-                        : Column(
-                            key: const ValueKey<String>('content'),
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: <Widget>[
-                              DiscoveredServerList(
-                                discovering: scanning,
-                                servers: state.discovered,
-                                enabled: !state.isConnecting,
-                                connectingBase: state.isConnecting
-                                    ? _connectingBase
-                                    : null,
-                                onConnect: _connectDiscovered,
-                                onRescan: () => ref
-                                    .read(connectionViewModelProvider.notifier)
-                                    .discover(),
-                              ),
-                              if (state.errorMessage != null) ...<Widget>[
-                                const SizedBox(height: 14),
-                                Text(
-                                  state.errorMessage!,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 28),
-                              // 手动区显隐走 220ms easeOut 尺寸过渡（docs/05 chrome 同词汇）。
-                              AnimatedSize(
-                                duration: reduceMotion
-                                    ? Duration.zero
-                                    : const Duration(milliseconds: 220),
-                                curve: Curves.easeOut,
-                                alignment: Alignment.topCenter,
-                                child: showForm
-                                    ? ServerAddressForm(
-                                        controller: _addressController,
-                                        isConnecting: state.isConnecting,
-                                        onSubmit: _connect,
-                                      )
-                                    : Center(
-                                        child: TextButton(
-                                          onPressed: state.isConnecting
-                                              ? null
-                                              : () => setState(
-                                                  () => _manualExpanded = true,
-                                                ),
-                                          style: TextButton.styleFrom(
-                                            foregroundColor: palette.muted,
-                                            textStyle: const TextStyle(
-                                              fontSize: 12.5,
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 52),
+                          // 开场 → 发现/手输的切换走淡入淡出：接续失败时控件不是「啪」
+                          // 地出现，而是接着品牌浮上来的那口气显形。
+                          AnimatedSwitcher(
+                            duration: reduceMotion
+                                ? Duration.zero
+                                : const Duration(milliseconds: 260),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            child: splash
+                                ? Center(
+                                    key: const ValueKey<String>('splash'),
+                                    // 接续这一句始终占位、只改透明度：700ms 后淡入，
+                                    // 布局不动——否则品牌块会在它出现时被顶着往上跳。
+                                    child: AnimatedOpacity(
+                                      opacity: _showRestoreHint ? 1 : 0,
+                                      duration: reduceMotion
+                                          ? Duration.zero
+                                          : const Duration(milliseconds: 260),
+                                      curve: Curves.easeOut,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: <Widget>[
+                                          SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: palette.mutedStrong,
                                             ),
                                           ),
-                                          child: const Text('手动输入地址'),
-                                        ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            '正在连接上次的服务器…',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: palette.muted,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                              ),
-                            ],
+                                    ),
+                                  )
+                                : Column(
+                                    key: const ValueKey<String>('content'),
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: <Widget>[
+                                      DiscoveredServerList(
+                                        discovering: scanning,
+                                        servers: state.discovered,
+                                        enabled: !state.isConnecting,
+                                        connectingBase: state.isConnecting
+                                            ? _connectingBase
+                                            : null,
+                                        onConnect: _connectDiscovered,
+                                        onRescan: () => ref
+                                            .read(
+                                              connectionViewModelProvider
+                                                  .notifier,
+                                            )
+                                            .discover(),
+                                      ),
+                                      if (state.errorMessage !=
+                                          null) ...<Widget>[
+                                        const SizedBox(height: 14),
+                                        Text(
+                                          state.errorMessage!,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 28),
+                                      // 手动区显隐走 220ms easeOut 尺寸过渡（docs/05 chrome 同词汇）。
+                                      AnimatedSize(
+                                        duration: reduceMotion
+                                            ? Duration.zero
+                                            : const Duration(milliseconds: 220),
+                                        curve: Curves.easeOut,
+                                        alignment: Alignment.topCenter,
+                                        child: showForm
+                                            ? ServerAddressForm(
+                                                controller: _addressController,
+                                                isConnecting:
+                                                    state.isConnecting,
+                                                onSubmit: _connect,
+                                              )
+                                            : Center(
+                                                child: TextButton(
+                                                  onPressed: state.isConnecting
+                                                      ? null
+                                                      : () => setState(
+                                                          () =>
+                                                              _manualExpanded =
+                                                                  true,
+                                                        ),
+                                                  style: TextButton.styleFrom(
+                                                    foregroundColor:
+                                                        palette.muted,
+                                                    textStyle: const TextStyle(
+                                                      fontSize: 12.5,
+                                                    ),
+                                                  ),
+                                                  child: const Text('手动输入地址'),
+                                                ),
+                                              ),
+                                      ),
+                                    ],
+                                  ),
                           ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
