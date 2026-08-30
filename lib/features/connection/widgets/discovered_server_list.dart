@@ -7,11 +7,12 @@ import '../data/lan_server_scanner.dart';
 // 发现区（连接页主角）：自动发现是连接主路径，卡片按设计系统 .card 规格
 // （panel + hairline + card 圆角 + 轻投影）承载「点选即连」。
 //
-// 三个状态共用同一块卡片形状，构图不塌：
-//   扫描中 → 卡片里一行「菊花 + 正在寻找」，居中；
-//   一无所获 → 卡片里图标 + 一句说明 + 重新扫描；
-//   有结果 → 「附近的服务器」标签行（右端挂重新扫描）+ 若干服务器卡片。
-// 之前扫描态/空态只有裸文字挂在居中的品牌块下面，左对齐、无容器，看着像没做完。
+// 三个状态共用**同一个定高框**（kDiscoveryHeight），构图不随状态抖动：
+//   扫描中 → 卡片里菊花 + 说明，整体居中；
+//   一无所获 → 同一张卡片换图标 + 重新扫描；
+//   有结果 → 标签行 + 服务器卡片，超出定高就在框内滚动。
+// 之前三态各自决定高度，扫描→有结果→空态之间下方的表单会跟着上下窜（用户说的
+// 「一会大一会小」）。
 class DiscoveredServerList extends StatelessWidget {
   const DiscoveredServerList({
     required this.discovering,
@@ -22,6 +23,11 @@ class DiscoveredServerList extends StatelessWidget {
     this.connectingBase,
     super.key,
   });
+
+  // 发现区固定高度。按最高的那个状态（空态：44 图标 + 标题 + 说明 + 重新扫描
+  // 按钮 + 上下 24 内边距 ≈ 194）留出余量定的，说明文字换行也不挤。改这个值
+  // 前先在窄屏上看空态有没有溢出。
+  static const double kDiscoveryHeight = 216;
 
   final bool discovering;
   final List<DiscoveredServer> servers;
@@ -34,14 +40,47 @@ class DiscoveredServerList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (servers.isEmpty) {
-      return _StatusCard(
-        discovering: discovering,
-        enabled: enabled,
-        onRescan: onRescan,
-      );
-    }
+    return SizedBox(
+      height: kDiscoveryHeight,
+      child: servers.isEmpty
+          ? _StatusCard(
+              discovering: discovering,
+              enabled: enabled,
+              onRescan: onRescan,
+            )
+          : _ServerList(
+              discovering: discovering,
+              servers: servers,
+              enabled: enabled,
+              connectingBase: connectingBase,
+              onConnect: onConnect,
+              onRescan: onRescan,
+            ),
+    );
+  }
+}
 
+// 有结果时的列表：标签行固定在顶部，卡片超过定高就只在这块区域内滚动，
+// 不把下方的手输区往下推。
+class _ServerList extends StatelessWidget {
+  const _ServerList({
+    required this.discovering,
+    required this.servers,
+    required this.enabled,
+    required this.connectingBase,
+    required this.onConnect,
+    required this.onRescan,
+  });
+
+  final bool discovering;
+  final List<DiscoveredServer> servers;
+  final bool enabled;
+  final Uri? connectingBase;
+  final ValueChanged<DiscoveredServer> onConnect;
+  final VoidCallback onRescan;
+
+  @override
+  Widget build(BuildContext context) {
     final palette = context.palette;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -81,15 +120,23 @@ class DiscoveredServerList extends StatelessWidget {
               ),
           ],
         ),
-        for (final server in servers) ...<Widget>[
-          const SizedBox(height: 10),
-          _ServerCard(
-            server: server,
-            enabled: enabled,
-            connecting: server.base == connectingBase,
-            onTap: () => onConnect(server),
+        const SizedBox(height: 10),
+        Expanded(
+          child: ListView.separated(
+            padding: EdgeInsets.zero,
+            itemCount: servers.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final server = servers[index];
+              return _ServerCard(
+                server: server,
+                enabled: enabled,
+                connecting: server.base == connectingBase,
+                onTap: () => onConnect(server),
+              );
+            },
           ),
-        ],
+        ),
       ],
     );
   }
@@ -113,8 +160,11 @@ class _StatusCard extends StatelessWidget {
     final palette = context.palette;
     return _CardShell(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         child: Column(
+          // 卡片被外层撑到定高，内容在其中垂直居中：扫描态（无按钮）和空态
+          // （有按钮）高度不同，居中才不会一个贴顶一个贴底。
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             // 圆形托底里的图标/菊花：扫描中用品牌青绿转圈，停下来用灰色图标。
@@ -154,7 +204,7 @@ class _StatusCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              discovering ? '手机和服务器需要在同一个 Wi-Fi 下' : '确认在同一个 Wi-Fi，或在下面手动输入地址',
+              discovering ? '手机和服务器需要在同一个 Wi-Fi' : '确认在同一个 Wi-Fi，或手动输入地址',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12.5,

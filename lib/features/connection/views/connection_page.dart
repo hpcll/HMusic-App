@@ -172,11 +172,11 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     40,
-                    // 视口 30% 处：只有品牌时读作"略高于中线"的开场，内容出现
-                    // 后它一动不动。夹在 24~260 之间——矮屏（横屏、开键盘）不
-                    // 把内容全顶到折叠线以下，大屏也不至于把品牌坠到半腰。
-                    // 内容再高也只是可滚，构图不变。
-                    (constraints.maxHeight * 0.30).clamp(24.0, 260.0),
+                    // 视口 18% 处：开场只有品牌时读作"上三分之一"的开场位，
+                    // 不是坠在半腰。夹在 24~180 之间——矮屏（横屏、开键盘）不
+                    // 把内容顶到折叠线以下，大屏也不至于飘太高。内容再高也只是
+                    // 可滚，品牌块位置始终不变。
+                    (constraints.maxHeight * 0.18).clamp(24.0, 180.0),
                     40,
                     40,
                   ),
