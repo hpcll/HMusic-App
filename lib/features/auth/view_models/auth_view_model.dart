@@ -26,12 +26,15 @@ class AuthViewModel extends Notifier<AuthViewState> {
             ? AuthSubmissionStatus.authenticated
             : AuthSubmissionStatus.idle,
         initialized: result.initialized,
+        checked: true,
         username: result.user?.username,
         clearError: true,
       );
     } on ApiFailure catch (failure) {
       state = state.copyWith(
         status: AuthSubmissionStatus.idle,
+        // 问不到就按"要登录"处理：把表单放出来让用户能重试，总好过停在开场画面。
+        checked: true,
         errorMessage: failure.message,
       );
     } catch (error) {
@@ -39,6 +42,7 @@ class AuthViewModel extends Notifier<AuthViewState> {
       debugPrint('[AuthViewModel] 读取登录状态出现意外失败：$error');
       state = state.copyWith(
         status: AuthSubmissionStatus.idle,
+        checked: true,
         errorMessage: '无法获取登录状态：$error',
       );
     }

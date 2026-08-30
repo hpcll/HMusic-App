@@ -55,9 +55,19 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
   Timer? _hintTimer;
   bool _showRestoreHint = false;
 
+  // 品牌渐显的时长；发现列表/手输框要等它走完才出现，不和开场抢戏（首次打开
+  // 没存过地址时接续会立刻返回 false，不挡一下就是一屏控件砸在渐显中途）。
+  // 用计时器而不是动画的 onEnd 作准：onEnd 万一不触发，这页就永远只有品牌。
+  static const Duration _introDuration = Duration(milliseconds: 520);
+  Timer? _introTimer;
+  bool _introDone = false;
+
   @override
   void initState() {
     super.initState();
+    _introTimer = Timer(_introDuration, () {
+      if (mounted) setState(() => _introDone = true);
+    });
     if (widget.autoResume) {
       _booting = true;
       _hintTimer = Timer(_hintDelay, () {
@@ -94,6 +104,7 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
 
   @override
   void dispose() {
+    _introTimer?.cancel();
     _hintTimer?.cancel();
     _addressController.dispose();
     super.dispose();
@@ -114,7 +125,8 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
     final scanning = state.discovering || !state.discoverCompleted;
     final showForm = _manualExpanded || (!scanning && state.discovered.isEmpty);
     // 开场态：只有品牌 + （慢了才出现的）一行说明，不渲染任何发现/表单控件。
-    final splash = _booting || state.restoring;
+    // 品牌渐显没走完也算开场，控件不插队。
+    final splash = _booting || state.restoring || !(_introDone || reduceMotion);
     return Scaffold(
       backgroundColor: palette.background,
       body: SafeArea(
@@ -133,9 +145,7 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
                   // 挂载即从 0 走到 1，之后不再重放）。
                   TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0, end: 1),
-                    duration: reduceMotion
-                        ? Duration.zero
-                        : const Duration(milliseconds: 520),
+                    duration: reduceMotion ? Duration.zero : _introDuration,
                     curve: Curves.easeOutCubic,
                     builder: (context, t, child) => Opacity(
                       opacity: t,
