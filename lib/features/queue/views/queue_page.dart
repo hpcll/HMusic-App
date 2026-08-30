@@ -100,7 +100,10 @@ class _QueuePageState extends ConsumerState<QueuePage> {
             ),
         ],
       ),
-      body: SafeArea(child: _body(context, state, notifier)),
+      // bottom: false —— 底部必须沉浸：SafeArea 若吃掉手势条高度，列表视口就在
+      // 手势条上沿截断，最后一行下面留一条不透明底板（用户报的「没有沉浸」）。
+      // 让内容滑到屏幕最底，静止时的让位由下方 _list 的 padding 负责。
+      body: SafeArea(bottom: false, child: _body(context, state, notifier)),
     );
   }
 
@@ -158,8 +161,9 @@ class _QueuePageState extends ConsumerState<QueuePage> {
     } else {
       list = ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        // 底部让位：桌面悬浮 mini 之下仍可滚到最后一行（窄屏 push 形态在
-        // SafeArea 内，环境 padding 为 0，只剩基础 12）。
+        // 底部让位：桌面悬浮 mini 之下仍可滚到最后一行；窄屏 push 形态的
+        // SafeArea 放开了 bottom，这里的环境 padding 就是手势条高度——内容
+        // 滑过手势条（沉浸），滚到底时最后一行仍完整露出。
         padding: EdgeInsets.only(
           bottom: 12 + MediaQuery.paddingOf(context).bottom,
         ),

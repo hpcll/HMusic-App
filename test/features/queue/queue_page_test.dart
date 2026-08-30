@@ -6,9 +6,20 @@ import 'package:hmusic/features/queue/views/queue_page.dart';
 
 import 'support/fake_queue_repository.dart';
 
-Widget _app(FakeQueueRepository repository) => ProviderScope(
+Widget _app(
+  FakeQueueRepository repository, {
+  EdgeInsets padding = EdgeInsets.zero,
+}) => ProviderScope(
   overrides: [queueRepositoryProvider.overrideWithValue(repository)],
-  child: const MaterialApp(home: QueuePage()),
+  child: MaterialApp(
+    home: const QueuePage(),
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(padding: padding, viewPadding: padding),
+      child: child!,
+    ),
+  ),
 );
 
 void main() {
@@ -37,5 +48,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.calls, contains('get'));
+  });
+
+  // 窄屏 push 形态曾用 SafeArea 吃掉手势条高度：列表视口在手势条上沿截断，
+  // 底下留一条不透明底板（「播放队列底部没有沉浸」）。列表必须铺到屏幕最底，
+  // 让位改由自身 padding 承担——滚到底时最后一行仍完整露在手势条上方。
+  testWidgets('窄屏 push 形态：列表铺到屏幕最底，让位只走列表 padding', (tester) async {
+    final repository = FakeQueueRepository(queue: buildQueue(count: 20));
+    await tester.pumpWidget(
+      _app(repository, padding: const EdgeInsets.only(bottom: 34)),
+    );
+    await tester.pumpAndSettle();
+
+    final Finder list = find.byType(ListView).first;
+    expect(
+      tester.getRect(list).bottom,
+      tester.getRect(find.byType(Scaffold)).bottom,
+    );
+    expect(
+      (tester.widget(list) as ListView).padding,
+      const EdgeInsets.only(bottom: 46),
+    );
   });
 }
