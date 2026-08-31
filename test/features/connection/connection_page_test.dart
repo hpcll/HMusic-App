@@ -82,11 +82,10 @@ GoRouter _connectRouter({String? initialLocation}) => GoRouter(
   ],
 );
 
-// 开场是一段要走完的过场：品牌渐显 900ms、最短停留 1400ms，之后控件才出现、
-// 接续成功也才跳页。pumpAndSettle 只在有帧调度时推进，渐显结束后它就停了，
-// 到不了 1400ms——所以这里显式把时钟推过开场。
+// 三幕开场共 1900ms（正中淡入 700 → 停 300 → 推到位 520 → 标语/内容），
+// 走完控件才出现、接续成功也才跳页。这里显式把时钟推过整段开场。
 Future<void> _settleOpening(WidgetTester tester) async {
-  await tester.pump(const Duration(milliseconds: 1500));
+  await tester.pump(const Duration(milliseconds: 2000));
   await tester.pumpAndSettle();
 }
 
@@ -139,12 +138,14 @@ void main() {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-    await _settleOpening(tester);
+    await tester.pumpAndSettle();
 
     // 一次自动连接都不能发起，也不能被弹去登录页。
     expect(repository.connectInputs, isEmpty);
     expect(find.text('auth destination'), findsNothing);
     expect(find.byType(ConnectionPage), findsOneWidget);
+    // 主动来换服务器不放开场：不用等那两秒，内容当场就在。
+    expect(find.byType(DiscoveredServerList), findsOneWidget);
     // 扫不到东西就展开手输框，并把上次的地址回填进去供修改（只是建议值，不自动连）。
     expect(find.text('连接服务器'), findsOneWidget);
     final field = tester.widget<TextField>(find.byType(TextField));
@@ -172,11 +173,15 @@ void main() {
       ),
     );
 
-    // 接续早就成功了（假仓库立即返回），但开场没走完，人还得留在这一页。
+    // 接续早就成功了（假仓库立即返回），但开场没走完，人还得留在这一页——
+    // 字标还停在正中（900ms）、乃至刚推到位（1600ms）都不许跳。
     await tester.pump(const Duration(milliseconds: 900));
     expect(repository.connectInputs, isNotEmpty);
     expect(find.text('auth destination'), findsNothing);
     expect(find.byType(ConnectionPage), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(find.text('auth destination'), findsNothing);
 
     await _settleOpening(tester);
     expect(find.text('auth destination'), findsOneWidget);
@@ -218,17 +223,18 @@ void main() {
     expect(find.text('连接服务器'), findsNothing);
     expect(find.text('手动输入地址'), findsNothing);
 
-    // 说明那一行的门槛是 700ms，此前只有品牌在浮上来。
-    await tester.pump(const Duration(milliseconds: 600));
+    // 800ms：正中的淡入（700ms）已走完，字标满不透明；但它还没被推上去，
+    // 所以接续说明仍然不许出声——否则会和停在正中的字标叠在一起。
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(tester.widget<Opacity>(brandFade).opacity, 1);
     expect(find.byType(AnimatedOpacity), findsOneWidget);
     expect(
       tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
       0,
     );
 
-    // 过了 700ms 还没连上，才开口解释在等什么；渐显（900ms）此时也走完了。
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(tester.widget<Opacity>(brandFade).opacity, 1);
+    // 1600ms：推到位了（1520ms 落地），这时才开口解释在等什么。
+    await tester.pump(const Duration(milliseconds: 800));
     expect(
       tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
       1,
@@ -265,9 +271,9 @@ void main() {
       ),
     );
 
-    // 1000ms：渐显（900ms）已走完、位移归零，但开场（1400ms）还没结束 →
-    // 只有品牌。此时量到的就是它的最终位置。
-    await tester.pump(const Duration(milliseconds: 1000));
+    // 1600ms：字标已推到位（1520ms 落地），但内容（1700ms 起）还没出现 →
+    // 此时量到的就是它的最终位置。
+    await tester.pump(const Duration(milliseconds: 1600));
     expect(find.byType(DiscoveredServerList), findsNothing);
     final double splashTop = tester.getRect(find.byType(BrandWordmark)).top;
 
@@ -276,6 +282,92 @@ void main() {
     expect(find.byType(DiscoveredServerList), findsOneWidget);
     expect(find.text('没有发现服务器'), findsOneWidget);
     expect(tester.getRect(find.byType(BrandWordmark)).top, splashTop);
+  });
+
+  // 用户要的开场：字标先在**屏幕正中**慢慢淡入，再由一个动画把它推到最终位置，
+  // 然后下方内容才展现。这条钉住"起点在正中、终点在锚点"这件事——只靠位移实现，
+  // 布局槽位全程在终点，所以量的是绘制后的实际矩形。
+  testWidgets('第 1 幕字标在屏幕正中，第 2 幕推到锚点', (tester) async {
+    final Completer<void> gate = Completer<void>();
+    final router = _connectRouter();
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(
+            _FakeConnectionRepository(
+              savedAddress: _FakeConnectionRepository.storedAddress,
+              connectGate: gate.future,
+            ),
+          ),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    final Size screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+
+    // 首帧：字标的中心落在屏幕垂直中线上（±1px 容差），而不是最终锚点。
+    final Rect atStart = tester.getRect(find.byType(BrandWordmark));
+    expect((atStart.center.dy - screen.height / 2).abs(), lessThan(1));
+
+    // 1600ms：推完了（1520ms 落地），字标停在锚点——18% 视口高，明显高于中线。
+    await tester.pump(const Duration(milliseconds: 1600));
+    final Rect landed = tester.getRect(find.byType(BrandWordmark));
+    expect(landed.top, lessThan(atStart.top));
+    expect(landed.top, closeTo(screen.height * 0.18, 1));
+
+    gate.complete();
+    await _settleOpening(tester);
+  });
+
+  // 热启动不放开场：同一个进程里再回到连接页（退出登录、换服务器失败后返回…），
+  // 用户点一下按钮不该再等一遍两秒的开场。闸门是 appOpeningProvider，一个
+  // ProviderScope 只放一次。
+  testWidgets('同一进程第二次进连接页：不放开场', (tester) async {
+    final router = _connectRouter();
+    addTearDown(router.dispose);
+    final ProviderContainer container = ProviderContainer(
+      overrides: [
+        connectionRepositoryProvider.overrideWithValue(
+          _FakeConnectionRepository(),
+        ),
+        lanServerScannerProvider.overrideWithValue(_silentScanner()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    // 第一程：开场照放，首帧字标在正中且透明。
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    final Finder brandFade = find
+        .ancestor(
+          of: find.byType(BrandWordmark),
+          matching: find.byType(Opacity),
+        )
+        .first;
+    expect(tester.widget<Opacity>(brandFade).opacity, lessThan(1));
+    await _settleOpening(tester);
+
+    // 换一棵树重进这一页（等价于同进程里再次落到 /connect）。
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(home: const ConnectionPage()),
+      ),
+    );
+    await tester.pump();
+
+    // 闸门已经用掉：字标直接就位、满不透明，内容也不用等。
+    expect(tester.widget<Opacity>(brandFade).opacity, 1);
+    await tester.pumpAndSettle();
+    expect(find.byType(DiscoveredServerList), findsOneWidget);
   });
 
   testWidgets('shows server connection form and restores address', (

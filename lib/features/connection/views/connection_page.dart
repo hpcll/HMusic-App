@@ -5,12 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../core/startup/app_opening.dart';
 import '../../../shared/widgets/brand_mark.dart';
 import '../../auth/views/auth_page.dart';
 import '../data/lan_server_scanner.dart';
 import '../view_models/connection_view_model.dart';
 import '../widgets/discovered_server_list.dart';
 import '../widgets/server_address_form.dart';
+
+// 字标显示高度。第 1 幕要把它摆到屏幕正中，得知道它自己多高。
+const double _kWordmarkHeight = 56;
 
 // 连接页信息层级：自动发现是主路径——「附近的服务器」卡片紧随品牌区，点选
 // 即连；手动表单是次要路径，默认折叠成一条 ghost 链接，只有扫描结束一无所获
@@ -33,7 +37,8 @@ class ConnectionPage extends ConsumerStatefulWidget {
   ConsumerState<ConnectionPage> createState() => _ConnectionPageState();
 }
 
-class _ConnectionPageState extends ConsumerState<ConnectionPage> {
+class _ConnectionPageState extends ConsumerState<ConnectionPage>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _addressController = TextEditingController();
 
   // 手动表单是否被用户主动展开；展开后不再收起（链接消失，状态单向）。
@@ -44,8 +49,7 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
 
   // 冷启动接续这一程只显示品牌，不显示任何「查找服务器」的东西。必须在
   // initState 同步置位：接续排在 microtask 里，state.restoring 要等下一轮
-  // 才为真，中间那一两帧会把「正在寻找局域网内的 HMusic Server…」闪出来
-  // ——用户每次开 App（无论登没登录）都先看见一次找服务器，正是这一下难看。
+  // 才为真，中间那一两帧会把「正在寻找局域网内的服务器」闪出来。
   bool _booting = false;
 
   // 接续慢了才解释自己。局域网接续通常几百毫秒就完了，一上来就甩菊花 +
@@ -55,25 +59,73 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
   Timer? _hintTimer;
   bool _showRestoreHint = false;
 
-  // 品牌渐显的节奏。开场不是"尽快让路"，是一段要走完的过场：字标先浮上来，
-  // 标语错半拍跟上（对齐 clearshot 那套：1.8s 动画 + 分两拍 + 最短停留 2s）。
-  static const Duration _introDuration = Duration(milliseconds: 900);
+  // 开场一条时间轴，三幕都从它身上按 Interval 切（clearshot 的开屏也是单个
+  // controller + Interval 分幕）：
+  //   0 → 700ms      字标在**屏幕正中**淡入；
+  //   700 → 1000ms   定住不动（这个停顿就是"不着急"的来源）；
+  //   1000 → 1520ms  推到它该在的位置（视口 18% 的锚点）；
+  //   1520 → 1820ms  标语淡入（接住落位）；
+  //   1700ms 起      下方发现区淡入，与标语略微错开；
+  //   1900ms         整段结束——接续成功也要等到这里才跳页。
+  static const Duration _openingTotal = Duration(milliseconds: 1900);
+  static const double _markFadeEnd = 700 / 1900;
+  static const double _liftStart = 1000 / 1900;
+  static const double _liftEnd = 1520 / 1900;
+  static const double _sloganEnd = 1820 / 1900;
+  static const double _contentStart = 1700 / 1900;
 
-  // 开场最短停留。接续在局域网里往往两三百毫秒就回来了，回来就跳 = 动画跑到
-  // 一半被切页，上一页的字标（已就位）和下一页的字标（还在上浮）叠在一起淡入
-  // 淡出，看着就是"最后一下出现重影"。必须等这段走完再走人。
-  static const Duration _openingHold = Duration(milliseconds: 1400);
-  Timer? _openingTimer;
-  bool _openingDone = false;
-  late final DateTime _openedAt;
+  late final AnimationController _opening;
+  late final Animation<double> _markFade;
+  late final Animation<double> _lift;
+  late final Animation<double> _sloganFade;
+
+  // 开场走完（或压根没放）后完成，接续跳页要等它。
+  final Completer<void> _openingDone = Completer<void>();
 
   @override
   void initState() {
     super.initState();
-    _openedAt = DateTime.now();
-    _openingTimer = Timer(_openingHold, () {
-      if (mounted) setState(() => _openingDone = true);
-    });
+    // 系统开了"减少动效"就不放开场——这里必须读 platformDispatcher 而不是
+    // MediaQuery：initState 里拿不到 MediaQuery，而放不放开场决定了
+    // controller 的初值，不能等到 build 再补。
+    final bool reduceMotion = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations;
+    // 开场只属于冷启动那一程：更换服务器（autoResume=false）不放，同一进程里
+    // 再次回到这一页也不放（热启动语义，见 AppOpening）。
+    final bool playOpening =
+        widget.autoResume &&
+        !reduceMotion &&
+        ref.read(appOpeningProvider).claim();
+
+    _opening = AnimationController(
+      vsync: this,
+      duration: _openingTotal,
+      value: playOpening ? 0 : 1,
+    );
+    _markFade = CurvedAnimation(
+      parent: _opening,
+      curve: const Interval(0, _markFadeEnd, curve: Curves.easeOut),
+    );
+    // 从正中推到锚点：0 = 还在正中，1 = 已就位。easeInOutCubic 起步和收尾
+    // 都软，中段快——像被"送"上去，不是弹上去。
+    _lift = CurvedAnimation(
+      parent: _opening,
+      curve: const Interval(_liftStart, _liftEnd, curve: Curves.easeInOutCubic),
+    );
+    _sloganFade = CurvedAnimation(
+      parent: _opening,
+      curve: const Interval(_liftEnd, _sloganEnd, curve: Curves.easeOut),
+    );
+
+    if (playOpening) {
+      unawaited(_opening.forward().whenComplete(_finishOpening));
+    } else {
+      _finishOpening();
+    }
+
     if (widget.autoResume) {
       _booting = true;
       _hintTimer = Timer(_hintDelay, () {
@@ -92,8 +144,9 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
         // 先尝试接续上次的服务器：成功就直接进登录页（token 有效会再自动放行到
         // 首页），用户开 App 不需要每次重新点服务器、更不该重新登录。
         if (await notifier.resumeSaved()) {
-          // 接续快过开场时也要把开场走完再跳：半路切页就是重影的来源。
-          await _awaitOpening();
+          // 接续快过开场时也要把开场走完再跳：半路切页，上一页已就位的字标和
+          // 下一页还在动的字标叠着交叉淡入，就是"最后一下出现重影"。
+          await _openingDone.future;
           if (mounted) context.go(AuthPage.path);
           return;
         }
@@ -110,31 +163,16 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
     );
   }
 
-  // 补齐开场剩下的时间；已经走完就立即返回。
-  Future<void> _awaitOpening() async {
-    final Duration remaining =
-        _openingHold - DateTime.now().difference(_openedAt);
-    if (remaining > Duration.zero) {
-      await Future<void>.delayed(remaining);
-    }
+  void _finishOpening() {
+    if (!_openingDone.isCompleted) _openingDone.complete();
   }
-
-  // 把总进度 t 切成一段（begin~end），段外夹到 0/1——用来错开两拍。
-  double _stage(double t, double begin, double end) =>
-      ((t - begin) / (end - begin)).clamp(0.0, 1.0);
-
-  // 淡入 + 上浮收尾：纯淡入偏"贴纸"，带一点位移才像浮上来。
-  Widget _rise(double t, double distance, Widget child) => Opacity(
-    opacity: t,
-    child: Transform.translate(
-      offset: Offset(0, (1 - t) * distance),
-      child: child,
-    ),
-  );
 
   @override
   void dispose() {
-    _openingTimer?.cancel();
+    // 页面先走一步（用户返回、路由被替换）时也要放行等待者，否则那个 await
+    // 永远悬着。
+    _finishOpening();
+    _opening.dispose();
     _hintTimer?.cancel();
     _addressController.dispose();
     super.dispose();
@@ -142,225 +180,47 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(connectionViewModelProvider);
+    final palette = context.palette;
     ref.listen(connectionViewModelProvider, (previous, next) {
       if (_addressController.text.isEmpty && next.suggestedAddress.isNotEmpty) {
         _addressController.text = next.suggestedAddress;
       }
     });
-    final palette = context.palette;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    // 「扫过且一无所获」→ 手动表单自动展开；尚未扫过/扫描中/有结果都收起，
-    // 保持构图干净、首帧不闪表单。
-    final scanning = state.discovering || !state.discoverCompleted;
-    final showForm = _manualExpanded || (!scanning && state.discovered.isEmpty);
-    // 开场态：只有品牌 + （慢了才出现的）一行说明，不渲染任何发现/表单控件。
-    // 品牌渐显没走完也算开场，控件不插队。
-    final splash =
-        _booting || state.restoring || !(_openingDone || reduceMotion);
     return Scaffold(
       backgroundColor: palette.background,
       body: SafeArea(
-        // 品牌块钉在视口固定高度处，不跟着内容一起被重新居中——原先是整列
-        // Center，开场只有品牌时列很矮，发现卡片一出现列变高、居中重算，
-        // 字标就被顶着往上挪了一截（用户看到的「icon 加文字往上位移了一点」）。
+        // 品牌块钉在视口固定高度处，不跟着内容一起被重新居中——若整列 Center，
+        // 开场只有品牌时列很矮，发现卡片一出现列变高、居中重算，字标就被顶着
+        // 往上挪一截（用户看到的「icon 加文字往上位移了一点」）。
         child: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
+            // 视口 18% 处：字标的最终落点，读作"上三分之一"的开场位。夹在
+            // 24~180 之间——矮屏（横屏、开键盘）不把内容顶到折叠线以下，大屏
+            // 也不至于飘太高。内容再高也只是可滚，这个位置始终不变。
+            final double anchorTop = (constraints.maxHeight * 0.18).clamp(
+              24.0,
+              180.0,
+            );
+            // 第 1 幕把字标画在屏幕正中：从锚点往下推这么多，就正好居中。
+            // 只动 transform 不动布局——布局槽位从第一帧就在终点，全程零重排，
+            // 下方内容不会被推来推去。
+            final double liftDistance =
+                (constraints.maxHeight - _kWordmarkHeight) / 2 - anchorTop;
             return SingleChildScrollView(
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    40,
-                    // 视口 18% 处：开场只有品牌时读作"上三分之一"的开场位，
-                    // 不是坠在半腰。夹在 24~180 之间——矮屏（横屏、开键盘）不
-                    // 把内容顶到折叠线以下，大屏也不至于飘太高。内容再高也只是
-                    // 可滚，品牌块位置始终不变。
-                    (constraints.maxHeight * 0.18).clamp(24.0, 180.0),
-                    40,
-                    40,
-                  ),
+                  padding: EdgeInsets.fromLTRB(40, anchorTop, 40, 40),
                   // 只横向居中，纵向必须顶对齐：用 Center 的话内容一变高，
                   // 剩余空间的纵向居中又会把品牌块推上去，等于没改。
                   child: Align(
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 380),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          // 品牌块分两拍浮上来：字标先走，标语错半拍跟上（clearshot 的
-                          // 开场也是先文字后图标两拍，比一整块同时淡入更像"呼吸"）。
-                          // 只在进页时跑一次——TweenAnimationBuilder 挂载即从 0 走到 1，
-                          // 之后不再重放。
-                          TweenAnimationBuilder<double>(
-                            tween: Tween<double>(begin: 0, end: 1),
-                            duration: reduceMotion
-                                ? Duration.zero
-                                : _introDuration,
-                            curve: Curves.easeInOut,
-                            builder: (context, t, child) {
-                              final double markT = Curves.easeOut.transform(
-                                _stage(t, 0, 0.7),
-                              );
-                              final double sloganT = Curves.easeOut.transform(
-                                _stage(t, 0.35, 1),
-                              );
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: <Widget>[
-                                  // 居中构图：品牌块（完整字标 + 副标题）与内容块拉开大段
-                                  // 距离，分组呼吸感是这页的关键——间距均匀就会「挤成一坨」。
-                                  // 字标本身含 H（字形双竖笔）+ Music 连读，不另写 "HMusic"。
-                                  _rise(
-                                    markT,
-                                    12,
-                                    const Center(
-                                      child: BrandWordmark(size: 56),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  // 副标题是品牌 slogan：一句轻轻的搭话，不解释产品、不重复
-                                  // 品牌名。衬线 + 加宽字距 = 扉页题句的声调；mutedStrong
-                                  // 保证可读但不抢字标。
-                                  _rise(
-                                    sloganT,
-                                    8,
-                                    Text(
-                                      '今天想听点什么',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontFamily: 'NotoSerifSC',
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                        height: 1.4,
-                                        letterSpacing: 3,
-                                        color: palette.mutedStrong,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 52),
-                          // 开场 → 发现/手输的切换走淡入淡出：接续失败时控件不是「啪」
-                          // 地出现，而是接着品牌浮上来的那口气显形。
-                          AnimatedSwitcher(
-                            duration: reduceMotion
-                                ? Duration.zero
-                                : const Duration(milliseconds: 260),
-                            switchInCurve: Curves.easeOut,
-                            switchOutCurve: Curves.easeIn,
-                            child: splash
-                                ? Center(
-                                    key: const ValueKey<String>('splash'),
-                                    // 接续这一句始终占位、只改透明度：700ms 后淡入，
-                                    // 布局不动——否则品牌块会在它出现时被顶着往上跳。
-                                    child: AnimatedOpacity(
-                                      opacity: _showRestoreHint ? 1 : 0,
-                                      duration: reduceMotion
-                                          ? Duration.zero
-                                          : const Duration(milliseconds: 260),
-                                      curve: Curves.easeOut,
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: <Widget>[
-                                          SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: palette.mutedStrong,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            '正在连接上次的服务器…',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: palette.muted,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                : Column(
-                                    key: const ValueKey<String>('content'),
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: <Widget>[
-                                      DiscoveredServerList(
-                                        discovering: scanning,
-                                        servers: state.discovered,
-                                        enabled: !state.isConnecting,
-                                        connectingBase: state.isConnecting
-                                            ? _connectingBase
-                                            : null,
-                                        onConnect: _connectDiscovered,
-                                        onRescan: () => ref
-                                            .read(
-                                              connectionViewModelProvider
-                                                  .notifier,
-                                            )
-                                            .discover(),
-                                      ),
-                                      if (state.errorMessage !=
-                                          null) ...<Widget>[
-                                        const SizedBox(height: 14),
-                                        Text(
-                                          state.errorMessage!,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.error,
-                                          ),
-                                        ),
-                                      ],
-                                      const SizedBox(height: 28),
-                                      // 手动区显隐走 220ms easeOut 尺寸过渡（docs/05 chrome 同词汇）。
-                                      AnimatedSize(
-                                        duration: reduceMotion
-                                            ? Duration.zero
-                                            : const Duration(milliseconds: 220),
-                                        curve: Curves.easeOut,
-                                        alignment: Alignment.topCenter,
-                                        child: showForm
-                                            ? ServerAddressForm(
-                                                controller: _addressController,
-                                                isConnecting:
-                                                    state.isConnecting,
-                                                onSubmit: _connect,
-                                              )
-                                            : Center(
-                                                child: TextButton(
-                                                  onPressed: state.isConnecting
-                                                      ? null
-                                                      : () => setState(
-                                                          () =>
-                                                              _manualExpanded =
-                                                                  true,
-                                                        ),
-                                                  style: TextButton.styleFrom(
-                                                    foregroundColor:
-                                                        palette.muted,
-                                                    textStyle: const TextStyle(
-                                                      fontSize: 12.5,
-                                                    ),
-                                                  ),
-                                                  child: const Text('手动输入地址'),
-                                                ),
-                                              ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ],
+                      child: AnimatedBuilder(
+                        animation: _opening,
+                        builder: (context, _) =>
+                            _body(context, palette, liftDistance),
                       ),
                     ),
                   ),
@@ -370,6 +230,155 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage> {
           },
         ),
       ),
+    );
+  }
+
+  // 三幕开场 + 页面本体。所有随开场变化的东西都在这里读 animation 值，外层
+  // 靠一个 AnimatedBuilder 驱动重建。
+  Widget _body(BuildContext context, HMusicPalette palette, double lift) {
+    final state = ref.watch(connectionViewModelProvider);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    // 「扫过且一无所获」→ 手动表单自动展开；尚未扫过/扫描中/有结果都收起，
+    // 保持构图干净、首帧不闪表单。
+    final scanning = state.discovering || !state.discoverCompleted;
+    final showForm = _manualExpanded || (!scanning && state.discovered.isEmpty);
+    // 第 3 幕之前不渲染任何发现/表单控件；接续中同样只留品牌。
+    final bool contentReady = _opening.value >= _contentStart;
+    final splash = _booting || state.restoring || !contentReady;
+    // 字标落位之后才允许出现接续说明：还在正中/半路时它就在锚点下方冒出来，
+    // 两者会叠在一起。
+    final bool landed = _lift.value >= 1;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // 第 1 幕：字标在屏幕正中淡入。第 2 幕：位移收回到 0，被"送"到锚点。
+        Opacity(
+          opacity: _markFade.value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - _lift.value) * lift),
+            // 字标本身含 H（字形双竖笔）+ Music 连读，不另写 "HMusic" 文字。
+            child: const Center(child: BrandWordmark(size: _kWordmarkHeight)),
+          ),
+        ),
+        const SizedBox(height: 20),
+        // 第 3 幕之一：标语接住落位。副标题是品牌 slogan——一句轻轻的搭话，
+        // 不解释产品、不重复品牌名。衬线 + 加宽字距 = 扉页题句的声调。
+        Opacity(
+          opacity: _sloganFade.value,
+          child: Text(
+            '今天想听点什么',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'NotoSerifSC',
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              height: 1.4,
+              letterSpacing: 3,
+              color: palette.mutedStrong,
+            ),
+          ),
+        ),
+        const SizedBox(height: 52),
+        // 开场 → 发现/手输的切换走淡入淡出：控件不是「啪」地出现，而是接着
+        // 字标落位的那口气显形。
+        AnimatedSwitcher(
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: splash
+              ? Center(
+                  key: const ValueKey<String>('splash'),
+                  // 接续这一句始终占位、只改透明度：门槛到了才淡入，布局不动
+                  // ——否则品牌块会在它出现时被顶着往上跳。
+                  child: AnimatedOpacity(
+                    opacity: (_showRestoreHint && landed) ? 1 : 0,
+                    duration: reduceMotion
+                        ? Duration.zero
+                        : const Duration(milliseconds: 260),
+                    curve: Curves.easeOut,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.mutedStrong,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '正在连接上次的服务器…',
+                          style: TextStyle(fontSize: 13, color: palette.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Column(
+                  key: const ValueKey<String>('content'),
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    DiscoveredServerList(
+                      discovering: scanning,
+                      servers: state.discovered,
+                      enabled: !state.isConnecting,
+                      connectingBase: state.isConnecting
+                          ? _connectingBase
+                          : null,
+                      onConnect: _connectDiscovered,
+                      onRescan: () => ref
+                          .read(connectionViewModelProvider.notifier)
+                          .discover(),
+                    ),
+                    if (state.errorMessage != null) ...<Widget>[
+                      const SizedBox(height: 14),
+                      Text(
+                        state.errorMessage!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 28),
+                    // 手动区显隐走 220ms easeOut 尺寸过渡（docs/05 chrome 同词汇）。
+                    AnimatedSize(
+                      duration: reduceMotion
+                          ? Duration.zero
+                          : const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                      alignment: Alignment.topCenter,
+                      child: showForm
+                          ? ServerAddressForm(
+                              controller: _addressController,
+                              isConnecting: state.isConnecting,
+                              onSubmit: _connect,
+                            )
+                          : Center(
+                              child: TextButton(
+                                onPressed: state.isConnecting
+                                    ? null
+                                    : () => setState(
+                                        () => _manualExpanded = true,
+                                      ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: palette.muted,
+                                  textStyle: const TextStyle(fontSize: 12.5),
+                                ),
+                                child: const Text('手动输入地址'),
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+        ),
+      ],
     );
   }
 
