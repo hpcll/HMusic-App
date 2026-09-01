@@ -107,6 +107,22 @@ Windows/Linux 当前定位是桌面管理和远程控制端，不要把它们当
 - [最新发布包](https://github.com/hpcll/HMusic-App/releases)
 - [安全问题报告](SECURITY.md)
 
+## 请作者喝杯咖啡
+
+HMusic App 和 HMusic-Server 都是免费开源的，没有会员、订阅和内购。如果它帮上了你，欢迎请作者喝杯咖啡～
+
+<p align="center">
+  <img src="docs/donate/wechat.jpg" alt="微信赞赏码" width="250" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="docs/donate/alipay.jpg" alt="支付宝收款码" width="250" />
+</p>
+
+<p align="center">
+  <b>微信赞赏</b>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <b>支付宝</b>
+</p>
+
 ## 许可证
 
 HMusic App 采用 [Apache License 2.0](LICENSE)。第三方依赖和声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
