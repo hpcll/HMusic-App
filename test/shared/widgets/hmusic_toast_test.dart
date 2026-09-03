@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/app/theme/hmusic_palette.dart';
@@ -135,11 +136,12 @@ void main() {
     await _pumpEntrance(tester);
 
     final rect = tester.getRect(_capsule());
-    // 无安全区（测试窗）：底距 10 + dock 66 + gap 8 + mini 50 + 呼吸距 8。
+    // 无安全区（测试窗）：底距 + dock 66 + gap 8 + mini 50 + 呼吸距 8。底距按
+    // 平台算（Android 让开整条手势条安全区，iOS 减 10），这里跟着主题平台走。
     expect(
       rect.bottom,
       844.0 -
-          (chromeBottomOffset(0) +
+          (chromeBottomOffset(0, platform: defaultTargetPlatform) +
               kChromeDockHeight +
               kChromeGap +
               kChromeMiniHeight +

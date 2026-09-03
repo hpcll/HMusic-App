@@ -67,7 +67,10 @@ class _HMusicToast extends StatelessWidget {
     final desktop = size.width >= 860;
     final bottom = desktop
         ? kMiniPlayerDesktopInset + 12
-        : chromeBottomOffset(MediaQuery.paddingOf(context).bottom) +
+        : chromeBottomOffset(
+                MediaQuery.paddingOf(context).bottom,
+                platform: Theme.of(context).platform,
+              ) +
               kChromeDockHeight +
               kChromeGap +
               kChromeMiniHeight +

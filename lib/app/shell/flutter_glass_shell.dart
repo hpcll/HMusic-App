@@ -54,6 +54,7 @@ class _FlutterGlassShellState extends State<FlutterGlassShell> {
     }
     final bottomOffset = chromeBottomOffset(
       MediaQuery.paddingOf(context).bottom,
+      platform: Theme.of(context).platform,
     );
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
     final miniVisible = widget.showMini && widget.miniActive;

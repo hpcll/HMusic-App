@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/animation.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform;
 
 // 外壳布局常量：侧栏、悬浮 mini player 与移动悬浮玻璃 chrome 的占位尺寸。
 // 放 shared 是为了让全局 toast 这类覆盖层能避开外壳 chrome，而不用从 shared
@@ -37,6 +38,15 @@ const Curve kChromeMorphCurve = Curves.easeOutCubic;
 // dock 选中药丸从 A tab 滑到 B tab 的时长（对齐 iOS 26+ 系统 tab bar 手感）。
 const Duration kDockPillDuration = Duration(milliseconds: 260);
 
-// chrome 底缘到屏幕物理底边的距离：压进安全区、悬在 home indicator/手势条
-// 上方（对齐 GlassShellMetrics.bottomOffset），无安全区设备退到 10。
-double chromeBottomOffset(double safeArea) => math.max(10, safeArea - 10);
+// chrome 底缘到屏幕物理底边的距离：压进安全区、悬在 home indicator/手势条上方。
+//
+// 两个平台不是同一个算法，因为「安全区」在两边的含义不同：
+// - iOS 的 34pt 里，home indicator 自身只占底部约 13pt，减 10 正好留出呼吸；
+//   这一支与原生玻璃壳 GlassShellMetrics.bottomOffset 同式，两侧必须一致。
+// - Android 手势条的安全区（常见 16dp）几乎就等于那颗胶囊自身的高度，再往里
+//   减就直接压在它身上（用户反馈「dock 栏和手势条重叠了」）；三键导航的 48dp
+//   是一条实体栏，更不能减。所以让开整条安全区再留 8 的呼吸。
+double chromeBottomOffset(double safeArea, {required TargetPlatform platform}) {
+  if (platform == TargetPlatform.iOS) return math.max(10, safeArea - 10);
+  return math.max(12, safeArea + 8);
+}
