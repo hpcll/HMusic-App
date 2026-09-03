@@ -54,6 +54,11 @@ class SharedPreferencesUpgradeConfigStore implements UpgradeConfigStore {
         'minVersion': config.minVersion,
         'notice': config.notice,
         'downloadUrl': config.downloadUrl,
+        // 新版信息也一起落盘：GitHub 不通时「检查更新」靠它兜底（见
+        // api_update_repository._releaseFromRemoteConfig）。
+        'latestVersion': config.latestVersion,
+        'apkUrl': config.apkUrl,
+        'apkSize': config.apkSize,
       }),
     );
   }

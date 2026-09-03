@@ -80,8 +80,18 @@ class AppReleaseInfo {
 
 // App 仓库根的 app-config.json：不发服务端新版也能全局控制老 App 准入。
 // minVersion 高于当前版本即强制升级；notice/downloadUrl 展示在强升页。
+// latestVersion/apkUrl/apkSize 是「检查更新」的国内退路：api.github.com 在大陆
+// （乃至挂代理时）常不通，而这份文件有 Gitee/raw/jsDelivr 三镜像 + 服务端中转，
+// 发版时把它们填上，App 拉不到 GitHub 也能看到新版并直装。
 class AppRemoteConfig {
-  const AppRemoteConfig({this.minVersion = '', this.notice, this.downloadUrl});
+  const AppRemoteConfig({
+    this.minVersion = '',
+    this.notice,
+    this.downloadUrl,
+    this.latestVersion = '',
+    this.apkUrl,
+    this.apkSize,
+  });
 
   factory AppRemoteConfig.fromJson(Map<String, Object?> json) {
     return AppRemoteConfig(
@@ -90,10 +100,18 @@ class AppRemoteConfig {
       downloadUrl: json['downloadUrl'] == null
           ? null
           : '${json['downloadUrl']}',
+      latestVersion: '${json['latestVersion'] ?? ''}',
+      apkUrl: json['apkUrl'] == null ? null : '${json['apkUrl']}',
+      apkSize: (json['apkSize'] as num?)?.toInt(),
     );
   }
 
   final String minVersion;
   final String? notice;
   final String? downloadUrl;
+
+  // 最新可下版本（空 = 这份配置没带更新信息）。
+  final String latestVersion;
+  final String? apkUrl;
+  final int? apkSize;
 }

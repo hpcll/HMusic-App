@@ -13,8 +13,9 @@ import '../models/chart.dart';
 import '../view_models/charts_view_model.dart';
 
 // 榜单详情：返回 + 播放全部 + 曲目列表。点行即播（行尾只留入库/队列两个附加
-// 动作），已入库的行标带角标。前 3 名排名用衬线加深墨（对齐 .chart-rank.top），
-// 播放次数用青绿计数（.chart-count，全站唯一表达「正在发生的事」外的青绿例外）。
+// 动作，入库位三态同宽：↓ / 菊花 / 灰对勾）。前 3 名排名用衬线加深墨（对齐
+// .chart-rank.top），播放次数用青绿计数（.chart-count，全站唯一表达「正在发生
+// 的事」外的青绿例外）。
 class ChartDetailView extends ConsumerWidget {
   const ChartDetailView({super.key});
 
@@ -124,7 +125,6 @@ class ChartDetailView extends ConsumerWidget {
               : _ChartRank(rank: entry.rank),
           coverUrl: entry.coverUrl,
           title: entry.title,
-          titleTrailing: archived ? const _ArchivedBadge() : null,
           subtitle: entry.artist,
           subtitleAccent: entry.playCount != null
               ? ' · ${entry.playCount} 次'
@@ -134,13 +134,19 @@ class ChartDetailView extends ConsumerWidget {
           // 队列这两个「附加动作」）。
           onTap: idle ? () => notifier.play(entry) : null,
           actions: <Widget>[
+            // 入库位恒在行尾同一格：没入库是 ↓、下载中转菊花、已入库是灰掉的
+            // 对勾——三态同宽，切换时右侧的队列钮不会横向漂移。
             if (archiving)
               const _ArchivingSpinner()
-            else if (!archived)
+            else
               HMusicIconButton(
-                icon: Icons.download_rounded,
-                tooltip: '下载到服务器',
-                onPressed: idle ? () => notifier.download(entry) : null,
+                icon: archived
+                    ? Icons.download_done_rounded
+                    : Icons.download_rounded,
+                tooltip: archived ? '已入库' : '下载到服务器',
+                onPressed: archived || !idle
+                    ? null
+                    : () => notifier.download(entry),
               ),
             HMusicIconButton(
               icon: Icons.add_rounded,
@@ -150,21 +156,6 @@ class ChartDetailView extends ConsumerWidget {
           ],
         );
       },
-    );
-  }
-}
-
-// 已入库角标：墨色小勾（不用青绿——accent 只留给「正在发生的事」，入库是
-// 既成状态；见 docs/03）。
-class _ArchivedBadge extends StatelessWidget {
-  const _ArchivedBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Icon(
-      Icons.download_done_rounded,
-      size: 14,
-      color: context.palette.muted,
     );
   }
 }

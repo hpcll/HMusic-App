@@ -36,6 +36,16 @@ bash tool/build_release.sh android
 同一台机器上再构建别的平台会把新行 upsert 进去，不再是每个包各带一个 `.sha256`）。Google Play 使用 AAB，
 并启用 Play App Signing；APK 只用于可信渠道的直接安装或测试。
 
+发 Release 之后顺手更新仓库根的 `app-config.json`（三镜像 + 服务端中转，见 docs/02）：
+
+```json
+{ "latestVersion": "v0.1.6", "apkUrl": "https://github.com/.../hmusic-0.1.6-android.apk", "apkSize": 26000000 }
+```
+
+App 的「检查更新」优先问 `api.github.com`，拉不到（大陆不通、代理出口被限流 403）就退到这份文件；
+不填这三个字段，那条退路等于不存在，用户只会看到 GitHub 的失败原因。`minVersion` 仍是强制升级门，
+只在需要召回旧版本时才抬高。
+
 ## Apple 与桌面平台
 
 iOS 自签分发可以生成不含 Apple 签名的 IPA，供用户使用自己的 Apple ID/证书重签：

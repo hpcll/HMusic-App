@@ -11,6 +11,7 @@ import 'package:hmusic/features/charts/views/charts_page.dart';
 import 'package:hmusic/features/settings/data/api_downloads_repository.dart';
 import 'package:hmusic/features/settings/data/downloads_repository.dart';
 import 'package:hmusic/features/settings/models/download_record.dart';
+import 'package:hmusic/shared/widgets/hmusic_icon_button.dart';
 import 'package:hmusic/shared/widgets/hmusic_track_row.dart';
 
 const HMusicTrack _archived = HMusicTrack(
@@ -118,13 +119,23 @@ void main() {
     }
   });
 
-  // 用户反馈：榜单的歌没入库。进详情时拉一次 /downloads 建索引：已入库的行标
-  // 挂角标、不再出下载钮；没入库的行给下载钮。
-  testWidgets('榜单行：已入库标角标，没入库给下载钮', (tester) async {
+  // 用户反馈：榜单的歌没入库。进详情时拉一次 /downloads 建索引：已入库的行在
+  // 原来下载钮那一格显示灰对勾（不另在标题旁挂角标），没入库的给下载钮。
+  testWidgets('榜单行：已入库在行尾显示对勾，没入库给下载钮', (tester) async {
     await _openChart(tester, _FakeDownloadsRepository());
 
     expect(find.byIcon(Icons.download_done_rounded), findsOneWidget);
     expect(find.byIcon(Icons.download_rounded), findsOneWidget);
+    // 对勾是「既成状态」，不可点。
+    final done = tester.widget<HMusicIconButton>(
+      find
+          .ancestor(
+            of: find.byIcon(Icons.download_done_rounded),
+            matching: find.byType(HMusicIconButton),
+          )
+          .first,
+    );
+    expect(done.onPressed, isNull);
   });
 
   testWidgets('点下载钮：发起入库并把该行标成排队中', (tester) async {

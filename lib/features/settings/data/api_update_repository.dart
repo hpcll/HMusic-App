@@ -16,8 +16,10 @@ final Provider<UpdateRepository> updateRepositoryProvider =
         // ApiClient 会强制拼 serverBase + /api/v1 前缀，对外部 API 不适用）。
         github: Dio(
           BaseOptions(
-            connectTimeout: const Duration(seconds: 8),
-            receiveTimeout: const Duration(seconds: 8),
+            // 15s 而不是 8s：走代理/VPN 到 api.github.com 的握手常在 10s 上下，
+            // 8s 会把「慢」误报成「不通」（用户反馈挂了 VPN 也说网络不通）。
+            connectTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 15),
             responseType: ResponseType.json,
             headers: <String, Object?>{
               'accept': 'application/vnd.github+json',
@@ -97,12 +99,61 @@ class ApiUpdateRepository implements UpdateRepository {
     } on DioException catch (error) {
       // 404 = 仓库还没发布 Release（或暂未公开），视为「没有更新渠道」而非报错。
       if (error.response?.statusCode == 404) return null;
+      // GitHub API 不通时退到 app-config.json：那份文件有三个镜像 + 服务端中转
+      // （见 remoteAppConfig），大陆不翻墙也能读到，只要发版时把 latestVersion/
+      // apkUrl 填进去，这里就能照常给出新版信息。
+      final fallback = await _releaseFromRemoteConfig();
+      if (fallback != null) return fallback;
       throw ApiFailure(
         kind: ApiFailureKind.offline,
         statusCode: error.response?.statusCode,
         code: 'APP_UPDATE_CHECK_FAILED',
-        message: '无法连接 GitHub 检查 App 更新（网络不通或超时）',
+        message: _githubFailureMessage(error),
       );
+    }
+  }
+
+  // 把 DioException 翻成人能照着行动的一句话。此前一律报「网络不通或超时」，
+  // 于是限流（403，代理出口 IP 每小时 60 次很容易被占满）也被说成断网。
+  static String _githubFailureMessage(DioException error) {
+    final int? status = error.response?.statusCode;
+    if (status == 403 || status == 429) {
+      final remaining = error.response?.headers.value('x-ratelimit-remaining');
+      if (remaining == '0') {
+        return 'GitHub 接口限流：同一出口 IP 每小时 60 次，代理出口常被占满，'
+            '过一会儿再试（或稍后从设置里手动下载）';
+      }
+      return 'GitHub 拒绝了这次请求（$status）';
+    }
+    if (status != null) return 'GitHub 返回 $status，稍后再试';
+    return switch (error.type) {
+      DioExceptionType.connectionTimeout =>
+        '连接 GitHub 超时（15s）：线路慢或被拦，挂代理也可能卡在握手',
+      DioExceptionType.receiveTimeout => 'GitHub 响应超时（15s）',
+      DioExceptionType.sendTimeout => '请求发送超时',
+      DioExceptionType.badCertificate => 'TLS 证书校验失败（可能被中间人/代理改写）',
+      DioExceptionType.connectionError =>
+        '连不上 GitHub：DNS 解析或线路被拦（${error.message ?? 'connection error'}）',
+      _ => '检查更新失败：${error.message ?? error.type.name}',
+    };
+  }
+
+  // app-config.json 里带的新版信息（发版时填）。没有 latestVersion 就当没有这条
+  // 退路，让上层报 GitHub 的真实失败原因。
+  Future<AppReleaseInfo?> _releaseFromRemoteConfig() async {
+    try {
+      final config = await remoteAppConfig();
+      final version = config?.latestVersion ?? '';
+      if (version.isEmpty) return null;
+      return AppReleaseInfo(
+        version: version,
+        notes: config?.notice,
+        url: config?.downloadUrl,
+        apkUrl: config?.apkUrl,
+        apkSize: config?.apkSize,
+      );
+    } catch (_) {
+      return null;
     }
   }
 
