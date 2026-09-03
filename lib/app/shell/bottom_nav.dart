@@ -25,12 +25,15 @@ const List<NavDestinationSpec> kSidebarDestinations = <NavDestinationSpec>[
   NavDestinationSpec(Icons.library_music_rounded, '歌单', 3),
   NavDestinationSpec(Icons.local_fire_department_rounded, '榜单', 4),
   NavDestinationSpec(Icons.insights_rounded, '统计', 5),
-  NavDestinationSpec(Icons.settings_rounded, '设置', 6),
+  NavDestinationSpec(Icons.settings_rounded, '设置', kSettingsBranch),
 ];
 
 // 主页分支 = 榜单（登录后落点、dock 首项）：系统返回的壳层兜底目标——
 // 非主页 tab 一级页按返回先回这里，主页再返回才交还系统退出 App。
 const int kHomeBranch = 4;
+
+// 设置分支：更新红点挂在这个 tab 上（唯一的「有新版」提示位）。
+const int kSettingsBranch = 6;
 
 // 窄屏 dock 4 tab 精选（播放/队列走 mini player push 全屏页；搜索并入
 // 榜单页头胶囊 push 全屏页——搜索页内容太薄，不值一个常驻 tab）。
@@ -65,6 +68,7 @@ class AppBottomNav extends StatelessWidget {
     required this.shell,
     this.minimized = false,
     this.onExpand,
+    this.updateAvailable = false,
     super.key,
   });
 
@@ -75,6 +79,10 @@ class AppBottomNav extends StatelessWidget {
 
   // 收缩态点圆钮的展开回调（对齐原生 expandDock intent）。
   final VoidCallback? onExpand;
+
+  // 有 App 新版可下：设置 tab 图标点红点（唯一的更新提示位，外壳读
+  // appUpdateBadgeProvider 后传入；本组件不碰 provider，保持可单独 pump）。
+  final bool updateAvailable;
 
   @override
   Widget build(BuildContext context) {
@@ -87,14 +95,24 @@ class AppBottomNav extends StatelessWidget {
           tween: Tween<double>(end: minimized ? 1 : 0),
           duration: disableAnimations ? Duration.zero : kChromeMorphDuration,
           curve: kChromeMorphCurve,
-          builder: (context, t, _) => _buildDock(context, t, fullWidth),
+          builder: (context, t, _) => _buildDock(
+            context,
+            t,
+            fullWidth,
+            badgedBranch: updateAvailable ? kSettingsBranch : null,
+          ),
         );
       },
     );
   }
 
   // t=0 展开条 / t=1 收缩圆钮；中途宽高圆角插值 + 两层交叉淡化。
-  Widget _buildDock(BuildContext context, double t, double fullWidth) {
+  Widget _buildDock(
+    BuildContext context,
+    double t,
+    double fullWidth, {
+    int? badgedBranch,
+  }) {
     final height = lerpDouble(kChromeDockHeight, kChromeMiniHeight, t)!;
     final width = lerpDouble(fullWidth, kChromeCompactDockWidth, t)!;
     final radius = BorderRadius.circular(height / 2);
@@ -130,7 +148,10 @@ class AppBottomNav extends StatelessWidget {
                   width: fullWidth,
                   child: IgnorePointer(
                     ignoring: t > 0.5,
-                    child: Opacity(opacity: rowOpacity, child: _row(context)),
+                    child: Opacity(
+                      opacity: rowOpacity,
+                      child: _row(context, badgedBranch),
+                    ),
                   ),
                 ),
               if (showCompact)
@@ -147,6 +168,7 @@ class AppBottomNav extends StatelessWidget {
                         spec: active,
                         active: true,
                         compact: true,
+                        badged: badgedBranch == active.branch,
                         onTap: () => onExpand?.call(),
                       ),
                     ),
@@ -160,7 +182,7 @@ class AppBottomNav extends StatelessWidget {
   }
 
   // 展开条：底层灰药丸滑到选中 tab（AnimatedAlign 从 A 滑到 B），上层 5 等分项。
-  Widget _row(BuildContext context) {
+  Widget _row(BuildContext context, int? badgedBranch) {
     final palette = context.palette;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final activeIndex = kNavDestinations.indexWhere(
@@ -203,6 +225,7 @@ class AppBottomNav extends StatelessWidget {
                 child: _NavItem(
                   spec: spec,
                   active: shell.currentIndex == spec.branch,
+                  badged: badgedBranch == spec.branch,
                   onTap: () => _go(spec.branch),
                 ),
               ),
@@ -223,12 +246,16 @@ class _NavItem extends StatelessWidget {
     required this.spec,
     required this.active,
     required this.onTap,
+    this.badged = false,
     this.compact = false,
   });
 
   final NavDestinationSpec spec;
   final bool active;
   final VoidCallback onTap;
+
+  // 图标右上角的红点（当前只有「设置」用：有新版可下）。
+  final bool badged;
 
   // 收缩圆钮形态：只留图标（标签语义交给 Semantics），不等分拉伸，
   // 按内容宽 + 左右 26 内边距（对齐 Swift DockItem compact）。
@@ -238,15 +265,18 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final color = active ? palette.textStrong : palette.muted;
+    final icon = _BadgedIcon(
+      icon: spec.icon,
+      color: color,
+      badged: badged,
+      badgeColor: Theme.of(context).colorScheme.error,
+    );
     final content = compact
-        ? Center(
-            widthFactor: 1,
-            child: Icon(spec.icon, size: kDockIconSize, color: color),
-          )
+        ? Center(widthFactor: 1, child: icon)
         : Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Icon(spec.icon, size: kDockIconSize, color: color),
+              icon,
               const SizedBox(height: 3),
               Text(spec.label, style: TextStyle(fontSize: 11, color: color)),
             ],
@@ -264,5 +294,45 @@ class _NavItem extends StatelessWidget {
     );
     if (!compact) return item;
     return Semantics(label: spec.label, button: true, child: item);
+  }
+}
+
+// dock 图标 + 右上角红点：红点画在图标框外沿（clipBehavior none），不挤压
+// 图标尺寸，收缩圆钮态同样带得上。
+class _BadgedIcon extends StatelessWidget {
+  const _BadgedIcon({
+    required this.icon,
+    required this.color,
+    required this.badged,
+    required this.badgeColor,
+  });
+
+  final IconData icon;
+  final Color color;
+  final bool badged;
+  final Color badgeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final glyph = Icon(icon, size: kDockIconSize, color: color);
+    if (!badged) return glyph;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        glyph,
+        Positioned(
+          right: 1,
+          top: 3,
+          child: Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: badgeColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

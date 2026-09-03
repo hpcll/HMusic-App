@@ -164,6 +164,15 @@ App Review 不能依赖审核员与 HMusic-Server 在同一 Wi-Fi。必须准备
 - 处理 Android 13+ 通知权限，但拒绝通知权限不能阻止前台使用。
 - 若使用 closed testing/生产访问门槛，提前准备测试人员与周期。
 - 同样执行内容权利、远程代码、HTTP 安全和审核 Demo Server 门禁。
+- **App 内自更新只属于直装渠道**：GitHub Release / 网盘分发的 Android 包在
+  「设置 → 关于与更新」里下载 APK 并交系统安装器，因此主 manifest 声明了
+  `REQUEST_INSTALL_PACKAGES`、并带一个 `${applicationId}.updates` FileProvider。
+  上架 Play 的构建必须去掉这条权限与该入口（Play 禁止应用自行分发/安装 APK）：
+  Dart 侧已由 `BuildEdition.isStore` 关掉入口（见
+  `features/settings/view_models/app_download_view_model.dart` 的
+  `canSelfInstallApp`），但**权限仍在 manifest 里**，上架前需要一个去掉它的
+  manifest 变体（product flavor 或 `tools:node="remove"` 覆盖），否则会被
+  Data Safety/权限申报卡住。
 
 ## 13. 发布工程与密钥
 

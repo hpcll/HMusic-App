@@ -2,8 +2,10 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/upgrade/app_update_badge.dart';
 import '../../features/player/widgets/mini_player.dart';
 import '../../shared/layout/shell_metrics.dart';
 import 'bottom_nav.dart';
@@ -17,7 +19,7 @@ import 'top_edge_scrim.dart';
 // 保持收缩。chrome 仍走 Scaffold.bottomNavigationBar 槽位（骨架恒定可见，
 // docs/03），extendBody 自动把 chrome 包络高度注入内容 MediaQuery 让位；
 // 胶囊四周的透明留白不吃点击，命中穿到下层内容。
-class FlutterGlassShell extends StatefulWidget {
+class FlutterGlassShell extends ConsumerStatefulWidget {
   const FlutterGlassShell({
     required this.shell,
     required this.showMini,
@@ -34,10 +36,10 @@ class FlutterGlassShell extends StatefulWidget {
   final bool miniActive;
 
   @override
-  State<FlutterGlassShell> createState() => _FlutterGlassShellState();
+  ConsumerState<FlutterGlassShell> createState() => _FlutterGlassShellState();
 }
 
-class _FlutterGlassShellState extends State<FlutterGlassShell> {
+class _FlutterGlassShellState extends ConsumerState<FlutterGlassShell> {
   bool _minimized = false;
   int _lastBranch = -1;
 
@@ -58,6 +60,8 @@ class _FlutterGlassShellState extends State<FlutterGlassShell> {
     );
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
     final miniVisible = widget.showMini && widget.miniActive;
+    // 红点随检查结果变化要能重建（provider 只在这一处 watch，dock 自身不碰）。
+    ref.watch(appUpdateBadgeProvider);
     return Scaffold(
       extendBody: true,
       // 无常驻顶栏（对齐 Apple Music）：状态栏区只留滚动消融 scrim，
@@ -130,6 +134,10 @@ class _FlutterGlassShellState extends State<FlutterGlassShell> {
             child: AppBottomNav(
               shell: widget.shell,
               minimized: _minimized,
+              // 有 App 新版 = 设置 tab 点红点（唯一的更新提示位）。
+              updateAvailable: ref
+                  .read(appUpdateBadgeProvider.notifier)
+                  .hasUpdate,
               onExpand: () => _setMinimized(false),
             ),
           ),

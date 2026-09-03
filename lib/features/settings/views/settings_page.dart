@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../core/upgrade/app_update_badge.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../../../shared/widgets/hmusic_toast.dart';
 import '../../../shared/widgets/view_title.dart';
@@ -61,6 +62,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final state = ref.watch(settingsMenuViewModelProvider);
     final notifier = ref.read(settingsMenuViewModelProvider.notifier);
     final wide = MediaQuery.sizeOf(context).width >= 860;
+    // 有新版 = 「关于与更新」行点红点（唯一的更新提示位，见 app_update_badge）。
+    ref.watch(appUpdateBadgeProvider);
+    final updateAvailable = ref.read(appUpdateBadgeProvider.notifier).hasUpdate;
 
     if (wide) {
       final section = state.section ?? SettingsSection.mi;
@@ -85,6 +89,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     SettingsMenu(
                       summary: state.summary,
                       activeSection: section,
+                      updateAvailable: updateAvailable,
                       onOpen: notifier.open,
                     ),
                     // 桌面「更换服务器」入口挂菜单列底部（退出走侧栏，不在此重复）。
@@ -131,7 +136,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         children: <Widget>[
           const ViewTitle('设置'),
           const SizedBox(height: 16),
-          SettingsMenu(summary: state.summary, onOpen: notifier.open),
+          SettingsMenu(
+            summary: state.summary,
+            updateAvailable: updateAvailable,
+            onOpen: notifier.open,
+          ),
           // 窄屏账户操作卡片（桌面走侧栏，不渲染）：当前服务器 + 更换服务器（次要）
           // + 退出登录（危险操作红色 outlined）——账户区块化，信息层级清晰。
           const SettingsAccountCard(),

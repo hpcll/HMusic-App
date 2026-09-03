@@ -13,12 +13,17 @@ class SettingsMenu extends StatelessWidget {
     required this.summary,
     required this.onOpen,
     this.activeSection,
+    this.updateAvailable = false,
     super.key,
   });
 
   final SettingsSummary summary;
   final ValueChanged<SettingsSection> onOpen;
   final SettingsSection? activeSection;
+
+  // 有新版可下：「关于与更新」行点一个红点（进 App 静默检出来的，见
+  // core/upgrade/app_update_badge.dart）。
+  final bool updateAvailable;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +37,7 @@ class SettingsMenu extends StatelessWidget {
             spec: _kGroups[i],
             summary: summary,
             activeSection: activeSection,
+            updateAvailable: updateAvailable,
             onOpen: onOpen,
           ),
         ],
@@ -94,12 +100,14 @@ class _MenuGroup extends StatelessWidget {
     required this.spec,
     required this.summary,
     required this.activeSection,
+    required this.updateAvailable,
     required this.onOpen,
   });
 
   final _MenuGroupSpec spec;
   final SettingsSummary summary;
   final SettingsSection? activeSection;
+  final bool updateAvailable;
   final ValueChanged<SettingsSection> onOpen;
 
   @override
@@ -137,6 +145,9 @@ class _MenuGroup extends StatelessWidget {
                   spec: spec.items[i],
                   summaryText: _summaryFor(summary, spec.items[i].section),
                   active: activeSection == spec.items[i].section,
+                  badged:
+                      updateAvailable &&
+                      spec.items[i].section == SettingsSection.about,
                   onTap: () => onOpen(spec.items[i].section),
                 ),
               ],
@@ -153,12 +164,16 @@ class _MenuRow extends StatelessWidget {
     required this.spec,
     required this.summaryText,
     required this.active,
+    required this.badged,
     required this.onTap,
   });
 
   final _MenuItemSpec spec;
   final String summaryText;
   final bool active;
+
+  // 「关于与更新」行的新版红点。
+  final bool badged;
   final VoidCallback onTap;
 
   @override
@@ -187,6 +202,7 @@ class _MenuRow extends StatelessWidget {
                 spec.section.label,
                 style: TextStyle(fontSize: 14, color: fore),
               ),
+              if (badged) ...<Widget>[const SizedBox(width: 6), _UpdateDot()],
               const SizedBox(width: 11),
               Expanded(
                 child: Text(
@@ -202,6 +218,24 @@ class _MenuRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// 新版红点：设置入口的唯一提示形态（不弹窗、不横幅——用户明确要求只在设置页
+// 提示）。红色取主题 error，与「危险操作」同一支色，读作「有事待办」。
+class _UpdateDot extends StatelessWidget {
+  const _UpdateDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.error,
+        shape: BoxShape.circle,
       ),
     );
   }

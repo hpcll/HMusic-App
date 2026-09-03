@@ -6,13 +6,17 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/hmusic_palette.dart';
 import '../../../../core/app_version.dart';
+import '../../../../core/upgrade/app_update_badge.dart';
 import '../../../../shared/widgets/hmusic_card.dart';
 import '../../../../shared/widgets/hmusic_dialog.dart';
 import '../../models/app_update.dart';
 import '../../models/update_state.dart';
+import '../../view_models/app_download_view_model.dart';
 import '../../view_models/update_view_model.dart';
 
-// 关于与更新：服务端版本检查/一键升级 + App 自身新版检查（跳浏览器下载）。
+// 关于与更新：服务端版本检查/一键升级 + App 自身新版检查。
+// App 新版在 Android 直装渠道走 App 内下载 + 进度条 + 交系统安装器；
+// 其余平台（iOS/桌面/商店版）仍旧跳浏览器。
 class AboutSectionView extends ConsumerStatefulWidget {
   const AboutSectionView({super.key});
 
@@ -153,17 +157,22 @@ class _ServerCard extends StatelessWidget {
   }
 }
 
-class _AppCard extends StatelessWidget {
+class _AppCard extends ConsumerWidget {
   const _AppCard({required this.state, required this.notifier});
 
   final UpdateState state;
   final UpdateViewModel notifier;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
     final release = state.appRelease;
     final hasUpdate = release != null && release.hasUpdateOver(kAppVersion);
+    final download = ref.watch(appDownloadViewModelProvider);
+    // App 内直装的条件：Android 直装渠道 + Release 里真有 APK 资产。
+    // 不满足就退回跳浏览器（iOS 走 App Store、桌面各自的包、商店版交给商店）。
+    final canInstall =
+        canSelfInstallApp && (release?.apkUrl?.isNotEmpty ?? false);
     return HMusicCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -173,9 +182,9 @@ class _AppCard extends StatelessWidget {
             title: 'HMusic App',
             version: 'v$kAppVersion',
             trailing: OutlinedButton(
-              onPressed: state.checkingApp
+              onPressed: state.checkingApp || download.busy
                   ? null
-                  : () => unawaited(notifier.checkApp()),
+                  : () => unawaited(_checkApp(ref)),
               child: Text(state.checkingApp ? '检查中…' : '检查更新'),
             ),
           ),
@@ -205,23 +214,97 @@ class _AppCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton(
-                onPressed: () => unawaited(_openDownload(release)),
-                child: const Text('去下载'),
+            if (download.stage == AppDownloadStage.downloading)
+              _DownloadProgress(
+                state: download,
+                notifier: ref.read(appDownloadViewModelProvider.notifier),
+              )
+            else if (download.stage == AppDownloadStage.installing)
+              Text(
+                '已下载完成，按系统弹窗里的「安装」继续',
+                style: TextStyle(fontSize: 12.5, color: palette.muted),
+              )
+            else ...<Widget>[
+              if (download.error != null) ...<Widget>[
+                Text(
+                  download.error!,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton(
+                  onPressed: canInstall
+                      ? () => unawaited(
+                          ref
+                              .read(appDownloadViewModelProvider.notifier)
+                              .downloadAndInstall(release),
+                        )
+                      : () => unawaited(_openDownload(release)),
+                  child: Text(canInstall ? '下载并安装' : '去下载'),
+                ),
               ),
-            ),
+            ],
           ],
         ],
       ),
     );
   }
 
+  // 手动检查更新顺手刷新红点：设置页的红点与这里的卡片说的是同一件事，
+  // 检完「已是最新」红点就该消失。
+  Future<void> _checkApp(WidgetRef ref) async {
+    await notifier.checkApp();
+    await ref.read(appUpdateBadgeProvider.notifier).refresh();
+  }
+
   Future<void> _openDownload(AppReleaseInfo release) async {
     final url = release.url;
     if (url == null || url.isEmpty) return;
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+}
+
+// 下载进度：有 content-length 就走确定进度 + 「x.x / y.y MB」，没有就走
+// 不确定条（服务端不给长度时不假装知道百分比）。
+class _DownloadProgress extends StatelessWidget {
+  const _DownloadProgress({required this.state, required this.notifier});
+
+  final AppDownloadState state;
+  final AppDownloadViewModel notifier;
+
+  static String _mb(int bytes) => (bytes / 1024 / 1024).toStringAsFixed(1);
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final progress = state.progress;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        LinearProgressIndicator(value: progress, minHeight: 2),
+        const SizedBox(height: 10),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                progress == null
+                    ? '正在下载…'
+                    : '正在下载 ${_mb(state.received)} / ${_mb(state.total)} MB'
+                          '（${(progress * 100).round()}%）',
+                style: TextStyle(fontSize: 12.5, color: palette.muted),
+              ),
+            ),
+            TextButton(onPressed: notifier.cancel, child: const Text('取消')),
+          ],
+        ),
+      ],
+    );
   }
 }
 

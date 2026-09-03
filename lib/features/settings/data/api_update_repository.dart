@@ -86,10 +86,13 @@ class ApiUpdateRepository implements UpdateRepository {
       final body = response.data ?? const <String, Object?>{};
       final version = '${body['tag_name'] ?? body['name'] ?? ''}'.trim();
       if (version.isEmpty) return null;
+      final apk = _pickApkAsset(body['assets']);
       return AppReleaseInfo(
         version: version,
         notes: body['body'] == null ? null : '${body['body']}',
         url: body['html_url'] == null ? null : '${body['html_url']}',
+        apkUrl: apk == null ? null : '${apk['browser_download_url']}',
+        apkSize: apk == null ? null : (apk['size'] as num?)?.toInt(),
       );
     } on DioException catch (error) {
       // 404 = 仓库还没发布 Release（或暂未公开），视为「没有更新渠道」而非报错。
@@ -101,6 +104,20 @@ class ApiUpdateRepository implements UpdateRepository {
         message: '无法连接 GitHub 检查 App 更新（网络不通或超时）',
       );
     }
+  }
+
+  // Release 资产里的可直装 APK：发布流水线每版只传一个 hmusic-<版本>-android.apk
+  //（未签名构建带 -unsigned 后缀，直装装不上，排掉）。找不到就返回 null，
+  // UI 退回跳浏览器。
+  static Map<String, Object?>? _pickApkAsset(Object? assets) {
+    if (assets is! List<Object?>) return null;
+    for (final asset in assets.whereType<Map<String, Object?>>()) {
+      final name = '${asset['name'] ?? ''}'.toLowerCase();
+      if (!name.endsWith('.apk') || name.contains('unsigned')) continue;
+      if ('${asset['browser_download_url'] ?? ''}'.isEmpty) continue;
+      return asset;
+    }
+    return null;
   }
 
   // 远程配置镜像序列：Gitee 国内主源（大陆免翻墙；镜像仓库建好后生效，

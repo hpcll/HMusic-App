@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/session/session_providers.dart';
+import '../core/upgrade/app_update_badge.dart';
 import '../core/upgrade/app_version_guard.dart';
 import '../features/settings/view_models/auto_archive_view_model.dart';
 import 'app_providers.dart';
@@ -21,6 +22,9 @@ class HMusicApp extends ConsumerWidget {
     ref.watch(appVersionGuardProvider);
     // 「播放过的在线歌自动入库」的执行体：挂在根上，任何页面点播都算听过。
     ref.watch(autoArchiveWatcherProvider);
+    // 进 App 静默检一次 App 新版（6h 节流，落盘）：结果只表现为设置入口的
+    // 红点，不弹窗不横幅。
+    ref.watch(appUpdateBadgeProvider);
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'HMusic',

@@ -56,11 +56,24 @@ class ServerUpdateInfo {
 }
 
 class AppReleaseInfo {
-  const AppReleaseInfo({required this.version, this.notes, this.url});
+  const AppReleaseInfo({
+    required this.version,
+    this.notes,
+    this.url,
+    this.apkUrl,
+    this.apkSize,
+  });
 
   final String version;
   final String? notes;
+
+  // Release 页面地址（不支持自更新的平台跳这里）。
   final String? url;
+
+  // 直装用的 APK 资产直链与字节数（Android 自更新用；Release 里没有 APK
+  // 资产时为空，UI 退回跳浏览器）。
+  final String? apkUrl;
+  final int? apkSize;
 
   bool hasUpdateOver(String current) => isNewerVersion(version, current);
 }
