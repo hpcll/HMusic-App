@@ -1,8 +1,8 @@
 {
   "minVersion": "0.0.0",
   "notice": "",
-  "downloadUrl": "",
-  "latestVersion": "",
-  "apkUrl": "",
+  "downloadUrl": "https://github.com/hpcll/HMusic-App/releases/latest",
+  "latestVersion": "v0.1.6",
+  "apkUrl": "https://github.com/hpcll/HMusic-App/releases/download/v0.1.6/hmusic-0.1.6-android.apk",
   "apkSize": 0
 }
