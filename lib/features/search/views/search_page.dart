@@ -76,7 +76,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     // 窄屏 push 形态：全屏覆盖 + 返回，输入框自动聚焦即刻可打字。
     return Scaffold(
       appBar: AppBar(title: const Text('搜索')),
+      // bottom: false —— 底部必须沉浸（同队列页）：SafeArea 若吃掉手势条高度，
+      // 列表视口就停在手势条上沿，结果滚不到它后面，那条带子成了一块死白边；
+      // 而且 SafeArea 会把 bottom padding 从子树的 MediaQuery 里摘掉，下面
+      // 列表自己算的「32 + 环境 padding」反而归零，等于让位让了两次又没让对。
       body: SafeArea(
+        bottom: false,
         child: _resultsList(
           context,
           state,

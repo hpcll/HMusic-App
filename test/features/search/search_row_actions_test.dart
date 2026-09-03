@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hmusic/core/downloads/download_index.dart';
 import 'package:hmusic/core/models/hmusic_track.dart';
 import 'package:hmusic/features/search/data/api_search_repository.dart';
 import 'package:hmusic/features/search/data/search_repository.dart';
