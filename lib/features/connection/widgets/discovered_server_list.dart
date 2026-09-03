@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
-import '../../../app/theme/hmusic_radii.dart';
 import '../data/lan_server_scanner.dart';
+import 'server_result_list.dart';
 
-// 发现区（连接页主角）：自动发现是连接主路径，卡片按设计系统 .card 规格
-// （panel + hairline + card 圆角 + 轻投影）承载「点选即连」。
+// 发现区（连接页主角）：自动发现是主路径，「附近的服务器」点选即连。
 //
-// 三个状态共用**同一个定高框**（kDiscoveryHeight），构图不随状态抖动：
-//   扫描中 → 卡片里菊花 + 说明，整体居中；
-//   一无所获 → 同一张卡片换图标 + 重新扫描；
-//   有结果 → 标签行 + 服务器卡片，超出定高就在框内滚动。
-// 之前三态各自决定高度，扫描→有结果→空态之间下方的表单会跟着上下窜（用户说的
-// 「一会大一会小」）。
+// 三个状态共用**同一个定高框**（kDiscoveryHeight），切换只换内容、骨架不
+// 动，下方手输区永远不会跟着上下窜（用户说的「一会大一会小」就是它）。
+// 框内对齐按内容分：有结果时标签行 + 卡片顶对齐铺满；扫描中 / 空态只有
+// 两三行轻量文字，**纵向居中、略偏上**——顶对齐会让两行字贴在框上沿、
+// 下面留一条 ~170px 的死白，整页散成「上面一撮字、下面一个链接」。
 class DiscoveredServerList extends StatelessWidget {
   const DiscoveredServerList({
     required this.discovering,
@@ -24,10 +22,10 @@ class DiscoveredServerList extends StatelessWidget {
     super.key,
   });
 
-  // 发现区固定高度。按最高的那个状态（空态：44 图标 + 标题 + 说明 + 重新扫描
-  // 按钮 + 上下 24 内边距 ≈ 194）留出余量定的，说明文字换行也不挤。改这个值
-  // 前先在窄屏上看空态有没有溢出。
-  static const double kDiscoveryHeight = 216;
+  // 发现面内区固定高度（外壳另有 12 内边距）：标签行 + 一张服务器小卡整卡
+  // + 下一张的露头（≈ 136）——多台服务器在面内滚动，露头本身就是「还能滚」
+  // 的提示；扫描中/空态居中留白，是「还在找」的呼吸感。
+  static const double kDiscoveryHeight = 136;
 
   final bool discovering;
   final List<DiscoveredServer> servers;
@@ -40,313 +38,150 @@ class DiscoveredServerList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 三态都在框内交叉淡化换内容：外壳定高不动，切换不跳（同页面的换场词汇）。
+    final bool reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final String phase = servers.isEmpty
+        ? (discovering ? 'scanning' : 'empty')
+        : 'found';
     return SizedBox(
       height: kDiscoveryHeight,
-      child: servers.isEmpty
-          ? _StatusCard(
-              discovering: discovering,
-              enabled: enabled,
-              onRescan: onRescan,
-            )
-          : _ServerList(
-              discovering: discovering,
-              servers: servers,
-              enabled: enabled,
-              connectingBase: connectingBase,
-              onConnect: onConnect,
-              onRescan: onRescan,
-            ),
+      child: AnimatedSwitcher(
+        duration: reduceMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        child: KeyedSubtree(
+          key: ValueKey<String>(phase),
+          child: servers.isEmpty
+              ? (discovering
+                    ? const _ScanningStatus()
+                    : Align(
+                        // 卡内居中略偏上：与扫描态同一锚点，两态切换文字原地换。
+                        alignment: const Alignment(0, _statusBiasY),
+                        child: EmptyDiscoveryStatus(
+                          enabled: enabled,
+                          onRescan: onRescan,
+                        ),
+                      ))
+              : ServerResultList(
+                  discovering: discovering,
+                  servers: servers,
+                  enabled: enabled,
+                  connectingBase: connectingBase,
+                  onConnect: onConnect,
+                  onRescan: onRescan,
+                ),
+        ),
+      ),
     );
   }
 }
 
-// 有结果时的列表：标签行固定在顶部，卡片超过定高就只在这块区域内滚动，
-// 不把下方的手输区往下推。
-class _ServerList extends StatelessWidget {
-  const _ServerList({
-    required this.discovering,
-    required this.servers,
+// 扫描中 / 空态的文字块在定高框内纵向居中、略偏上：正居中会和下方的
+// 「手动输入地址」挤视觉重心，偏上一点让上呼吸 > 下呼吸。
+const double _statusBiasY = -0.3;
+
+// 扫描中：菊花 + 一行状态 + 一行提示，居中紧凑。
+class _ScanningStatus extends StatelessWidget {
+  const _ScanningStatus();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Align(
+      alignment: const Alignment(0, _statusBiasY),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              SizedBox(
+                width: 15,
+                height: 15,
+                // 扫描菊花用墨色，不用品牌青绿——accent 铁律只覆盖「正在发生的
+                // 事」中少数几处，扫局域网不在其列（docs/03）。
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: palette.mutedStrong,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '正在寻找局域网内的服务器',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: palette.textStrong,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '手机和服务器需要在同一个 Wi-Fi',
+            style: TextStyle(fontSize: 12.5, height: 1.5, color: palette.muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// 扫完一无所获：标题 + 一行提示 + hairline 小钮「重新扫描」，在发现卡内
+// 居中略偏上。与扫描态（_ScanningStatus）同一锚点，两态切换只是文字换。
+class EmptyDiscoveryStatus extends StatelessWidget {
+  const EmptyDiscoveryStatus({
     required this.enabled,
-    required this.connectingBase,
-    required this.onConnect,
     required this.onRescan,
+    super.key,
   });
 
-  final bool discovering;
-  final List<DiscoveredServer> servers;
   final bool enabled;
-  final Uri? connectingBase;
-  final ValueChanged<DiscoveredServer> onConnect;
   final VoidCallback onRescan;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                '附近的服务器',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: palette.mutedStrong,
-                ),
-              ),
-            ),
-            if (discovering)
-              SizedBox(
-                width: 12,
-                height: 12,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: palette.accent,
-                ),
-              )
-            else
-              TextButton(
-                onPressed: enabled ? onRescan : null,
-                style: TextButton.styleFrom(
-                  foregroundColor: palette.mutedStrong,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: const TextStyle(fontSize: 12.5),
-                ),
-                child: const Text('重新扫描'),
-              ),
-          ],
+        Text(
+          '没有发现服务器',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: palette.textStrong,
+          ),
         ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: ListView.separated(
-            padding: EdgeInsets.zero,
-            itemCount: servers.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final server = servers[index];
-              return _ServerCard(
-                server: server,
-                enabled: enabled,
-                connecting: server.base == connectingBase,
-                onTap: () => onConnect(server),
-              );
-            },
+        const SizedBox(height: 8),
+        Text(
+          '确认手机和服务器在同一个 Wi-Fi',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12.5, height: 1.5, color: palette.muted),
+        ),
+        const SizedBox(height: 14),
+        // hairline 小丸钮：是「再做一次」的含蓄出路，不抢手动表单的主角地位；
+        // 墨色 + 1px 描边，青绿按铁律不用于操作染色。
+        OutlinedButton.icon(
+          onPressed: enabled ? onRescan : null,
+          icon: const Icon(Icons.refresh_rounded, size: 14),
+          label: const Text('重新扫描'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: palette.mutedStrong,
+            side: BorderSide(color: palette.line),
+            minimumSize: const Size(0, 32),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: const StadiumBorder(),
+            textStyle: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
-    );
-  }
-}
-
-// 还没有结果时的那块卡片。扫描中和一无所获共用一个外框，只换里面的内容——
-// 换状态时卡片不会消失重建，构图稳。
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.discovering,
-    required this.enabled,
-    required this.onRescan,
-  });
-
-  final bool discovering;
-  final bool enabled;
-  final VoidCallback onRescan;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return _CardShell(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        child: Column(
-          // 卡片被外层撑到定高，内容在其中垂直居中：扫描态（无按钮）和空态
-          // （有按钮）高度不同，居中才不会一个贴顶一个贴底。
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            // 圆形托底里的图标/菊花：扫描中用品牌青绿转圈，停下来用灰色图标。
-            // 尺寸固定，两态互换时卡片高度不跳。
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: palette.panelSecondary,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: discovering
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: palette.accent,
-                      ),
-                    )
-                  : Icon(
-                      Icons.wifi_tethering_off_rounded,
-                      size: 20,
-                      color: palette.muted,
-                    ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              discovering ? '正在寻找局域网内的服务器' : '没有发现服务器',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: palette.textStrong,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              discovering ? '手机和服务器需要在同一个 Wi-Fi' : '确认在同一个 Wi-Fi，或手动输入地址',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12.5,
-                height: 1.5,
-                color: palette.muted,
-              ),
-            ),
-            if (!discovering) ...<Widget>[
-              const SizedBox(height: 14),
-              TextButton.icon(
-                onPressed: enabled ? onRescan : null,
-                icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('重新扫描'),
-                style: TextButton.styleFrom(
-                  foregroundColor: palette.accent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: const TextStyle(fontSize: 13),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// 设计系统 .card：panel 底 + hairline 描边 + 14 圆角 + 0 1px 2px 4% 投影。
-class _CardShell extends StatelessWidget {
-  const _CardShell({required this.child, this.onTap});
-
-  final Widget child;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Material(
-      color: palette.panel,
-      borderRadius: BorderRadius.circular(HMusicRadii.card),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: palette.line),
-            borderRadius: BorderRadius.circular(HMusicRadii.card),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                offset: const Offset(0, 1),
-                blurRadius: 2,
-              ),
-            ],
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-class _ServerCard extends StatelessWidget {
-  const _ServerCard({
-    required this.server,
-    required this.enabled,
-    required this.connecting,
-    required this.onTap,
-  });
-
-  final DiscoveredServer server;
-  final bool enabled;
-  final bool connecting;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return _CardShell(
-      onTap: enabled ? onTap : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: palette.panelSecondary,
-                borderRadius: BorderRadius.circular(HMusicRadii.small),
-              ),
-              child: Icon(
-                Icons.dns_rounded,
-                size: 18,
-                color: palette.mutedStrong,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    server.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: palette.textStrong,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${server.base.host}:${server.base.port}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12.5, color: palette.muted),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            if (connecting)
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: palette.accent,
-                ),
-              )
-            else
-              Icon(Icons.arrow_forward_rounded, size: 16, color: palette.muted),
-          ],
-        ),
-      ),
     );
   }
 }

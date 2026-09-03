@@ -34,4 +34,45 @@ void main() {
       paletteHex(HMusicPalette.dark.background.toARGB32()),
     );
   });
+
+  // Android 12+ 起系统自己画开屏，默认在正中放启动器图标，一直挂到 Flutter 首帧。
+  // 留着它，用户「一打开就看到一个 icon 在中间」，连接页那段「字标从正中慢慢淡入」
+  // 就永远没机会发生（真机反馈原话：不是慢慢显示，是打开他就显示了，然后突然滑到
+  // 最后的位置）。图标位换成全透明后开屏只剩底色。
+  //
+  // 亮暗两份都要有：资源匹配里 night 限定符的优先级高于版本号，只写 values-v31
+  // 的话，暗色下会挑中 values-night/styles.xml，这几个属性整套丢失。
+  group('Android 12+ 系统开屏不放居中图标', () {
+    for (final String path in const <String>[
+      'android/app/src/main/res/values-v31/styles.xml',
+      'android/app/src/main/res/values-night-v31/styles.xml',
+    ]) {
+      test(path, () {
+        final String xml = File(path).readAsStringSync();
+        expect(
+          xml,
+          contains(
+            '<item name="android:windowSplashScreenAnimatedIcon">'
+            '@drawable/splash_no_icon</item>',
+          ),
+        );
+        // 系统只在 windowBackground 是单一颜色时才拿它当开屏底色；我们的
+        // launch_background 是 layer-list，所以这一项必须显式写。
+        expect(
+          xml,
+          contains(
+            '<item name="android:windowSplashScreenBackground">'
+            '@color/hmusic_launch_background</item>',
+          ),
+        );
+      });
+    }
+  });
+
+  test('系统开屏图标位那张图是全透明的', () {
+    final String xml = File(
+      'android/app/src/main/res/drawable/splash_no_icon.xml',
+    ).readAsStringSync();
+    expect(xml, contains('@android:color/transparent'));
+  });
 }

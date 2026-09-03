@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 暗色下的同一件事，见 values-v31/styles.xml 的说明：night 限定符优先级
+         高于版本号，缺了这份，暗色开屏就会退回 values-night 并重新冒出居中的
+         启动器图标。底色引用的 @color 自己会按 night 解析，只有父主题不同。 -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@color/hmusic_launch_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_no_icon</item>
+    </style>
+</resources>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ 起系统自己画开屏：底色 + **居中的启动器图标**，一直挂到
+         Flutter 画出首帧。那个图标不是我们开场动画里的字标，位置和消失时机也
+         都不受我们控制——真机上看到的是「一打开就有个 icon 在正中」，然后我们
+         的开场把字标推上去，中间那一下交接就成了用户说的「不连贯」。
+         这里把系统图标位换成全透明：开屏只剩一块与 App 同色的底，第一个出现的
+         图形就是我们自己从正中慢慢淡入的字标。
+
+         两件必须成对做的事：
+         1. windowSplashScreenBackground 要显式写。系统只在 windowBackground
+            是**单一颜色**时才拿它当开屏底色，我们的 launch_background 是
+            layer-list，不写就会退回系统默认。
+         2. values-night-v31 也要有一份。资源匹配里 night 限定符的优先级高于
+            版本号，只写这一个文件的话，暗色下会挑中 values-night/styles.xml，
+            这几个属性就整套丢了（表现：亮色正常、暗色又冒出启动器图标）。 -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@color/hmusic_launch_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_no_icon</item>
+    </style>
+</resources>

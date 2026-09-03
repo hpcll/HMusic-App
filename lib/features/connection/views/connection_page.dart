@@ -6,20 +6,18 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/startup/app_opening.dart';
-import '../../../shared/widgets/brand_mark.dart';
 import '../../auth/views/auth_page.dart';
 import '../data/lan_server_scanner.dart';
 import '../view_models/connection_view_model.dart';
-import '../widgets/discovered_server_list.dart';
-import '../widgets/server_address_form.dart';
+import '../widgets/connection_chrome.dart';
+import '../widgets/connection_scenes.dart';
+import 'connection_opening.dart';
 
-// 字标显示高度。第 1 幕要把它摆到屏幕正中，得知道它自己多高。
-const double _kWordmarkHeight = 56;
-
-// 连接页信息层级：自动发现是主路径——「附近的服务器」卡片紧随品牌区，点选
-// 即连；手动表单是次要路径，默认折叠成一条 ghost 链接，只有扫描结束一无所获
-// 时才自动展开（首次部署/mDNS 与扫段都不可达的场景）。错误行统一放两区之间，
-// 卡片连接失败和手动连接失败共用一个落点。
+// 连接页信息层级（题句式纸面）：品牌区 → 发现区（自动发现是主路径，点选即连；
+// 扫描中只是轻量状态行，卡片留给真实内容）→ 手动表单（次要路径，默认折叠成
+// ghost 链接）→ 页脚注脚（hairline + 衬线小字，页面因此「落地」）。
+// 页面只管状态生命周期与路由；布局几何与三幕开场在 ConnectionScenes，
+// 时间轴在 ConnectionOpening。
 class ConnectionPage extends ConsumerStatefulWidget {
   const ConnectionPage({super.key, this.autoResume = true});
 
@@ -38,11 +36,20 @@ class ConnectionPage extends ConsumerStatefulWidget {
 }
 
 class _ConnectionPageState extends ConsumerState<ConnectionPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final TextEditingController _addressController = TextEditingController();
 
-  // 手动表单是否被用户主动展开；展开后不再收起（链接消失，状态单向）。
-  bool _manualExpanded = false;
+  // 手动表单地址输入框的焦点：注脚的让位信号。不用 viewInsets 做依赖——
+  // body 里被 Scaffold 摘掉读不到；在页面层读则要登记 viewInsets 依赖，
+  // 键盘动画期间 insets 逐帧上报，等于整页每帧重建。焦点只在点击瞬间变化。
+  final FocusNode _addressFocus = FocusNode();
+
+  // 键盘让位不在这一层做：Scaffold 随键盘收缩 body（resizeToAvoidBottomInset
+  // 默认开），Android 端引擎已把 IME 的每一帧位置同步成 viewInsets，滚动区
+  // 逐帧变矮；TextField 自带的 showOnScreen 用 scrollPadding 把输入框连同
+  // 下方的连接按钮一起抬到键盘上方（见 ServerAddressForm）。早期版本在
+  // 这里手写过垫层 + 逐帧滚动 + 原生 WindowInsetsAnimation 桥，全是为了绕开
+  // 当时内容子树随 body 逐帧重建的掉帧；重建根因修掉后这些机制只剩副作用。
 
   // 正在连接的发现卡片，只给它转菊花。
   Uri? _connectingBase;
@@ -59,28 +66,7 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage>
   Timer? _hintTimer;
   bool _showRestoreHint = false;
 
-  // 开场一条时间轴，三幕都从它身上按 Interval 切（clearshot 的开屏也是单个
-  // controller + Interval 分幕）：
-  //   0 → 700ms      字标在**屏幕正中**淡入；
-  //   700 → 1000ms   定住不动（这个停顿就是"不着急"的来源）；
-  //   1000 → 1520ms  推到它该在的位置（视口 18% 的锚点）；
-  //   1520 → 1820ms  标语淡入（接住落位）；
-  //   1700ms 起      下方发现区淡入，与标语略微错开；
-  //   1900ms         整段结束——接续成功也要等到这里才跳页。
-  static const Duration _openingTotal = Duration(milliseconds: 1900);
-  static const double _markFadeEnd = 700 / 1900;
-  static const double _liftStart = 1000 / 1900;
-  static const double _liftEnd = 1520 / 1900;
-  static const double _sloganEnd = 1820 / 1900;
-  static const double _contentStart = 1700 / 1900;
-
-  late final AnimationController _opening;
-  late final Animation<double> _markFade;
-  late final Animation<double> _lift;
-  late final Animation<double> _sloganFade;
-
-  // 开场走完（或压根没放）后完成，接续跳页要等它。
-  final Completer<void> _openingDone = Completer<void>();
+  late final ConnectionOpening _opening;
 
   @override
   void initState() {
@@ -99,33 +85,9 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage>
         widget.autoResume &&
         !reduceMotion &&
         ref.read(appOpeningProvider).claim();
+    _opening = ConnectionOpening(vsync: this, play: playOpening);
 
-    _opening = AnimationController(
-      vsync: this,
-      duration: _openingTotal,
-      value: playOpening ? 0 : 1,
-    );
-    _markFade = CurvedAnimation(
-      parent: _opening,
-      curve: const Interval(0, _markFadeEnd, curve: Curves.easeOut),
-    );
-    // 从正中推到锚点：0 = 还在正中，1 = 已就位。easeInOutCubic 起步和收尾
-    // 都软，中段快——像被"送"上去，不是弹上去。
-    _lift = CurvedAnimation(
-      parent: _opening,
-      curve: const Interval(_liftStart, _liftEnd, curve: Curves.easeInOutCubic),
-    );
-    _sloganFade = CurvedAnimation(
-      parent: _opening,
-      curve: const Interval(_liftEnd, _sloganEnd, curve: Curves.easeOut),
-    );
-
-    if (playOpening) {
-      unawaited(_opening.forward().whenComplete(_finishOpening));
-    } else {
-      _finishOpening();
-    }
-
+    _addressFocus.addListener(_onAddressFocusChanged);
     if (widget.autoResume) {
       _booting = true;
       _hintTimer = Timer(_hintDelay, () {
@@ -146,7 +108,7 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage>
         if (await notifier.resumeSaved()) {
           // 接续快过开场时也要把开场走完再跳：半路切页，上一页已就位的字标和
           // 下一页还在动的字标叠着交叉淡入，就是"最后一下出现重影"。
-          await _openingDone.future;
+          await _opening.done.future;
           if (mounted) context.go(AuthPage.path);
           return;
         }
@@ -163,24 +125,31 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage>
     );
   }
 
-  void _finishOpening() {
-    if (!_openingDone.isCompleted) _openingDone.complete();
-  }
-
   @override
   void dispose() {
-    // 页面先走一步（用户返回、路由被替换）时也要放行等待者，否则那个 await
-    // 永远悬着。
-    _finishOpening();
     _opening.dispose();
     _hintTimer?.cancel();
+    _addressFocus.dispose();
     _addressController.dispose();
     super.dispose();
+  }
+
+  // 注脚随焦点显隐（见 build 里的 ConnectionFootnote）。
+  void _onAddressFocusChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    // 键盘免疫的视口高度：在 Scaffold 之上量，键盘开合不改变它。注意用
+    // viewPadding 而不是 padding——键盘弹出时 padding.bottom 会被清零
+    // （insets 蚕食 padding），viewPadding 是硬件遮挡，恒定不变；拿 padding
+    // 算几何，键盘升起那几帧锚点会被推着走。注脚的让位信号另见 _addressFocus。
+    final double viewportHeight =
+        MediaQuery.sizeOf(context).height -
+        MediaQuery.viewPaddingOf(context).vertical;
+    final state = ref.watch(connectionViewModelProvider);
     ref.listen(connectionViewModelProvider, (previous, next) {
       if (_addressController.text.isEmpty && next.suggestedAddress.isNotEmpty) {
         _addressController.text = next.suggestedAddress;
@@ -188,197 +157,41 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage>
     });
     return Scaffold(
       backgroundColor: palette.background,
+      // 底部走 SafeArea 的 padding：手势条在场时让开它，键盘升起后系统把
+      // padding.bottom 清零，滚动区一直贴到键盘上缘——用恒定的 viewPadding
+      // 会在键盘上方留一条手势条高的空白。
       body: SafeArea(
-        // 品牌块钉在视口固定高度处，不跟着内容一起被重新居中——若整列 Center，
-        // 开场只有品牌时列很矮，发现卡片一出现列变高、居中重算，字标就被顶着
-        // 往上挪一截（用户看到的「icon 加文字往上位移了一点」）。
-        child: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            // 视口 18% 处：字标的最终落点，读作"上三分之一"的开场位。夹在
-            // 24~180 之间——矮屏（横屏、开键盘）不把内容顶到折叠线以下，大屏
-            // 也不至于飘太高。内容再高也只是可滚，这个位置始终不变。
-            final double anchorTop = (constraints.maxHeight * 0.18).clamp(
-              24.0,
-              180.0,
-            );
-            // 第 1 幕把字标画在屏幕正中：从锚点往下推这么多，就正好居中。
-            // 只动 transform 不动布局——布局槽位从第一帧就在终点，全程零重排，
-            // 下方内容不会被推来推去。
-            final double liftDistance =
-                (constraints.maxHeight - _kWordmarkHeight) / 2 - anchorTop;
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(40, anchorTop, 40, 40),
-                  // 只横向居中，纵向必须顶对齐：用 Center 的话内容一变高，
-                  // 剩余空间的纵向居中又会把品牌块推上去，等于没改。
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 380),
-                      child: AnimatedBuilder(
-                        animation: _opening,
-                        builder: (context, _) =>
-                            _body(context, palette, liftDistance),
-                      ),
-                    ),
-                  ),
-                ),
+        // 注脚压在底缘、不占布局高度：开场几何（正中/18% 锚点）始终以完整
+        // 视口为基准，不会被注脚挤偏；矮屏滚到底时注脚叠在内容之上也无伤
+        // （只是 hairline + 一行小字），键盘弹起时注脚自身让位。
+        child: Stack(
+          children: <Widget>[
+            ConnectionScenes(
+              opening: _opening,
+              viewportHeight: viewportHeight,
+              restoring: _booting || state.restoring,
+              restoreHintArmed: _showRestoreHint,
+              state: state,
+              addressController: _addressController,
+              addressFocus: _addressFocus,
+              connectingBase: state.isConnecting ? _connectingBase : null,
+              onConnectDiscovered: _connectDiscovered,
+              onRescan: () =>
+                  ref.read(connectionViewModelProvider.notifier).discover(),
+              onSubmitManual: _connect,
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: ConnectionFootnote(
+                opacity: _opening.contentFade,
+                hidden: _addressFocus.hasFocus,
               ),
-            );
-          },
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  // 三幕开场 + 页面本体。所有随开场变化的东西都在这里读 animation 值，外层
-  // 靠一个 AnimatedBuilder 驱动重建。
-  Widget _body(BuildContext context, HMusicPalette palette, double lift) {
-    final state = ref.watch(connectionViewModelProvider);
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    // 「扫过且一无所获」→ 手动表单自动展开；尚未扫过/扫描中/有结果都收起，
-    // 保持构图干净、首帧不闪表单。
-    final scanning = state.discovering || !state.discoverCompleted;
-    final showForm = _manualExpanded || (!scanning && state.discovered.isEmpty);
-    // 第 3 幕之前不渲染任何发现/表单控件；接续中同样只留品牌。
-    final bool contentReady = _opening.value >= _contentStart;
-    final splash = _booting || state.restoring || !contentReady;
-    // 字标落位之后才允许出现接续说明：还在正中/半路时它就在锚点下方冒出来，
-    // 两者会叠在一起。
-    final bool landed = _lift.value >= 1;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        // 第 1 幕：字标在屏幕正中淡入。第 2 幕：位移收回到 0，被"送"到锚点。
-        Opacity(
-          opacity: _markFade.value,
-          child: Transform.translate(
-            offset: Offset(0, (1 - _lift.value) * lift),
-            // 字标本身含 H（字形双竖笔）+ Music 连读，不另写 "HMusic" 文字。
-            child: const Center(child: BrandWordmark(size: _kWordmarkHeight)),
-          ),
-        ),
-        const SizedBox(height: 20),
-        // 第 3 幕之一：标语接住落位。副标题是品牌 slogan——一句轻轻的搭话，
-        // 不解释产品、不重复品牌名。衬线 + 加宽字距 = 扉页题句的声调。
-        Opacity(
-          opacity: _sloganFade.value,
-          child: Text(
-            '今天想听点什么',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'NotoSerifSC',
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
-              letterSpacing: 3,
-              color: palette.mutedStrong,
-            ),
-          ),
-        ),
-        const SizedBox(height: 52),
-        // 开场 → 发现/手输的切换走淡入淡出：控件不是「啪」地出现，而是接着
-        // 字标落位的那口气显形。
-        AnimatedSwitcher(
-          duration: reduceMotion
-              ? Duration.zero
-              : const Duration(milliseconds: 260),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          child: splash
-              ? Center(
-                  key: const ValueKey<String>('splash'),
-                  // 接续这一句始终占位、只改透明度：门槛到了才淡入，布局不动
-                  // ——否则品牌块会在它出现时被顶着往上跳。
-                  child: AnimatedOpacity(
-                    opacity: (_showRestoreHint && landed) ? 1 : 0,
-                    duration: reduceMotion
-                        ? Duration.zero
-                        : const Duration(milliseconds: 260),
-                    curve: Curves.easeOut,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: palette.mutedStrong,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '正在连接上次的服务器…',
-                          style: TextStyle(fontSize: 13, color: palette.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : Column(
-                  key: const ValueKey<String>('content'),
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    DiscoveredServerList(
-                      discovering: scanning,
-                      servers: state.discovered,
-                      enabled: !state.isConnecting,
-                      connectingBase: state.isConnecting
-                          ? _connectingBase
-                          : null,
-                      onConnect: _connectDiscovered,
-                      onRescan: () => ref
-                          .read(connectionViewModelProvider.notifier)
-                          .discover(),
-                    ),
-                    if (state.errorMessage != null) ...<Widget>[
-                      const SizedBox(height: 14),
-                      Text(
-                        state.errorMessage!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-                    // 手动区显隐走 220ms easeOut 尺寸过渡（docs/05 chrome 同词汇）。
-                    AnimatedSize(
-                      duration: reduceMotion
-                          ? Duration.zero
-                          : const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                      alignment: Alignment.topCenter,
-                      child: showForm
-                          ? ServerAddressForm(
-                              controller: _addressController,
-                              isConnecting: state.isConnecting,
-                              onSubmit: _connect,
-                            )
-                          : Center(
-                              child: TextButton(
-                                onPressed: state.isConnecting
-                                    ? null
-                                    : () => setState(
-                                        () => _manualExpanded = true,
-                                      ),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: palette.muted,
-                                  textStyle: const TextStyle(fontSize: 12.5),
-                                ),
-                                child: const Text('手动输入地址'),
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-        ),
-      ],
     );
   }
 

@@ -13,7 +13,7 @@ import 'package:hmusic/features/connection/data/connection_repository.dart';
 import 'package:hmusic/features/connection/data/lan_server_scanner.dart';
 import 'package:hmusic/features/connection/models/connection_result.dart';
 import 'package:hmusic/features/connection/views/connection_page.dart';
-import 'package:hmusic/features/connection/widgets/discovered_server_list.dart';
+import 'package:hmusic/features/connection/widgets/server_address_form.dart';
 import 'package:hmusic/shared/widgets/brand_mark.dart';
 
 // 页面 initState 会自动扫描：测试必须注入假扫描器，绝不能碰真实网卡/mDNS/网络。
@@ -145,7 +145,7 @@ void main() {
     expect(find.text('auth destination'), findsNothing);
     expect(find.byType(ConnectionPage), findsOneWidget);
     // 主动来换服务器不放开场：不用等那两秒，内容当场就在。
-    expect(find.byType(DiscoveredServerList), findsOneWidget);
+    expect(find.text('没有发现服务器'), findsOneWidget);
     // 扫不到东西就展开手输框，并把上次的地址回填进去供修改（只是建议值，不自动连）。
     expect(find.text('连接服务器'), findsOneWidget);
     final field = tester.widget<TextField>(find.byType(TextField));
@@ -221,7 +221,6 @@ void main() {
     expect(tester.widget<Opacity>(brandFade).opacity, lessThan(1));
     expect(find.textContaining('正在寻找局域网内'), findsNothing);
     expect(find.text('连接服务器'), findsNothing);
-    expect(find.text('手动输入地址'), findsNothing);
 
     // 800ms：正中的淡入（700ms）已走完，字标满不透明；但它还没被推上去，
     // 所以接续说明仍然不许出声——否则会和停在正中的字标叠在一起。
@@ -247,9 +246,10 @@ void main() {
     expect(find.text('auth destination'), findsOneWidget);
   });
 
-  // 用户反馈：「最后搜索的那个页面出来后，能看出来 icon 加文字往上位移了一点」。
-  // 原先整列是 Center 居中：开场时列很矮，发现卡片一出现列变高，居中重算就把
-  // 品牌块往上顶了一截。品牌钉在视口固定高度处之后，两个状态下它必须在同一位置。
+  // 新版开场分幕重叠：内容在字标上移途中就开始浮出，不再有「内容未出现」的
+  // 干净采样点。退而钉死「字标的布局槽恒定」：落位帧（1350ms，lift 结束）量
+  // 到的位置，与开场走完、发现区显形后必须一致——内容怎么变，品牌块都不会
+  // 被顶动（顶对齐 + transform 只动绘制不动布局）。
   testWidgets('发现区出现前后，品牌块位置不动', (tester) async {
     final router = _connectRouter();
     addTearDown(router.dispose);
@@ -271,17 +271,15 @@ void main() {
       ),
     );
 
-    // 1600ms：字标已推到位（1520ms 落地），但内容（1700ms 起）还没出现 →
-    // 此时量到的就是它的最终位置。
-    await tester.pump(const Duration(milliseconds: 1600));
-    expect(find.byType(DiscoveredServerList), findsNothing);
-    final double splashTop = tester.getRect(find.byType(BrandWordmark)).top;
+    // 1350ms：字标落位（lift 1350 结束），发现区正在淡入（1100 起）。
+    await tester.pump(const Duration(milliseconds: 1350));
+    final double lockedTop = tester.getRect(find.byType(BrandWordmark)).top;
 
-    // 开场结束，发现区显形（假扫描器一无所获，落到空态卡片）。
+    // 开场结束，发现区显形（假扫描器一无所获 → 空态：提示 + 自动展开表单）。
     await _settleOpening(tester);
-    expect(find.byType(DiscoveredServerList), findsOneWidget);
+    expect(find.byType(ServerAddressForm), findsOneWidget);
     expect(find.text('没有发现服务器'), findsOneWidget);
-    expect(tester.getRect(find.byType(BrandWordmark)).top, splashTop);
+    expect(tester.getRect(find.byType(BrandWordmark)).top, lockedTop);
   });
 
   // 用户要的开场：字标先在**屏幕正中**慢慢淡入，再由一个动画把它推到最终位置，
@@ -367,7 +365,46 @@ void main() {
     // 闸门已经用掉：字标直接就位、满不透明，内容也不用等。
     expect(tester.widget<Opacity>(brandFade).opacity, 1);
     await tester.pumpAndSettle();
-    expect(find.byType(DiscoveredServerList), findsOneWidget);
+    expect(find.text('没有发现服务器'), findsOneWidget);
+  });
+
+  // 页脚注脚是压在滚动视图之上的一块装饰（Stack + Positioned）。它的 hairline
+  // 是 ColoredBox（命中行为 opaque）、标语是 RenderParagraph（hitTestSelf 恒真），
+  // 不套 IgnorePointer 的话从注脚这一带起手就拖不动页面——矮屏/开键盘时这页是
+  // 可滚的，而拇指最自然的起手位置正是屏幕底缘。
+  testWidgets('注脚不吃手势：从注脚上起手照样能滚动', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(
+            _FakeConnectionRepository(),
+          ),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: const MaterialApp(home: ConnectionPage()),
+      ),
+    );
+    await _settleOpening(tester);
+
+    // 手输框内部也有个 Scrollable（EditableText），要的是页面那一层。
+    final ScrollableState scrollable = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byType(SingleChildScrollView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(scrollable.position.maxScrollExtent, greaterThan(0));
+    expect(scrollable.position.pixels, 0);
+
+    await tester.drag(
+      find.text('你的音乐，在你的服务器上'),
+      const Offset(0, -120),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+    expect(scrollable.position.pixels, greaterThan(0));
   });
 
   testWidgets('shows server connection form and restores address', (
@@ -478,10 +515,9 @@ void main() {
     );
     await _settleOpening(tester);
 
-    // 层级翻转：有发现结果时表单收起，只留「手动输入地址」链接。
+    // 骨架恒定：发现卡内出结果，手动表单原位不动。
     expect(find.text('192.168.31.11:6650'), findsOneWidget);
-    expect(find.text('连接服务器'), findsNothing);
-    expect(find.text('手动输入地址'), findsOneWidget);
+    expect(find.text('连接服务器'), findsOneWidget);
 
     await tester.tap(find.text('192.168.31.11:6650'));
     await tester.pumpAndSettle();
@@ -490,7 +526,7 @@ void main() {
     expect(find.text('auth destination'), findsOneWidget);
   });
 
-  testWidgets('有发现结果时点「手动输入地址」展开表单', (tester) async {
+  testWidgets('手动表单恒可见：有结果时也无需展开', (tester) async {
     final scanner = LanServerScanner(
       sweepDelay: Duration.zero,
       mdnsCandidates: () =>
@@ -516,10 +552,7 @@ void main() {
     );
     await _settleOpening(tester);
 
-    expect(find.text('连接服务器'), findsNothing);
-    await tester.tap(find.text('手动输入地址'));
-    await tester.pumpAndSettle();
-
+    // 表单永远在场：有发现结果时也直接可见，不再折叠成链接。
     expect(find.text('连接服务器'), findsOneWidget);
     expect(find.text('手动输入地址'), findsNothing);
   });
@@ -546,5 +579,178 @@ void main() {
     ).readAsStringSync();
     expect(router, contains("queryParameters['switch']"));
     expect(router, contains('autoResume:'));
+  });
+
+  // 注脚遇到键盘要让位：输入框聚焦（页面层用 FocusNode 驱动，不碰 viewInsets
+  // ——body 里被 Scaffold 摘掉，页面层读则键盘动画逐帧重建整页会抖）。
+  // 否则输入框聚焦、视口被压缩，注脚会被顶上来正好叠在延迟最高的「连接服务器」
+  // 按钮上——真机反馈「脚注和那条线被键盘推上来了」。焦点一收回注脚就要回来。
+  testWidgets('输入框聚焦时注脚让位，失焦后回来', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(
+            _FakeConnectionRepository(),
+          ),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: const MaterialApp(home: ConnectionPage()),
+      ),
+    );
+    await _settleOpening(tester);
+    expect(find.text('你的音乐，在你的服务器上'), findsOneWidget);
+
+    // 点输入框：键盘即将弹起（聚焦信号先行），注脚立即让位。
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    expect(find.text('你的音乐，在你的服务器上'), findsNothing);
+    // 表单本体不受影响。
+    expect(find.text('连接服务器'), findsOneWidget);
+
+    // 失焦（键盘收起）：注脚回来。
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    expect(find.text('你的音乐，在你的服务器上'), findsOneWidget);
+  });
+
+  // 用户反馈：键盘弹出时整页抖动。v1 的两个根因都已修掉：几何基准随 body
+  // 收缩走（已改用键盘免疫的 viewPadding）、内容子树写在 LayoutBuilder 闭包里
+  // 随 body 逐帧重建（已外提）。所以现在直接用 Scaffold 默认的
+  // resizeToAvoidBottomInset：键盘只压缩滚动视口，未聚焦就不滚动。此测试复刻
+  // insets 逐帧上报 + padding 被蚕食的完整序列，任何一帧几何都不许动。
+  testWidgets('键盘弹起时品牌块与内容位置纹丝不动', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(
+            _FakeConnectionRepository(),
+          ),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: const MaterialApp(home: ConnectionPage()),
+      ),
+    );
+    await _settleOpening(tester);
+
+    // 手势条在场（真实手机形态），几何基准要含它。改过的 view 状态测完必须
+    // 还原，否则残留的 insets 会让后面的键盘用例读到「键盘在降」。
+    addTearDown(tester.view.reset);
+    tester.view.padding = const FakeViewPadding(bottom: 24);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 24);
+    await tester.pump();
+
+    final double brandTopBefore = tester
+        .getTopLeft(find.byType(BrandWordmark))
+        .dy;
+    final double buttonTopBefore = tester.getTopLeft(find.text('连接服务器')).dy;
+
+    // 复刻真机键盘弹起的完整序列：insets 逐帧上报 + padding 被蚕食到 0（viewPadding
+    // 恒定不动）。几何基准取 viewPadding、输入框未聚焦，所以任何一帧都不许动。
+    for (final double inset in <double>[40, 120, 240, 320]) {
+      tester.view.viewInsets = FakeViewPadding(bottom: inset);
+      tester.view.padding = FakeViewPadding(
+        bottom: inset >= 24 ? 0 : 24 - inset,
+      );
+      await tester.pump(const Duration(milliseconds: 33));
+      expect(tester.getTopLeft(find.byType(BrandWordmark)).dy, brandTopBefore);
+      expect(tester.getTopLeft(find.text('连接服务器')).dy, buttonTopBefore);
+    }
+  });
+
+  // 键盘让位（用户反馈「输入时看不到输入框」+「两段式不丝滑」）：走 Flutter
+  // 标准机制——Scaffold 随键盘逐帧收缩 body，EditableText 每个 metrics 节拍把
+  // 光标连同 scrollPadding 划出的矩形滚进视口。ServerAddressForm 把
+  // scrollPadding.bottom 一路算到连接按钮下缘 + 16，输入框和按钮一起抬上来；
+  // 键盘收起视口恢复，滚动区自动钳回，不需要任何手写恢复逻辑。
+  testWidgets('键盘弹起后输入框与连接按钮抬到键盘上方，收起回位', (tester) async {
+    // dpr=1：viewInsets/尺寸直接按逻辑像素算，好断言。760 高：内容装得下
+    // （max=0），对应真机形态——收起后滚动区钳回 0 就是原位；内容装不下的
+    // 矮屏收起后停在最近的合法位置，不主动跳回顶部（标准行为，不另钉）。
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(800, 760);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(
+            _FakeConnectionRepository(),
+          ),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: const MaterialApp(home: ConnectionPage()),
+      ),
+    );
+    await _settleOpening(tester);
+    final double fieldTopBefore = tester.getTopLeft(find.byType(TextField)).dy;
+
+    // 聚焦输入框（键盘开始升）。
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    // 键盘 300 高：metrics 一到 body 收缩，EditableText 在 post-frame
+    // 里 jumpTo 让位（真机上引擎逐帧同步 insets，每帧都走这一趟）。
+    const double keyboardTop = 760 - 300;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pump(); // metrics → body 收缩 + 让位调度
+    await tester.pump(); // post-frame jumpTo 落地
+    await tester.pumpAndSettle();
+
+    // 输入框在键盘上方；连接按钮下缘恰好落在键盘上缘之上 16——少了被吞，
+    // 多了就是用户反馈过的「推太高」。
+    expect(
+      tester.getRect(find.byType(TextField)).bottom,
+      lessThanOrEqualTo(keyboardTop),
+    );
+    expect(
+      tester.getRect(find.byType(FilledButton)).bottom,
+      closeTo(keyboardTop - 16, 2),
+    );
+
+    // 收起：视口恢复，滚动余量归零，内容被钳回原位。
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.byType(TextField)).dy, fieldTopBefore);
+  });
+
+  // 用户反馈：发现区三态（扫描中/空态/有结果）结构互跳，表单跟着上下蹿。
+  // 现在骨架恒定：发现卡定高、内部换内容，表单永远在卡下方原位。
+  testWidgets('扫描中转空态：输入框与按钮位置纹丝不动', (tester) async {
+    final Completer<List<String>> sweepGate = Completer<List<String>>();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(
+            _FakeConnectionRepository(),
+          ),
+          lanServerScannerProvider.overrideWithValue(
+            // 扫段被 gate 卡住 → 这一趟扫不完，一直显示「正在寻找」；放行 = 扫完。
+            LanServerScanner(
+              sweepDelay: Duration.zero,
+              mdnsCandidates: () => const Stream<Uri>.empty(),
+              localAddresses: () => sweepGate.future,
+              probe: (_) async => throw Exception('unreachable'),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: ConnectionPage()),
+      ),
+    );
+    // 扫描中菊花一直在转，pumpAndSettle 到不了静止，全程改用固定时钟推进。
+    await tester.pump(const Duration(milliseconds: 2500)); // 走过开场与提示延时
+
+    // 表单恒在，直接记录位置。
+    expect(find.text('正在寻找局域网内的服务器'), findsOneWidget);
+
+    final double fieldTopBefore = tester.getTopLeft(find.byType(TextField)).dy;
+    final double buttonTopBefore = tester.getTopLeft(find.text('连接服务器')).dy;
+
+    // 这一趟扫完：一无所获，发现卡内换字，卡与表单几何不动。
+    sweepGate.complete(const <String>[]);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('没有发现服务器'), findsOneWidget);
+
+    expect(tester.getTopLeft(find.byType(TextField)).dy, fieldTopBefore);
+    expect(tester.getTopLeft(find.text('连接服务器')).dy, buttonTopBefore);
   });
 }

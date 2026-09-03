@@ -17,4 +17,16 @@ void main() {
     );
     expect(flag.hasMatch(manifest), isTrue);
   });
+
+  // 同类：main.dart 显式声明 SystemUiMode.edgeToEdge。Android 15+ 本就强制
+  // edge-to-edge，删掉这行画面一个像素都不变，但引擎的键盘动画同步只认窗口上的
+  // LAYOUT_HIDE_NAVIGATION 标志——没有它，键盘动画每帧上报的 inset 少一个导航条
+  // 高度、停稳再补跳（真机日志：动画末帧与终值差 60 物理像素）。用例测不出，守源码。
+  test('main.dart 显式声明 edge-to-edge：键盘动画帧与终值口径一致', () {
+    final String main = File('lib/main.dart').readAsStringSync();
+    expect(
+      main,
+      contains('SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)'),
+    );
+  });
 }

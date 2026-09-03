@@ -133,4 +133,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AuthForm), findsOneWidget);
   });
+
+  // 用户反馈：冷启动接续快进登录页那一下，「图标重了一下」。根因是这页把品牌
+  // 块垂直居中，而连接页锚在视口 18%——两页 450ms 交叉淡出时，两个位置不同的
+  // 字标一深一浅叠着。这页必须与连接页同一套几何（锚点 18%，夹 24~180）。
+  testWidgets('品牌块锚在视口 18%，与连接页逐像素重合', (tester) async {
+    final router = _authRouter();
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      _app(_FakeAuthRepository(authenticated: false), router),
+    );
+    await tester.pumpAndSettle();
+
+    final double top = tester.getTopLeft(find.byType(BrandWordmark)).dy;
+    final double expected = (600.0 * 0.18).clamp(24.0, 180.0);
+    expect(top, moreOrLessEquals(expected, epsilon: 2));
+  });
 }
