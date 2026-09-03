@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/session/session_providers.dart';
 import '../core/upgrade/app_version_guard.dart';
+import '../features/settings/view_models/auto_archive_view_model.dart';
 import 'app_providers.dart';
 import 'theme/hmusic_theme.dart';
 
@@ -18,6 +19,8 @@ class HMusicApp extends ConsumerWidget {
     ref.watch(sessionGuardProvider);
     // 服务端 403 拒绝老版本 → 立即关强升门（同上，不能由 apiClient 拉起）。
     ref.watch(appVersionGuardProvider);
+    // 「播放过的在线歌自动入库」的执行体：挂在根上，任何页面点播都算听过。
+    ref.watch(autoArchiveWatcherProvider);
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'HMusic',

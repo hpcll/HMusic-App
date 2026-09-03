@@ -9,6 +9,7 @@ import '../../../../shared/widgets/hmusic_card.dart';
 import '../../../../shared/widgets/hmusic_icon_button.dart';
 import '../../../../shared/widgets/state_dot.dart';
 import '../../models/download_record.dart';
+import '../../view_models/auto_archive_view_model.dart';
 import '../../view_models/downloads_view_model.dart';
 
 // 本地下载子页：说明 + 已下载/下载中列表（状态点 + 大小 + 失败原因）。
@@ -44,9 +45,11 @@ class _DownloadsSectionViewState extends ConsumerState<DownloadsSectionView> {
       children: <Widget>[
         Text(
           '下载到服务器本地的歌播放时直接走本地文件——不再依赖平台直链，永不过期。'
-          '在搜索结果里点下载图标即可加入。',
+          '搜索结果和榜单行的下载图标都能加入。',
           style: TextStyle(fontSize: 12, color: palette.muted, height: 1.6),
         ),
+        const SizedBox(height: 14),
+        const _AutoArchiveRow(),
         const SizedBox(height: 16),
         if (!state.loaded)
           Padding(
@@ -80,6 +83,52 @@ class _DownloadsSectionViewState extends ConsumerState<DownloadsSectionView> {
             ),
           ),
       ],
+    );
+  }
+}
+
+// 自动入库开关：默认关。开着时任何页面点播的在线歌都会顺手下一份到服务器，
+// 听过的歌自然积累成本地曲库；关着就只有手动点下载图标才下。
+class _AutoArchiveRow extends ConsumerWidget {
+  const _AutoArchiveRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = context.palette;
+    final enabled = ref.watch(autoArchiveEnabledProvider);
+    return HMusicCard(
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  '播放过的在线歌自动入库',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: palette.textStrong,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '听过就下一份到服务器，下次免解析；服务器硬盘会随之变大。',
+                  style: TextStyle(fontSize: 12.5, color: palette.muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Switch(
+            value: enabled,
+            onChanged: (value) => unawaited(
+              ref.read(autoArchiveEnabledProvider.notifier).setEnabled(value),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

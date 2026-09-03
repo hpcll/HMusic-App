@@ -8,10 +8,12 @@ import '../../../shared/widgets/hmusic_icon_button.dart';
 import '../../../shared/widgets/hmusic_track_row.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../../player/view_models/player_view_model.dart';
+import '../../settings/models/download_record.dart';
 import '../models/chart.dart';
 import '../view_models/charts_view_model.dart';
 
-// 榜单详情：返回 + 播放全部 + 曲目列表。前 3 名排名用衬线加深墨（对齐 .chart-rank.top），
+// 榜单详情：返回 + 播放全部 + 曲目列表。点行即播（行尾只留入库/队列两个附加
+// 动作），已入库的行标带角标。前 3 名排名用衬线加深墨（对齐 .chart-rank.top），
 // 播放次数用青绿计数（.chart-count，全站唯一表达「正在发生的事」外的青绿例外）。
 class ChartDetailView extends ConsumerWidget {
   const ChartDetailView({super.key});
@@ -107,35 +109,83 @@ class ChartDetailView extends ConsumerWidget {
       itemBuilder: (context, index) {
         if (index == 0) return header;
         final i = index - 1;
+        final entry = rows[i];
+        final idle = state.actingRank == 0;
+        // 入库状态：已完成的行给标题挂角标、不再出下载钮；排队/下载中转菊花。
+        final key = chartEntryTrackKey(entry);
+        final archive = key == null ? null : state.downloads[key];
+        final archived = archive == DownloadStatus.done;
+        final archiving =
+            archive == DownloadStatus.pending ||
+            archive == DownloadStatus.downloading;
         return HMusicTrackRow(
-          leading: _isEntryPlaying(rows[i], playingTrack)
+          leading: _isEntryPlaying(entry, playingTrack)
               ? const _PlayingRank()
-              : _ChartRank(rank: rows[i].rank),
-          coverUrl: rows[i].coverUrl,
-          title: rows[i].title,
-          subtitle: rows[i].artist,
-          subtitleAccent: rows[i].playCount != null
-              ? ' · ${rows[i].playCount} 次'
+              : _ChartRank(rank: entry.rank),
+          coverUrl: entry.coverUrl,
+          title: entry.title,
+          titleTrailing: archived ? const _ArchivedBadge() : null,
+          subtitle: entry.artist,
+          subtitleAccent: entry.playCount != null
+              ? ' · ${entry.playCount} 次'
               : null,
           showDivider: i != rows.length - 1,
+          // 整行即播放键：点哪一行放哪一首（不再另出播放钮，行尾只留入库与
+          // 队列这两个「附加动作」）。
+          onTap: idle ? () => notifier.play(entry) : null,
           actions: <Widget>[
-            HMusicIconButton(
-              icon: Icons.play_arrow_rounded,
-              tooltip: '播放',
-              onPressed: state.actingRank == 0
-                  ? () => notifier.play(rows[i])
-                  : null,
-            ),
+            if (archiving)
+              const _ArchivingSpinner()
+            else if (!archived)
+              HMusicIconButton(
+                icon: Icons.download_rounded,
+                tooltip: '下载到服务器',
+                onPressed: idle ? () => notifier.download(entry) : null,
+              ),
             HMusicIconButton(
               icon: Icons.add_rounded,
               tooltip: '加入队列',
-              onPressed: state.actingRank == 0
-                  ? () => notifier.enqueue(rows[i])
-                  : null,
+              onPressed: idle ? () => notifier.enqueue(entry) : null,
             ),
           ],
         );
       },
+    );
+  }
+}
+
+// 已入库角标：墨色小勾（不用青绿——accent 只留给「正在发生的事」，入库是
+// 既成状态；见 docs/03）。
+class _ArchivedBadge extends StatelessWidget {
+  const _ArchivedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(
+      Icons.download_done_rounded,
+      size: 14,
+      color: context.palette.muted,
+    );
+  }
+}
+
+// 排队/下载中：占位与图标钮同宽，行尾不因状态切换而漂移。
+class _ArchivingSpinner extends StatelessWidget {
+  const _ArchivingSpinner();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 34,
+      child: Center(
+        child: SizedBox.square(
+          dimension: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: context.palette.mutedStrong,
+          ),
+        ),
+      ),
     );
   }
 }

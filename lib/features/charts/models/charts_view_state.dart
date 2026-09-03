@@ -1,4 +1,5 @@
 import '../../../shared/models/hmusic_notice.dart';
+import '../../settings/models/download_record.dart';
 import 'chart.dart';
 
 enum ChartsStatus { initial, loading, loaded, error }
@@ -14,6 +15,7 @@ class ChartsViewState {
     this.detail,
     this.detailLoading = false,
     this.actingRank = 0,
+    this.downloads = const <String, DownloadStatus>{},
     this.errorMessage,
     this.notice,
   });
@@ -29,6 +31,12 @@ class ChartsViewState {
 
   // 正在操作的条目 rank，防连点；-1 表示整榜播放占位。0 = 空闲。
   final int actingRank;
+
+  // 进详情时拉一次 /downloads 建的入库索引，键为 trackKey（source:sourceTrackId）：
+  // 已入库的行标角标、下载中的行转菊花。缺键 = 没下载过。进度不在这里看
+  //（服务端只报状态不报百分比，完整列表在设置的「本地下载」）。
+  final Map<String, DownloadStatus> downloads;
+
   final String? errorMessage;
   final HMusicNotice? notice;
 
@@ -42,6 +50,7 @@ class ChartsViewState {
     ChartDetail? detail,
     bool? detailLoading,
     int? actingRank,
+    Map<String, DownloadStatus>? downloads,
     String? errorMessage,
     HMusicNotice? notice,
     bool clearActive = false,
@@ -57,6 +66,7 @@ class ChartsViewState {
       detail: clearDetail ? null : (detail ?? this.detail),
       detailLoading: detailLoading ?? this.detailLoading,
       actingRank: actingRank ?? this.actingRank,
+      downloads: downloads ?? this.downloads,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       notice: clearNotice ? null : (notice ?? this.notice),
     );
