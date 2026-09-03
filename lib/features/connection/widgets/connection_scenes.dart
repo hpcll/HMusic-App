@@ -77,11 +77,10 @@ class ConnectionScenes extends StatelessWidget {
     final double liftDistance =
         (viewportHeight - _kWordmarkHeight) / 2 - anchorTop;
 
-    // 内容子树在 LayoutBuilder 外构建：键盘动画期间 Scaffold 逐帧收缩 body，
-    // LayoutBuilder 每帧重跑，若内容写在 builder 闭包里，整棵列（含
-    // TextField）会每帧重建，真机上键盘动画掉帧（用户反馈的"抖动"）。
-    // 提到外面后 builder 每帧只换滚动区的最小高度，列的约束不变、不重排。
-    // 锚点/上升位移只依赖 viewportHeight，与 constraints 无关，天然可外提。
+    // 整列内容的几何只依赖键盘免疫的 viewportHeight，不碰 body 约束：键盘
+    // 动画期间 Scaffold 逐帧收缩 body，凡是依赖当前约束的东西都会每帧重跑
+    // 一次（此前这里是 LayoutBuilder + 跟着 body 走的最小高度，键盘每帧
+    // 都把整棵列重排一遍——那是用户反馈的"抖动"的最后一份来源）。
     final Widget content = Padding(
       // 底部多留 96：给压在视口底缘的注脚让位，矮屏滚到底
       // 时最后的控件不会贴在注脚文字下面。
@@ -176,15 +175,22 @@ class ConnectionScenes extends StatelessWidget {
       ),
     );
 
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        return SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: content,
-          ),
-        );
-      },
+    // 滚动区最小高度取恒定的 viewportHeight：键盘弹起时视口变矮而内容不变，
+    // 多出来的那段正好是让位需要的滚动余量（键盘高度减手势条），且列的约束
+    // 一帧都不变——键盘动画期间没有重建、没有重排，只有滚动偏移在动。
+    //
+    // 整列再包一层 RepaintBoundary：内容自成一层后，让位/滚动的每一帧只是把
+    // 这一层按新偏移合成一次，既不用重跑整列的 paint，栅格结果也能被引擎的
+    // raster cache 留住（缓存键忽略整数平移）。没有它，每帧都要把品牌图、
+    // 衬线标语、发现卡和表单整屏重绘重栅一遍——Impeller 关掉回退 Skia 的
+    // 机型上，那就是键盘动画和滚动的掉帧来源。
+    return SingleChildScrollView(
+      child: RepaintBoundary(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: viewportHeight),
+          child: content,
+        ),
+      ),
     );
   }
 }

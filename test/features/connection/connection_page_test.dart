@@ -712,6 +712,68 @@ void main() {
     expect(tester.getTopLeft(find.byType(TextField)).dy, fieldTopBefore);
   });
 
+  // 让位期间不许重排：内容的高度只跟键盘免疫的 viewportHeight 有关，键盘一来
+  // 只有视口变矮、滚动余量长出键盘那么高。此前滚动区的最小高度跟着 body 约束
+  // 走（LayoutBuilder），键盘每一帧都把整列重排一次——真机上就是让位/滚动的
+  // 掉帧。内容高度 = maxScrollExtent + viewportDimension，键盘前后必须相等。
+  testWidgets('键盘让位只改视口不改内容高度，余量恰好长出键盘那么高', (tester) async {
+    // 1000 高：内容装得下，最小高度真正起作用（内容比视口高时两种写法
+    // 都取自然高度，看不出差别）。
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(800, 1000);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectionRepositoryProvider.overrideWithValue(
+            _FakeConnectionRepository(),
+          ),
+          lanServerScannerProvider.overrideWithValue(_silentScanner()),
+        ],
+        child: const MaterialApp(home: ConnectionPage()),
+      ),
+    );
+    await _settleOpening(tester);
+
+    ScrollPosition position() => tester
+        .state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(SingleChildScrollView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        )
+        .position;
+
+    final double contentBefore =
+        position().maxScrollExtent + position().viewportDimension;
+    final double extentBefore = position().maxScrollExtent;
+
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pump();
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(
+      position().maxScrollExtent + position().viewportDimension,
+      closeTo(contentBefore, 0.5),
+    );
+    expect(position().maxScrollExtent - extentBefore, closeTo(300, 0.5));
+
+    // 内容整列自成一层：让位/滚动每帧只把这一层按新偏移合成，不重跑整列的
+    // paint，也让引擎的 raster cache 留得住栅格结果。
+    expect(
+      find.descendant(
+        of: find.byType(SingleChildScrollView),
+        matching: find.byType(RepaintBoundary),
+      ),
+      findsWidgets,
+    );
+  });
+
   // 用户反馈：发现区三态（扫描中/空态/有结果）结构互跳，表单跟着上下蹿。
   // 现在骨架恒定：发现卡定高、内部换内容，表单永远在卡下方原位。
   testWidgets('扫描中转空态：输入框与按钮位置纹丝不动', (tester) async {

@@ -100,11 +100,16 @@ class _ScanningStatus extends StatelessWidget {
               SizedBox(
                 width: 15,
                 height: 15,
-                // 扫描菊花用墨色，不用品牌青绿——accent 铁律只覆盖「正在发生的
-                // 事」中少数几处，扫局域网不在其列（docs/03）。
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: palette.mutedStrong,
+                // 菊花单独成层：它一转就是每帧重绘，不隔开的话整页（含
+                // 品牌块、表单）跟着一起重绘——扫描往往和"点输入框弹键盘"
+                // 撞在一起，那几帧的预算要留给让位。
+                child: RepaintBoundary(
+                  // 扫描菊花用墨色，不用品牌青绿——accent 铁律只覆盖「正在发生的
+                  // 事」中少数几处，扫局域网不在其列（docs/03）。
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: palette.mutedStrong,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
