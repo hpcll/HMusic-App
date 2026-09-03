@@ -1,3 +1,4 @@
+import '../../../core/app_version.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../models/app_update.dart';
 
@@ -11,6 +12,7 @@ class UpdateState {
     this.checkingServer = false,
     this.checkingApp = false,
     this.upgrading = false,
+    this.netdiskUrl = kNetdiskDownloadUrl,
     this.notice,
   });
 
@@ -24,6 +26,11 @@ class UpdateState {
   final bool checkingServer;
   final bool checkingApp;
   final bool upgrading;
+
+  // 网盘下载入口：没梯子的用户查得到新版但下不来（下载直链在 github.com），
+  // 这条是那种情况下的退路。默认内置常量，app-config.json 下发的值优先。
+  final String netdiskUrl;
+
   final HMusicNotice? notice;
 
   UpdateState copyWith({
@@ -34,6 +41,7 @@ class UpdateState {
     bool? checkingServer,
     bool? checkingApp,
     bool? upgrading,
+    String? netdiskUrl,
     HMusicNotice? notice,
     bool clearServerUpdate = false,
     bool clearAppRelease = false,
@@ -49,6 +57,7 @@ class UpdateState {
       checkingServer: checkingServer ?? this.checkingServer,
       checkingApp: checkingApp ?? this.checkingApp,
       upgrading: upgrading ?? this.upgrading,
+      netdiskUrl: netdiskUrl ?? this.netdiskUrl,
       notice: clearNotice ? null : (notice ?? this.notice),
     );
   }

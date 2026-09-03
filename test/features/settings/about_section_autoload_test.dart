@@ -6,6 +6,7 @@ import 'package:hmusic/core/providers/infrastructure_providers.dart';
 import 'package:hmusic/core/storage/key_value_store.dart';
 import 'package:hmusic/features/settings/data/api_update_repository.dart';
 import 'package:hmusic/features/settings/models/app_update.dart';
+import 'package:hmusic/features/settings/view_models/update_view_model.dart';
 import 'package:hmusic/features/settings/widgets/sections/about_section.dart';
 
 // 用户反馈：「就算设置按钮有红点了，进入更新页面还是要手动点检查更新才会出现
@@ -40,7 +41,8 @@ class _FakeUpdateRepository implements UpdateRepository {
   Future<void> triggerServerUpdate() async => throw UnimplementedError();
 
   @override
-  Future<AppRemoteConfig?> remoteAppConfig() async => null;
+  Future<AppRemoteConfig?> remoteAppConfig() async =>
+      const AppRemoteConfig(netdiskUrl: 'https://pan.quark.cn/s/mirror');
 }
 
 void main() {
@@ -69,6 +71,35 @@ void main() {
     expect(
       find.text('下载并安装').evaluate().length + find.text('去下载').evaluate().length,
       1,
+    );
+  });
+
+  // 没梯子的用户查得到新版却下不来（下载直链在 github.com）：网盘入口必须常驻，
+  // 且地址跟随 app-config.json 下发（换链接不用发新版）。
+  testWidgets('关于页常驻网盘入口，地址取 app-config 下发的值', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          updateRepositoryProvider.overrideWithValue(_FakeUpdateRepository()),
+          keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: AboutSectionView()),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('从网盘下载'), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AboutSectionView)),
+      listen: false,
+    );
+    expect(
+      container.read(updateViewModelProvider).netdiskUrl,
+      'https://pan.quark.cn/s/mirror',
     );
   });
 }

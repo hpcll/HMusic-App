@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/app_version.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/upgrade/app_update_badge.dart';
+import '../../../core/upgrade/upgrade_config_store.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_update_repository.dart';
 import '../models/update_state.dart';
@@ -33,7 +34,26 @@ class UpdateViewModel extends Notifier<UpdateState> {
   // App 新版这一路以前不在这里：于是设置入口都点上红点了，进来还得再点一次
   // 「检查更新」才看得到「下载并安装」。红点说的和这一页说的必须是同一件事。
   Future<void> load() async {
-    await Future.wait(<Future<void>>[_loadServerVersion(), loadAppRelease()]);
+    await Future.wait(<Future<void>>[
+      _loadServerVersion(),
+      loadAppRelease(),
+      _loadNetdiskUrl(),
+    ]);
+  }
+
+  // 网盘入口地址：app-config.json（三镜像 + 服务端中转）下发的优先，拉不到就用
+  // 上次落盘的那份，都没有就保持内置常量——这条退路恰恰在网络最差时才被用到，
+  // 不能反过来依赖网络。
+  Future<void> _loadNetdiskUrl() async {
+    try {
+      final config =
+          await ref.read(updateRepositoryProvider).remoteAppConfig() ??
+          await ref.read(upgradeConfigStoreProvider).read();
+      final url = config?.netdiskUrl ?? '';
+      if (url.isNotEmpty) state = state.copyWith(netdiskUrl: url);
+    } catch (_) {
+      // 保持内置常量。
+    }
   }
 
   Future<void> _loadServerVersion() async {

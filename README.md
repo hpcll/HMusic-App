@@ -28,11 +28,15 @@ curl -fsSL https://raw.githubusercontent.com/hpcll/HMusic-Server/main/bootstrap.
 
 | 平台 | 下载文件 | 说明 |
 | --- | --- | --- |
-| Android | APK | 可直接安装；AAB 用于 Google Play |
+| Android | APK | 可直接安装；`-arm64-v8a` 适用近年所有手机（包最小），`-android.apk` 是含全部架构的通用包；AAB 用于 Google Play |
 | iOS | `ios-unsigned.ipa` | 需要用自己的 Apple ID 或证书重签后安装 |
 | macOS | `macos-universal.dmg` | 挂载后把 HMusic 拖进“应用程序”；同时支持 Apple Silicon 和 Intel |
 | Windows | `windows-x64-setup.exe`（推荐）或 `windows-x64.zip` | 安装版带中文向导；ZIP 为便携版 |
 | Linux | `linux-x64.tar.gz` | x86_64 便携版，内含应用图标 |
+
+GitHub 连不上（或下载很慢）时，同一批包也在夸克网盘：
+**<https://pan.quark.cn/s/c6534914a56b>**（每个版本一个目录，无提取码）。App 内“设置 → 关于与更新”
+也常驻这条入口——检查更新能走国内镜像，但下载直链在 github.com 上，没有代理时走网盘更稳。
 
 桌面端的包没有 Apple / 微软的付费签名，**首次打开一定会被系统拦一次，这是正常的**：
 

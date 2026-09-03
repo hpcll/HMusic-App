@@ -249,14 +249,35 @@ class _AppCard extends ConsumerWidget {
               ),
             ],
           ],
+          // 网盘退路常驻：下载直链在 github.com，没梯子的用户「查得到、下不来」
+          //（检查更新那一路有 Gitee 镜像绕开，下载没有）。链接由 app-config.json
+          // 下发、内置常量兜底，所以网络最差时它也在。
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => unawaited(_openUrl(state.netdiskUrl)),
+              child: Text(
+                '从网盘下载（国内直连，含各平台安装包）',
+                style: TextStyle(fontSize: 12.5, color: palette.muted),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Future<void> _openDownload(AppReleaseInfo release) async {
-    final url = release.url;
-    if (url == null || url.isEmpty) return;
+  Future<void> _openDownload(AppReleaseInfo release) =>
+      _openUrl(release.url ?? '');
+
+  Future<void> _openUrl(String url) async {
+    if (url.isEmpty) return;
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 }

@@ -52,8 +52,17 @@ Android 侧一次出四个 APK：
 发 Release 之后顺手更新仓库根的 `app-config.json`（三镜像 + 服务端中转，见 docs/02）：
 
 ```json
-{ "latestVersion": "v0.1.6", "apkUrl": "https://github.com/.../hmusic-0.1.6-android.apk", "apkSize": 26000000 }
+{
+  "latestVersion": "v0.1.6",
+  "apkUrl": "https://github.com/.../hmusic-0.1.6-android.apk",
+  "apkSize": 61266359,
+  "netdiskUrl": "https://pan.quark.cn/s/c6534914a56b"
+}
 ```
+
+`netdiskUrl` 是没梯子用户的退路（关于页常驻那条「从网盘下载」）：检查更新能靠 Gitee 镜像绕开
+GitHub，下载直链却在 github.com 上。换网盘链接改这里即可，不用发新版；App 内置了同一条链接兜底
+（`kNetdiskDownloadUrl`），所以连 app-config 都拉不到时入口仍在。
 
 App 的「检查更新」优先问 `api.github.com`，拉不到（大陆不通、代理出口被限流 403）就退到这份文件；
 不填这三个字段，那条退路等于不存在，用户只会看到 GitHub 的失败原因。`minVersion` 仍是强制升级门，

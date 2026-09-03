@@ -91,6 +91,7 @@ class AppRemoteConfig {
     this.latestVersion = '',
     this.apkUrl,
     this.apkSize,
+    this.netdiskUrl,
   });
 
   factory AppRemoteConfig.fromJson(Map<String, Object?> json) {
@@ -103,6 +104,7 @@ class AppRemoteConfig {
       latestVersion: '${json['latestVersion'] ?? ''}',
       apkUrl: json['apkUrl'] == null ? null : '${json['apkUrl']}',
       apkSize: (json['apkSize'] as num?)?.toInt(),
+      netdiskUrl: json['netdiskUrl'] == null ? null : '${json['netdiskUrl']}',
     );
   }
 
@@ -114,4 +116,7 @@ class AppRemoteConfig {
   final String latestVersion;
   final String? apkUrl;
   final int? apkSize;
+
+  // 网盘下载入口（没梯子时的退路；空则用内置的 kNetdiskDownloadUrl）。
+  final String? netdiskUrl;
 }
