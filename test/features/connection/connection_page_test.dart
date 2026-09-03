@@ -226,18 +226,17 @@ void main() {
     // 所以接续说明仍然不许出声——否则会和停在正中的字标叠在一起。
     await tester.pump(const Duration(milliseconds: 800));
     expect(tester.widget<Opacity>(brandFade).opacity, 1);
-    expect(find.byType(AnimatedOpacity), findsOneWidget);
-    expect(
-      tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
-      0,
-    );
+    final Finder hintFade = find
+        .ancestor(
+          of: find.text('正在连接上次的服务器…'),
+          matching: find.byType(AnimatedOpacity),
+        )
+        .first;
+    expect(tester.widget<AnimatedOpacity>(hintFade).opacity, 0);
 
     // 1600ms：推到位了（1520ms 落地），这时才开口解释在等什么。
     await tester.pump(const Duration(milliseconds: 800));
-    expect(
-      tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
-      1,
-    );
+    expect(tester.widget<AnimatedOpacity>(hintFade).opacity, 1);
     expect(find.text('正在连接上次的服务器…'), findsOneWidget);
 
     // 放行接续，收干净计时器与动画（否则测试结束会报未完成的 timer）。
@@ -585,6 +584,9 @@ void main() {
   // ——body 里被 Scaffold 摘掉，页面层读则键盘动画逐帧重建整页会抖）。
   // 否则输入框聚焦、视口被压缩，注脚会被顶上来正好叠在延迟最高的「连接服务器」
   // 按钮上——真机反馈「脚注和那条线被键盘推上来了」。焦点一收回注脚就要回来。
+  // 让位是淡出而非摘出树：收键盘的瞬间 body 还在收缩中，若瞬时就地渲染，注脚
+  // 会先压在连接按钮的位置闪一下 hairline，再随 body 展开落回页底（真机反馈
+  // 「收起键盘时那条白线在连接按钮上闪一下」）。淡出让它在下落途中才显形。
   testWidgets('输入框聚焦时注脚让位，失焦后回来', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -598,19 +600,25 @@ void main() {
       ),
     );
     await _settleOpening(tester);
-    expect(find.text('你的音乐，在你的服务器上'), findsOneWidget);
+    final Finder footnoteFade = find
+        .ancestor(
+          of: find.text('你的音乐，在你的服务器上'),
+          matching: find.byType(AnimatedOpacity),
+        )
+        .first;
+    expect(tester.widget<AnimatedOpacity>(footnoteFade).opacity, 1);
 
-    // 点输入框：键盘即将弹起（聚焦信号先行），注脚立即让位。
+    // 点输入框：键盘即将弹起（聚焦信号先行），注脚让位（淡出）。
     await tester.tap(find.byType(TextField));
     await tester.pump();
-    expect(find.text('你的音乐，在你的服务器上'), findsNothing);
+    expect(tester.widget<AnimatedOpacity>(footnoteFade).opacity, 0);
     // 表单本体不受影响。
     expect(find.text('连接服务器'), findsOneWidget);
 
-    // 失焦（键盘收起）：注脚回来。
+    // 失焦（键盘收起）：注脚淡回来。
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pump();
-    expect(find.text('你的音乐，在你的服务器上'), findsOneWidget);
+    expect(tester.widget<AnimatedOpacity>(footnoteFade).opacity, 1);
   });
 
   // 用户反馈：键盘弹出时整页抖动。v1 的两个根因都已修掉：几何基准随 body

@@ -44,7 +44,7 @@ class ConnectionRestoreHint extends StatelessWidget {
 }
 
 // 页脚注脚：hairline + 衬线小字，给页面一个落点，不再「悬在半空」。输入框
-// 聚焦时让位（hidden=true 直接不渲染），避免和手动表单挤在一起。
+// 聚焦时让位（淡出，不摘出树），避免和手动表单挤在一起。
 // 信号由页面层传（地址输入框的 FocusNode）：不能在内部读 viewInsets——
 // Scaffold 收缩 body 时会把 viewInsets 从 body 子树的 MediaQuery 里摘掉，
 // 内部读恒为 0；也不能在页面层登记 viewInsets 依赖——Android 键盘动画期间
@@ -67,31 +67,40 @@ class ConnectionFootnote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (hidden) {
-      return const SizedBox.shrink();
-    }
     final palette = context.palette;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return IgnorePointer(
       child: FadeTransition(
         opacity: opacity,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(40, 4, 40, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(height: 1, color: palette.lineSoft),
-              const SizedBox(height: 14),
-              Text(
-                '你的音乐，在你的服务器上',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'NotoSerifSC',
-                  fontSize: 11.5,
-                  letterSpacing: 1.5,
-                  color: palette.muted,
+        child: AnimatedOpacity(
+          // 收起键盘那一瞬焦点已失、body 还没展开完，注脚若瞬时就地渲染，
+          // 会先压在收缩后的底缘（正是连接按钮的位置）闪一下 hairline，再随
+          // body 展开滑回页底。淡入把出现摊进 body 展开的动画里：按钮位置那
+          // 几帧接近全透明，落底时才显形。
+          opacity: hidden ? 0 : 1,
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(40, 4, 40, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(height: 1, color: palette.lineSoft),
+                const SizedBox(height: 14),
+                Text(
+                  '你的音乐，在你的服务器上',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'NotoSerifSC',
+                    fontSize: 11.5,
+                    letterSpacing: 1.5,
+                    color: palette.muted,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
