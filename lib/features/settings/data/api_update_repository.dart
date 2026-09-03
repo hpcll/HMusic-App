@@ -62,16 +62,14 @@ class ApiUpdateRepository implements UpdateRepository {
   final ApiClient _apiClient;
   final Dio _github;
 
-  // 本机 ABI 在资产名里的写法（arm64 / armeabi / x86_64 / x86）：Release 里同时
-  // 有分架构包和通用包时挑对应的那个，能把自更新的下载量从 60MB 级压到 25MB 级。
-  // 目前发布流水线只出通用包，这一支等于空转（挑不到就退通用包）。
+  // 本机 ABI 在资产名里的写法（与 tool/build_release.sh 出的名字一致）：Release
+  // 里同时有分架构包和通用包时挑本机那一个，把自更新的下载量从 61MB 压到 25MB。
   final String _abiTag;
 
   static String _currentAbiTag() => switch (Abi.current()) {
-    Abi.androidArm64 => 'arm64',
-    Abi.androidArm => 'armeabi',
+    Abi.androidArm64 => 'arm64-v8a',
+    Abi.androidArm => 'armeabi-v7a',
     Abi.androidX64 => 'x86_64',
-    Abi.androidIA32 => 'x86',
     _ => '',
   };
 
@@ -190,17 +188,28 @@ class ApiUpdateRepository implements UpdateRepository {
     if (candidates.isEmpty) return null;
     if (_abiTag.isNotEmpty) {
       for (final asset in candidates) {
-        if ('${asset['name']}'.toLowerCase().contains(_abiTag)) return asset;
+        if (_matchesAbi('${asset['name']}'.toLowerCase(), _abiTag)) {
+          return asset;
+        }
       }
     }
     // 通用包：名字里不带任何架构标记的那个。
-    const abis = <String>['arm64', 'armeabi', 'x86_64', 'x86'];
     for (final asset in candidates) {
       final name = '${asset['name']}'.toLowerCase();
-      if (!abis.any(name.contains)) return asset;
+      if (!_kAbiTags.any((abi) => _matchesAbi(name, abi))) return asset;
     }
     return candidates.first;
   }
+
+  static const List<String> _kAbiTags = <String>[
+    'arm64-v8a',
+    'armeabi-v7a',
+    'x86_64',
+  ];
+
+  // 架构标记按整段匹配（`-x86_64.apk` 不能被 `x86` 命中，反之亦然）。
+  static bool _matchesAbi(String assetName, String abi) =>
+      assetName.contains('-$abi.') || assetName.contains('-$abi-');
 
   // 远程配置镜像序列：Gitee 国内主源（大陆免翻墙；镜像仓库建好后生效，
   // 未建时 404 秒过）→ GitHub raw → jsDelivr CDN。任一成功即用，

@@ -150,6 +150,10 @@ fi
 # 而 release 模式下的这次重新生成正好会剔除 integration_test 这类 dev 依赖插件——
 # 也就是说 dev 插件混进 release 注册表这件事，交给 pub 自己就解决了，不需要手删文件。
 flutter build apk --release
+# 分架构包：App 内自更新只下本机那一份（25MB 上下，通用包是 61MB）。资产名里的
+# 架构标记就是 App 侧挑包的依据（api_update_repository._pickApkAsset），改名要同步。
+# 通用包仍然要出：手动下载、以及挑不到本机架构时的回落。
+flutter build apk --release --split-per-abi
 flutter build appbundle --release
 
 # 插件注册文件是 Android 端的生命线，缺了它 FlutterEngine 只打一行 warning 继续跑：
@@ -191,4 +195,16 @@ cp build/app/outputs/bundle/release/app-release.aab "$AAB"
 
 hash_file "$APK"
 hash_file "$AAB"
+
+# 分架构包：flutter 的产物名是 app-<abi>-release.apk，转成发布名
+# hmusic-<版本>-android-<abi>[-unsigned].apk（abi 段保留 arm64-v8a/armeabi-v7a/
+# x86_64 原样，App 侧按「-<abi>.」或「-<abi>-」定位，不会把 x86 和 x86_64 搞混）。
+for abi in arm64-v8a armeabi-v7a x86_64; do
+  SPLIT_SRC="build/app/outputs/flutter-apk/app-${abi}-release.apk"
+  [ -f "$SPLIT_SRC" ] || { echo "缺少分架构包 $SPLIT_SRC" >&2; exit 1; }
+  SPLIT_APK="$DIST_DIR/hmusic-${VERSION}-android-${abi}${SIGNING_SUFFIX}.apk"
+  cp "$SPLIT_SRC" "$SPLIT_APK"
+  hash_file "$SPLIT_APK"
+done
+
 printf '发布产物已写入 %s\n' "$DIST_DIR"

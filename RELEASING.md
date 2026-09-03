@@ -36,6 +36,19 @@ bash tool/build_release.sh android
 同一台机器上再构建别的平台会把新行 upsert 进去，不再是每个包各带一个 `.sha256`）。Google Play 使用 AAB，
 并启用 Play App Signing；APK 只用于可信渠道的直接安装或测试。
 
+Android 侧一次出四个 APK：
+
+| 产物 | 用途 |
+|---|---|
+| `hmusic-<版本>-android.apk` | 通用包（含全部架构，~61MB）：手动下载、以及 App 挑不到本机架构时的回落 |
+| `hmusic-<版本>-android-arm64-v8a.apk` | 近年所有手机（~25MB）：App 内自更新实际下的就是它 |
+| `hmusic-<版本>-android-armeabi-v7a.apk` | 32 位老机（~22MB） |
+| `hmusic-<版本>-android-x86_64.apk` | 模拟器 / x86 平板（~26MB） |
+
+架构段的写法（`arm64-v8a` / `armeabi-v7a` / `x86_64`）是 App 挑包的依据
+（`api_update_repository._pickApkAsset` 按 `-<abi>.` 整段匹配），**改名要同步改那里**。
+发布工作流按 `dist/*-android*.apk` 收集，分包会自动跟着上 Release。
+
 发 Release 之后顺手更新仓库根的 `app-config.json`（三镜像 + 服务端中转，见 docs/02）：
 
 ```json
