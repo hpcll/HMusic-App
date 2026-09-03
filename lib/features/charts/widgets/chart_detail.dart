@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../shared/widgets/back_link.dart';
 import '../../../shared/widgets/hmusic_icon_button.dart';
 import '../../../shared/widgets/hmusic_track_row.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../../player/view_models/player_view_model.dart';
-import '../../settings/models/download_record.dart';
 import '../models/chart.dart';
 import '../view_models/charts_view_model.dart';
 
@@ -34,6 +34,9 @@ class ChartDetailView extends ConsumerWidget {
     final playingTrack = ref.watch(
       serverPlaybackStateProvider.select((s) => s.value?.track),
     );
+    // 行尾入库位的三态由共享索引决定（搜索页同源）。
+    ref.watch(downloadIndexProvider);
+    final archive = ref.read(downloadIndexProvider.notifier);
 
     // 头部（返回/播放全部/榜名/简介）+ 加载/空态占位；曲目行走 builder 懒建，
     // 100+ 行的榜首帧不再全量 build。加载中不出旧榜的行（与旧全量分支语义一致）。
@@ -112,13 +115,8 @@ class ChartDetailView extends ConsumerWidget {
         final i = index - 1;
         final entry = rows[i];
         final idle = state.actingRank == 0;
-        // 入库状态：已完成的行给标题挂角标、不再出下载钮；排队/下载中转菊花。
-        final key = chartEntryTrackKey(entry);
-        final archive = key == null ? null : state.downloads[key];
-        final archived = archive == DownloadStatus.done;
-        final archiving =
-            archive == DownloadStatus.pending ||
-            archive == DownloadStatus.downloading;
+        final archived = archive.isArchived(entry.track);
+        final archiving = archive.isArchiving(entry.track);
         return HMusicTrackRow(
           leading: _isEntryPlaying(entry, playingTrack)
               ? const _PlayingRank()

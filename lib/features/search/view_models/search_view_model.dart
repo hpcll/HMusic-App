@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/hmusic_audio_handler.dart';
+import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/queue/api_queue_repository.dart';
@@ -55,6 +58,8 @@ class SearchViewModel extends Notifier<SearchViewState> {
       await ref
           .read(downloadsRepositoryProvider)
           .start(track, quality: quality);
+      // 乐观标排队中 + 开表：下完这一行自己变成对勾（榜单页同源索引）。
+      ref.read(downloadIndexProvider.notifier).markQueued(track);
       state = state.copyWith(
         notice: HMusicNotice.success('已开始下载：${track.title}'),
         clearError: true,
@@ -85,6 +90,8 @@ class SearchViewModel extends Notifier<SearchViewState> {
         tracks: result.tracks,
         clearError: true,
       );
+      // 出结果就拉一次入库索引：行尾要标「已入库/下载中」（与榜单页同一份）。
+      unawaited(ref.read(downloadIndexProvider.notifier).refresh());
     } on ApiFailure catch (failure) {
       if (requestId != _requestId) return;
       state = state.copyWith(

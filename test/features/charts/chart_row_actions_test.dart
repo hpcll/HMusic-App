@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/audio/models/hmusic_playback_state.dart';
+import 'package:hmusic/core/downloads/download_index.dart';
 import 'package:hmusic/core/models/hmusic_track.dart';
 import 'package:hmusic/features/charts/data/api_charts_repository.dart';
 import 'package:hmusic/features/charts/data/charts_repository.dart';
@@ -160,7 +161,7 @@ void main() {
 
     expect(downloads.started.single.sourceTrackId, '2');
     expect(
-      container.read(chartsViewModelProvider).downloads['wy:2'],
+      container.read(downloadIndexProvider)['wy:2'],
       DownloadStatus.pending,
     );
     // 排队中的行转菊花，下载钮收起（同一位置不再可点）。

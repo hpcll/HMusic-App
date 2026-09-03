@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/hmusic_audio_handler.dart';
+import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/queue/api_queue_repository.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../../search/data/api_search_repository.dart';
 import '../../settings/data/api_downloads_repository.dart';
-import '../../settings/models/download_record.dart';
 import '../data/api_charts_repository.dart';
 import '../models/chart.dart';
 import '../models/charts_view_state.dart';
@@ -32,16 +32,8 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
   // 预取代数：reload 时自增，丢弃旧代回填的预览，避免竞态。
   int _generation = 0;
 
-  // 入库状态轮询：有排队/下载中的条目时每 3s 拉一次 /downloads，全部落地自动
-  // 停表（同「本地下载」子页的纪律）。服务端不报百分比，所以只轮状态。
-  static const Duration _archivePollInterval = Duration(seconds: 3);
-  Timer? _archivePoll;
-
   @override
-  ChartsViewState build() {
-    ref.onDispose(_stopArchivePoll);
-    return const ChartsViewState();
-  }
+  ChartsViewState build() => const ChartsViewState();
 
   Future<void> load() async {
     final generation = ++_generation;
@@ -101,9 +93,9 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
           .read(chartsRepositoryProvider)
           .getChart(summary.id);
       state = state.copyWith(detail: detail, detailLoading: false);
-      // 入库索引只在进详情时拉一次：行上要标「已入库/下载中」，但不值得为它
-      // 常驻轮询（服务端只报状态不报进度，完整列表在设置的「本地下载」）。
-      unawaited(_loadDownloadIndex());
+      // 行上要标「已入库/下载中」：索引与轮询由共享的 downloadIndex 负责
+      //（搜索结果页用同一份，见 core/downloads/download_index.dart）。
+      unawaited(ref.read(downloadIndexProvider.notifier).refresh());
     } on ApiFailure catch (failure) {
       // 详情拉取失败退回卡片墙并提示。
       state = state.copyWith(
@@ -112,46 +104,6 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
         notice: HMusicNotice.error(failure.message),
       );
     }
-  }
-
-  Future<void> _loadDownloadIndex() async {
-    try {
-      final records = await ref.read(downloadsRepositoryProvider).list();
-      final index = <String, DownloadStatus>{};
-      for (final record in records) {
-        final track = record.track;
-        if (track == null) continue;
-        index['${track.source}:${track.sourceTrackId}'] = record.status;
-      }
-      state = state.copyWith(downloads: index);
-      _syncArchivePoll();
-    } catch (_) {
-      // 索引是锦上添花：拉不到（没连服务端、旧服务端、网络抖）就当都没入库，
-      // 下载按钮照样能点——服务端对同一 trackKey 是幂等的。
-    }
-  }
-
-  // 有活跃条目才开表，落地即停：用户停在榜单页也能看到行从菊花变成对勾
-  // （此前只在进详情时拉一次，下完不刷新，得退出重进才看得到）。
-  void _syncArchivePoll() {
-    final active = state.downloads.values.any(
-      (status) =>
-          status == DownloadStatus.pending ||
-          status == DownloadStatus.downloading,
-    );
-    if (!active) {
-      _stopArchivePoll();
-      return;
-    }
-    _archivePoll ??= Timer.periodic(
-      _archivePollInterval,
-      (_) => unawaited(_loadDownloadIndex()),
-    );
-  }
-
-  void _stopArchivePoll() {
-    _archivePoll?.cancel();
-    _archivePoll = null;
   }
 
   // 下载到服务器曲库（对齐搜索页的「下载到服务器」）：不选音质，按服务端默认
@@ -163,15 +115,11 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
     try {
       final track = await _resolveEntry(entry);
       await ref.read(downloadsRepositoryProvider).start(track);
+      // 乐观标排队中 + 开表：下完这一行自己变成对勾，不用退出重进。
+      ref.read(downloadIndexProvider.notifier).markQueued(track);
       state = state.copyWith(
-        downloads: <String, DownloadStatus>{
-          ...state.downloads,
-          '${track.source}:${track.sourceTrackId}': DownloadStatus.pending,
-        },
         notice: HMusicNotice.success('已开始下载：${entry.title}'),
       );
-      // 立刻开表：接下来每 3s 拉一次状态，下完这一行自己变成对勾。
-      _syncArchivePoll();
     } on ApiFailure catch (failure) {
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } on Exception catch (error) {
@@ -182,7 +130,7 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
   }
 
   void back() {
-    _stopArchivePoll();
+    ref.read(downloadIndexProvider.notifier).stop();
     state = state.copyWith(clearActive: true, clearDetail: true);
   }
 

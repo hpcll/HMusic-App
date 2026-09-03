@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/platform_shell/widgets/adaptive_glass_surface.dart';
 import '../../../shared/widgets/hmusic_toast.dart';
@@ -38,6 +39,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(searchViewModelProvider);
+    // 行尾入库位的三态（↓ / 菊花 / 灰对勾）由共享索引决定，与榜单页同一份；
+    // 这里 watch 一下，索引变了要重建结果行。
+    ref.watch(downloadIndexProvider);
     ref.listen(searchViewModelProvider.select((s) => s.notice), (_, notice) {
       if (notice == null) return;
       showHMusicToast(context, notice);
@@ -140,6 +144,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               child: SearchResultList(
                 tracks: state.tracks,
                 playingTrackId: state.playingTrackId,
+                archive: ref.read(downloadIndexProvider.notifier),
                 onPlay: _play,
                 onEnqueue: _enqueue,
                 onDownload: _download,

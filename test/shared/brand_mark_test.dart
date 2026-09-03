@@ -81,7 +81,10 @@ void main() {
   // 同步回调，RawImage 第一帧就拿得到 image；没预热则第一帧 image 为 null（画的
   // 是空盒子），也就是用户看到的"图片迟到、然后啪一下出现"。
   testWidgets('预热之后首帧就有像素，不再淡入空盒子', (tester) async {
-    await BrandWordmark.warmUp();
+    // runAsync：预热要真的读文件 + 解码，而 testWidgets 默认跑在假时钟上——
+    // 解码的回调排不上，warmUp 内部那个 2s 兜底超时也永远不会到，用例就吊死
+    // （机器繁忙时必现，CI/本地都撞过 10 分钟超时）。
+    await tester.runAsync(() => BrandWordmark.warmUp());
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(
