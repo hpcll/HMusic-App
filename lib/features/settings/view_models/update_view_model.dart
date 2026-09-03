@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_version.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../core/upgrade/app_update_badge.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_update_repository.dart';
 import '../models/update_state.dart';
@@ -26,13 +27,37 @@ class UpdateViewModel extends Notifier<UpdateState> {
     return const UpdateState();
   }
 
-  // 进页加载当前服务端版本（公开接口，失败静默——纯展示用）。
+  // 进页加载：当前服务端版本 + App 新版信息，两路都静默（失败不弹提示——纯展示，
+  // 手动点「检查更新」时才报具体错误）。
+  //
+  // App 新版这一路以前不在这里：于是设置入口都点上红点了，进来还得再点一次
+  // 「检查更新」才看得到「下载并安装」。红点说的和这一页说的必须是同一件事。
   Future<void> load() async {
+    await Future.wait(<Future<void>>[_loadServerVersion(), loadAppRelease()]);
+  }
+
+  Future<void> _loadServerVersion() async {
     try {
       final version = await ref.read(updateRepositoryProvider).serverVersion();
       state = state.copyWith(serverVersion: version);
     } catch (_) {
       // 拿不到就先空着，检查更新时会再报具体错误。
+    }
+  }
+
+  Future<void> loadAppRelease() async {
+    if (state.checkingApp) return;
+    try {
+      final release = await ref
+          .read(updateRepositoryProvider)
+          .latestAppRelease();
+      state = state.copyWith(appRelease: release, appReleaseChecked: true);
+      // 顺手把版本号记给红点，省掉它自己再发一次请求。
+      await ref
+          .read(appUpdateBadgeProvider.notifier)
+          .noteVersion(release?.version ?? '');
+    } catch (_) {
+      // 静默：这一路是进页面顺手拉的，失败不该弹错误。
     }
   }
 
@@ -62,6 +87,9 @@ class UpdateViewModel extends Notifier<UpdateState> {
       final release = await ref
           .read(updateRepositoryProvider)
           .latestAppRelease();
+      await ref
+          .read(appUpdateBadgeProvider.notifier)
+          .noteVersion(release?.version ?? '');
       state = state.copyWith(
         checkingApp: false,
         appRelease: release,

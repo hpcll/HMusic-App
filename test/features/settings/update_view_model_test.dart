@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/models/server_info.dart';
 import 'package:hmusic/core/network/api_failure.dart';
+import 'package:hmusic/core/providers/infrastructure_providers.dart';
+import 'package:hmusic/core/storage/key_value_store.dart';
 import 'package:hmusic/features/settings/data/api_update_repository.dart';
 import 'package:hmusic/features/settings/models/app_update.dart';
 import 'package:hmusic/features/settings/view_models/update_view_model.dart';
@@ -54,7 +56,11 @@ class _FakeUpdateRepository implements UpdateRepository {
 
 ProviderContainer _container(_FakeUpdateRepository repository) {
   final container = ProviderContainer(
-    overrides: [updateRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      updateRepositoryProvider.overrideWithValue(repository),
+      // 检查更新会把版本号记给红点（落盘），内存 store 免掉平台通道。
+      keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+    ],
   );
   addTearDown(container.dispose);
   return container;
@@ -70,6 +76,9 @@ const ServerUpdateInfo _newerVersion = ServerUpdateInfo(
 );
 
 void main() {
+  // 红点用 AppLifecycleListener 监听「回到前台」，需要 WidgetsBinding。
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('isNewerVersion：v 前缀/段数不齐/相等', () {
     expect(isNewerVersion('v0.2.0', '0.1.0'), isTrue);
     expect(isNewerVersion('0.1.1', '0.1.0'), isTrue);

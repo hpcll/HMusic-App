@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/hmusic_palette.dart';
 import '../../../../core/app_version.dart';
-import '../../../../core/upgrade/app_update_badge.dart';
 import '../../../../shared/widgets/hmusic_card.dart';
 import '../../../../shared/widgets/hmusic_dialog.dart';
 import '../../models/app_update.dart';
@@ -184,7 +183,7 @@ class _AppCard extends ConsumerWidget {
             trailing: OutlinedButton(
               onPressed: state.checkingApp || download.busy
                   ? null
-                  : () => unawaited(_checkApp(ref)),
+                  : () => unawaited(notifier.checkApp()),
               child: Text(state.checkingApp ? '检查中…' : '检查更新'),
             ),
           ),
@@ -253,13 +252,6 @@ class _AppCard extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  // 手动检查更新顺手刷新红点：设置页的红点与这里的卡片说的是同一件事，
-  // 检完「已是最新」红点就该消失。
-  Future<void> _checkApp(WidgetRef ref) async {
-    await notifier.checkApp();
-    await ref.read(appUpdateBadgeProvider.notifier).refresh();
   }
 
   Future<void> _openDownload(AppReleaseInfo release) async {
