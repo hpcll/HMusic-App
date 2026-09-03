@@ -32,8 +32,16 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
   // 预取代数：reload 时自增，丢弃旧代回填的预览，避免竞态。
   int _generation = 0;
 
+  // 入库状态轮询：有排队/下载中的条目时每 3s 拉一次 /downloads，全部落地自动
+  // 停表（同「本地下载」子页的纪律）。服务端不报百分比，所以只轮状态。
+  static const Duration _archivePollInterval = Duration(seconds: 3);
+  Timer? _archivePoll;
+
   @override
-  ChartsViewState build() => const ChartsViewState();
+  ChartsViewState build() {
+    ref.onDispose(_stopArchivePoll);
+    return const ChartsViewState();
+  }
 
   Future<void> load() async {
     final generation = ++_generation;
@@ -116,10 +124,34 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
         index['${track.source}:${track.sourceTrackId}'] = record.status;
       }
       state = state.copyWith(downloads: index);
+      _syncArchivePoll();
     } catch (_) {
       // 索引是锦上添花：拉不到（没连服务端、旧服务端、网络抖）就当都没入库，
       // 下载按钮照样能点——服务端对同一 trackKey 是幂等的。
     }
+  }
+
+  // 有活跃条目才开表，落地即停：用户停在榜单页也能看到行从菊花变成对勾
+  // （此前只在进详情时拉一次，下完不刷新，得退出重进才看得到）。
+  void _syncArchivePoll() {
+    final active = state.downloads.values.any(
+      (status) =>
+          status == DownloadStatus.pending ||
+          status == DownloadStatus.downloading,
+    );
+    if (!active) {
+      _stopArchivePoll();
+      return;
+    }
+    _archivePoll ??= Timer.periodic(
+      _archivePollInterval,
+      (_) => unawaited(_loadDownloadIndex()),
+    );
+  }
+
+  void _stopArchivePoll() {
+    _archivePoll?.cancel();
+    _archivePoll = null;
   }
 
   // 下载到服务器曲库（对齐搜索页的「下载到服务器」）：不选音质，按服务端默认
@@ -138,6 +170,8 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
         },
         notice: HMusicNotice.success('已开始下载：${entry.title}'),
       );
+      // 立刻开表：接下来每 3s 拉一次状态，下完这一行自己变成对勾。
+      _syncArchivePoll();
     } on ApiFailure catch (failure) {
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } on Exception catch (error) {
@@ -148,6 +182,7 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
   }
 
   void back() {
+    _stopArchivePoll();
     state = state.copyWith(clearActive: true, clearDetail: true);
   }
 

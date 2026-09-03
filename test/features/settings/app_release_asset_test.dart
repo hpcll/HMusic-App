@@ -43,10 +43,20 @@ class _StubAdapter implements HttpClientAdapter {
   );
 }
 
-ApiUpdateRepository _repository(Map<String, Object?> body) {
+ApiUpdateRepository _repository(Map<String, Object?> body, {String abi = ''}) {
   final dio = Dio()..httpClientAdapter = _StubAdapter(body);
-  return ApiUpdateRepository(apiClient: _MockApiClient(), github: dio);
+  return ApiUpdateRepository(
+    apiClient: _MockApiClient(),
+    github: dio,
+    abiTag: abi,
+  );
 }
+
+Map<String, Object?> _apk(String name, int size) => <String, Object?>{
+  'name': name,
+  'browser_download_url': 'https://example.com/$name',
+  'size': size,
+};
 
 void main() {
   test('Release 资产里挑可直装的 APK：跳过 aab 与未签名包', () async {
@@ -73,6 +83,32 @@ void main() {
     expect(release?.version, 'v0.1.6');
     expect(release?.apkUrl, 'https://example.com/hmusic.apk');
     expect(release?.apkSize, 26000000);
+  });
+
+  // 发布流水线以后要是也传分架构包，自更新就该下自己那一个（60MB → 25MB）。
+  test('同时有分架构包和通用包：挑本机架构那一个', () async {
+    final release = await _repository(
+      _release(<Map<String, Object?>>[
+        _apk('hmusic-0.1.6-android.apk', 61000000),
+        _apk('hmusic-0.1.6-android-armeabi-v7a.apk', 22000000),
+        _apk('hmusic-0.1.6-android-arm64.apk', 24900000),
+      ]),
+      abi: 'arm64',
+    ).latestAppRelease();
+
+    expect(release?.apkUrl, contains('arm64'));
+    expect(release?.apkSize, 24900000);
+  });
+
+  test('只有通用包：本机架构挑不到也要回落到它', () async {
+    final release = await _repository(
+      _release(<Map<String, Object?>>[
+        _apk('hmusic-0.1.6-android.apk', 61000000),
+      ]),
+      abi: 'arm64',
+    ).latestAppRelease();
+
+    expect(release?.apkUrl, endsWith('hmusic-0.1.6-android.apk'));
   });
 
   test('Release 里没有 APK 资产：apkUrl 空，UI 退回跳浏览器', () async {

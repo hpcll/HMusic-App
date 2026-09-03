@@ -57,14 +57,25 @@ class _FakeChartsRepository implements ChartsRepository {
 class _FakeDownloadsRepository implements DownloadsRepository {
   final List<HMusicTrack> started = <HMusicTrack>[];
 
+  // 服务端对刚发起的那首会先报 pending/downloading，落地后才变 done：
+  // 用它复刻「下完了列表页该自己变对勾」这条时间线。
+  DownloadStatus startedStatus = DownloadStatus.downloading;
+
   @override
-  Future<List<DownloadRecord>> list() async => const <DownloadRecord>[
-    DownloadRecord(
+  Future<List<DownloadRecord>> list() async => <DownloadRecord>[
+    const DownloadRecord(
       id: 'd1',
       title: '已入库的歌',
       status: DownloadStatus.done,
       track: _archived,
     ),
+    for (final track in started)
+      DownloadRecord(
+        id: 'd-${track.sourceTrackId}',
+        title: track.title,
+        status: startedStatus,
+        track: track,
+      ),
   ];
 
   @override
@@ -157,6 +168,28 @@ void main() {
 
     // 成功提示走全局 toast（3.2s 自动收）：放它走完，否则拆树时还有待触发的
     // 定时器，测试框架会报错。
+    await tester.pump(const Duration(seconds: 4));
+  });
+
+  // 用户反馈：下完了停在榜单页也不变成完成状态，得退出重进才看得到。
+  // 有活跃条目就每 3s 拉一次 /downloads，落地即停表。
+  testWidgets('停在榜单页：下载完成后该行自己变成对勾，轮询随之停表', (tester) async {
+    final downloads = _FakeDownloadsRepository();
+    await _openChart(tester, downloads);
+
+    await tester.tap(find.byIcon(Icons.download_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    // 下载中：那一格是菊花，没有可点的下载钮。
+    expect(find.byIcon(Icons.download_rounded), findsNothing);
+
+    // 服务端那边落地了：下一次轮询就该把这一行翻成对勾。
+    downloads.startedStatus = DownloadStatus.done;
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    expect(find.byIcon(Icons.download_done_rounded), findsNWidgets(2));
+
+    // 没有活跃条目了 → 表停掉（否则拆树时会有待触发的定时器，测试框架报错）。
     await tester.pump(const Duration(seconds: 4));
   });
 }

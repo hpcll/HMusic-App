@@ -1,3 +1,5 @@
+import 'dart:ffi' show Abi;
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -49,12 +51,29 @@ abstract class UpdateRepository {
 }
 
 class ApiUpdateRepository implements UpdateRepository {
-  ApiUpdateRepository({required ApiClient apiClient, required Dio github})
-    : _apiClient = apiClient,
-      _github = github;
+  ApiUpdateRepository({
+    required ApiClient apiClient,
+    required Dio github,
+    String? abiTag,
+  }) : _apiClient = apiClient,
+       _github = github,
+       _abiTag = abiTag ?? _currentAbiTag();
 
   final ApiClient _apiClient;
   final Dio _github;
+
+  // 本机 ABI 在资产名里的写法（arm64 / armeabi / x86_64 / x86）：Release 里同时
+  // 有分架构包和通用包时挑对应的那个，能把自更新的下载量从 60MB 级压到 25MB 级。
+  // 目前发布流水线只出通用包，这一支等于空转（挑不到就退通用包）。
+  final String _abiTag;
+
+  static String _currentAbiTag() => switch (Abi.current()) {
+    Abi.androidArm64 => 'arm64',
+    Abi.androidArm => 'armeabi',
+    Abi.androidX64 => 'x86_64',
+    Abi.androidIA32 => 'x86',
+    _ => '',
+  };
 
   @override
   Future<String> serverVersion() async {
@@ -157,18 +176,30 @@ class ApiUpdateRepository implements UpdateRepository {
     }
   }
 
-  // Release 资产里的可直装 APK：发布流水线每版只传一个 hmusic-<版本>-android.apk
-  //（未签名构建带 -unsigned 后缀，直装装不上，排掉）。找不到就返回 null，
-  // UI 退回跳浏览器。
-  static Map<String, Object?>? _pickApkAsset(Object? assets) {
+  // Release 资产里的可直装 APK：排掉 .aab 与未签名包（装不上）。同时有分架构包
+  // 和通用包时优先本机架构，否则用不带架构标记的通用包。
+  Map<String, Object?>? _pickApkAsset(Object? assets) {
     if (assets is! List<Object?>) return null;
+    final candidates = <Map<String, Object?>>[];
     for (final asset in assets.whereType<Map<String, Object?>>()) {
       final name = '${asset['name'] ?? ''}'.toLowerCase();
       if (!name.endsWith('.apk') || name.contains('unsigned')) continue;
       if ('${asset['browser_download_url'] ?? ''}'.isEmpty) continue;
-      return asset;
+      candidates.add(asset);
     }
-    return null;
+    if (candidates.isEmpty) return null;
+    if (_abiTag.isNotEmpty) {
+      for (final asset in candidates) {
+        if ('${asset['name']}'.toLowerCase().contains(_abiTag)) return asset;
+      }
+    }
+    // 通用包：名字里不带任何架构标记的那个。
+    const abis = <String>['arm64', 'armeabi', 'x86_64', 'x86'];
+    for (final asset in candidates) {
+      final name = '${asset['name']}'.toLowerCase();
+      if (!abis.any(name.contains)) return asset;
+    }
+    return candidates.first;
   }
 
   // 远程配置镜像序列：Gitee 国内主源（大陆免翻墙；镜像仓库建好后生效，
