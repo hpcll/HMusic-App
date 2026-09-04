@@ -37,22 +37,26 @@ class UpdateViewModel extends Notifier<UpdateState> {
     await Future.wait(<Future<void>>[
       _loadServerVersion(),
       loadAppRelease(),
-      _loadNetdiskUrl(),
+      _loadRemoteLinks(),
     ]);
   }
 
-  // 网盘入口地址：app-config.json（三镜像 + 服务端中转）下发的优先，拉不到就用
-  // 上次落盘的那份，都没有就保持内置常量——这条退路恰恰在网络最差时才被用到，
-  // 不能反过来依赖网络。
-  Future<void> _loadNetdiskUrl() async {
+  // 更新出口地址（网盘 + iOS 的 App Store 链接）：app-config.json（三镜像 +
+  // 服务端中转）下发的优先，拉不到就用上次落盘的那份。网盘还有内置常量兜底，
+  // iOS 链接没有——没上架时 iOS 端本来就不给下载动作，这条退路恰恰在网络
+  // 最差时才被用到，不能反过来依赖网络。
+  Future<void> _loadRemoteLinks() async {
     try {
       final config =
           await ref.read(updateRepositoryProvider).remoteAppConfig() ??
           await ref.read(upgradeConfigStoreProvider).read();
-      final url = config?.netdiskUrl ?? '';
-      if (url.isNotEmpty) state = state.copyWith(netdiskUrl: url);
+      if (config == null) return;
+      final netdisk = config.netdiskUrl ?? '';
+      if (netdisk.isNotEmpty) state = state.copyWith(netdiskUrl: netdisk);
+      final ios = config.iosUrl ?? '';
+      if (ios.isNotEmpty) state = state.copyWith(iosUrl: ios);
     } catch (_) {
-      // 保持内置常量。
+      // 保持内置常量 / 空链接。
     }
   }
 

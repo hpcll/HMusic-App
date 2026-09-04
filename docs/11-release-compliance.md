@@ -179,6 +179,10 @@ App Review 不能依赖审核员与 HMusic-Server 在同一 Wi-Fi。必须准备
 - CI 使用 App Store Connect API Key/签名证书的最小权限 secret，不提交 `.p8`、证书或密码。
 - 区分 dev/staging/review/prod 配置，但功能边界公开一致；Review 环境只替换 Server 地址和数据。
 - iOS 只能通过 App Store/TestFlight 更新二进制，禁止自更新或下载执行新代码。
+  实现口径（2026-09-03）：更新检查与 `minVersion` 强升门平台无关照常生效，但 iOS 端
+  下载动作只指向 App Store——仓库 `app-config.json` 的 `iosUrl`（App Store/TestFlight
+  页面链接）下发后，「关于与更新」按钮与强升页直达商店；留空则只显示说明、不露网盘
+  入口（APK/ipa 直链对 iOS 无意义，也不得填入 `iosUrl`）。
 - release 构建关闭调试入口、DevTools 和详细网络日志。
 - TestFlight 先完成内部测试、外部测试、崩溃和后台音频观察，再送正式审核。
 - 保存每次提交的版本、commit、依赖锁、隐私问卷、Review Notes 和审核反馈记录。

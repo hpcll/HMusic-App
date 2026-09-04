@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,11 @@ import 'package:hmusic/features/settings/widgets/sections/about_section.dart';
 // 下载并安装按钮」。进页面就该把 App 新版信息静默拉进来——红点说的和这一页
 // 说的必须是同一件事。
 class _FakeUpdateRepository implements UpdateRepository {
+  _FakeUpdateRepository({this.remoteConfig});
+
+  // remoteAppConfig 的返回值；null 时给默认网盘配置（非 iOS 路径用）。
+  final AppRemoteConfig? remoteConfig;
+
   int appReleaseCalls = 0;
 
   @override
@@ -42,6 +48,7 @@ class _FakeUpdateRepository implements UpdateRepository {
 
   @override
   Future<AppRemoteConfig?> remoteAppConfig() async =>
+      remoteConfig ??
       const AppRemoteConfig(netdiskUrl: 'https://pan.quark.cn/s/mirror');
 }
 
@@ -101,5 +108,78 @@ void main() {
       container.read(updateViewModelProvider).netdiskUrl,
       'https://pan.quark.cn/s/mirror',
     );
+  });
+
+  // iOS 没有 APK 自装通道：未上架（iosUrl 空）时不给任何下载按钮、也不露
+  // 网盘入口（网盘里是安卓/ipa 装包，装不上 iPhone），只说明分发渠道。
+  testWidgets('iOS 未上架：无下载按钮无网盘入口，说明走 App Store', (tester) async {
+    // 平台覆盖必须在测试体内复位（try/finally）——binding 的 invariant 检查
+    // 跑在 tearDown 之前，挂到 addTearDown 会报 debug 变量被改。
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            updateRepositoryProvider.overrideWithValue(_FakeUpdateRepository()),
+            keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(child: AboutSectionView()),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('发现新版本 v9.9.9'), findsOneWidget);
+      expect(find.text('下载并安装'), findsNothing);
+      expect(find.text('去下载'), findsNothing);
+      expect(find.textContaining('App Store'), findsOneWidget);
+      expect(find.textContaining('从网盘下载'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  // 上架后 iosUrl 由 app-config.json 下发：按钮直达 App Store，网盘入口仍隐藏。
+  testWidgets('iOS 已上架：按钮直达 App Store，网盘入口隐藏', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            updateRepositoryProvider.overrideWithValue(
+              _FakeUpdateRepository(
+                remoteConfig: const AppRemoteConfig(
+                  netdiskUrl: 'https://pan.quark.cn/s/mirror',
+                  iosUrl: 'https://apps.apple.com/cn/app/id1234',
+                ),
+              ),
+            ),
+            keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(child: AboutSectionView()),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('去 App Store 更新'), findsOneWidget);
+      expect(find.textContaining('从网盘下载'), findsNothing);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(AboutSectionView)),
+        listen: false,
+      );
+      expect(
+        container.read(updateViewModelProvider).iosUrl,
+        'https://apps.apple.com/cn/app/id1234',
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

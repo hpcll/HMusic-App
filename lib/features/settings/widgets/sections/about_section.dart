@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,7 +16,8 @@ import '../../view_models/update_view_model.dart';
 
 // 关于与更新：服务端版本检查/一键升级 + App 自身新版检查。
 // App 新版在 Android 直装渠道走 App 内下载 + 进度条 + 交系统安装器；
-// 其余平台（iOS/桌面/商店版）仍旧跳浏览器。
+// iOS 走 App Store 链接（app-config.json 下发，未上架只给说明、不露网盘
+// 入口——APK 装不上 iOS）；桌面/商店版跳各自的下载页。
 class AboutSectionView extends ConsumerStatefulWidget {
   const AboutSectionView({super.key});
 
@@ -168,10 +170,14 @@ class _AppCard extends ConsumerWidget {
     final release = state.appRelease;
     final hasUpdate = release != null && release.hasUpdateOver(kAppVersion);
     final download = ref.watch(appDownloadViewModelProvider);
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
     // App 内直装的条件：Android 直装渠道 + Release 里真有 APK 资产。
-    // 不满足就退回跳浏览器（iOS 走 App Store、桌面各自的包、商店版交给商店）。
+    // 不满足就退回跳浏览器（iOS 走 App Store 链接、桌面各自的包、商店版交给商店）。
     final canInstall =
         canSelfInstallApp && (release?.apkUrl?.isNotEmpty ?? false);
+    // iOS 的下载出口只有 App Store；没上架（iosUrl 空）就不给按钮，只说明。
+    final iosStoreUrl = state.iosUrl;
+    final showStoreButton = isIos && iosStoreUrl.isNotEmpty;
     return HMusicCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -234,47 +240,63 @@ class _AppCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
               ],
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton(
-                  onPressed: canInstall
-                      ? () => unawaited(
-                          ref
-                              .read(appDownloadViewModelProvider.notifier)
-                              .downloadAndInstall(release),
-                        )
-                      : () => unawaited(_openDownload(release)),
-                  child: Text(canInstall ? '下载并安装' : '去下载'),
+              if (isIos && !showStoreButton)
+                Text(
+                  'iOS 版通过 App Store / TestFlight 分发，上架后在这里更新。',
+                  style: TextStyle(fontSize: 12.5, color: palette.muted),
+                )
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton(
+                    onPressed: canInstall
+                        ? () => unawaited(
+                            ref
+                                .read(appDownloadViewModelProvider.notifier)
+                                .downloadAndInstall(release),
+                          )
+                        : () => unawaited(_openDownload(release, iosStoreUrl)),
+                    child: Text(
+                      canInstall
+                          ? '下载并安装'
+                          : showStoreButton
+                          ? '去 App Store 更新'
+                          : '去下载',
+                    ),
+                  ),
                 ),
-              ),
             ],
           ],
           // 网盘退路常驻：下载直链在 github.com，没梯子的用户「查得到、下不来」
           //（检查更新那一路有 Gitee 镜像绕开，下载没有）。链接由 app-config.json
-          // 下发、内置常量兜底，所以网络最差时它也在。
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 32),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              onPressed: () => unawaited(_openUrl(state.netdiskUrl)),
-              child: Text(
-                '从网盘下载（国内直连，含各平台安装包）',
-                style: TextStyle(fontSize: 12.5, color: palette.muted),
+          // 下发、内置常量兜底，所以网络最差时它也在。iOS 例外——网盘里是
+          // APK/ipa 装包，装不上 iPhone，露出来只会误导。
+          if (!isIos) ...<Widget>[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => unawaited(_openUrl(state.netdiskUrl)),
+                child: Text(
+                  '从网盘下载（国内直连，含各平台安装包）',
+                  style: TextStyle(fontSize: 12.5, color: palette.muted),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Future<void> _openDownload(AppReleaseInfo release) =>
-      _openUrl(release.url ?? '');
+  // 下载出口：iOS 有 App Store 链接时直达商店，否则落回 Release 页面。
+  Future<void> _openDownload(AppReleaseInfo release, String iosUrl) =>
+      _openUrl(iosUrl.isNotEmpty ? iosUrl : release.url ?? '');
 
   Future<void> _openUrl(String url) async {
     if (url.isEmpty) return;

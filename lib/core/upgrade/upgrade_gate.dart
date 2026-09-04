@@ -22,6 +22,7 @@ class UpgradeGateState {
     this.fromServer = false,
     this.notice,
     this.downloadUrl,
+    this.iosUrl,
     this.checked = false,
   });
 
@@ -33,7 +34,11 @@ class UpgradeGateState {
   // true = 服务端要求（换服务器可解）；false = 官方远程配置要求。
   final bool fromServer;
   final String? notice;
+
+  // 下载出口：downloadUrl 走浏览器（Android/桌面），iosUrl 是 App Store /
+  // TestFlight 页面（iOS 专用；空 = 未上架，强升页只给说明 + 重新检测）。
   final String? downloadUrl;
+  final String? iosUrl;
   final bool checked;
 }
 
@@ -124,6 +129,7 @@ class UpgradeGate extends Notifier<UpgradeGateState> {
         fromServer: false,
         notice: config.notice,
         downloadUrl: config.downloadUrl,
+        iosUrl: config.iosUrl,
         checked: true,
       );
     } catch (_) {

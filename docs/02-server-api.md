@@ -150,6 +150,29 @@ ChartEntry: `{rank,title,artist,album?,coverUrl?,playCount?,track?}`。
 `apple-cn,apple-us,apple-jp,apple-kr,apple-tw,apple-hk`。
 family/wy-*/qq-* 的 entry 带 track（点了直接播）；apple-* 无 track（前端搜索匹配）。
 
+## 7½. Spotify `/spotify`（个人自用，2026-09-04 契约冻结；App 接入待做）
+
+非官方个人通道（ADR-0003 边界内，商店版禁用）：服务端持 `sp_dc` 换 web player
+token，数据走 Spotify 官方 /v1，播放一律 LX 匹配链。详细行为见 HMusic-Server
+docs/FEATURES.md §五½。错误码：`SPOTIFY_NOT_LINKED`(409 未绑定)、
+`SPOTIFY_SESSION_INVALID`(401 sp_dc 失效→重新粘贴)、`SPOTIFY_SECRETS_*`/
+`SPOTIFY_TOKEN_UNREACHABLE`/`SPOTIFY_API_*`(502 上游)、`SPOTIFY_MATCH_EMPTY`(409)。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/session` | `{spDc}` 当场验 token，无效 401；成功 `{loggedIn:true}` |
+| GET | `/session` | → `{loggedIn, tokenExpiresAtMs\|null}` |
+| DELETE | `/session` | 解绑 |
+| GET | `/recommendations?limit=30&timeRange=short_term` | → `{tracks: SpotifyEntry[]}`（/me/top/tracks） |
+| GET | `/playlists?limit=30` | → `{playlists: {id,name,tracksTotal,coverUrl}[]}` |
+| GET | `/playlists/:id/tracks?limit=100` | → `{tracks: SpotifyEntry[]}` |
+| POST | `/recommendations/play` | `{startIndex?,deviceId?,limit?,timeRange?}` → `{queue,playback,matched}` |
+| POST | `/playlists/:id/play` | `{startIndex?,deviceId?}` → `{queue,playback,matched}` |
+
+SpotifyEntry: `{id,title,artist,album,durationMs,coverUrl,uri}`。
+整单播放与榜单同纪律：首条命中即替换队列开播，其余后台匹配入队、失配跳过，
+`matched` 是开播时点已命中的条数（App 可如实展示「匹配 n/总 m」）。
+
 ## 8. Stats `/stats`
 
 | GET | `/stats` | → `{stats:{overview,last30d,topArtists[],topTracks[],topAlbums[],sourceDist[],dailyTrend[],hourDist[]}}` |

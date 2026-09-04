@@ -25,13 +25,18 @@ void main() {
     ).thenAnswer(
       (_) async => <String, Object?>{
         'available': true,
-        'config': <String, Object?>{'minVersion': '9.9.9', 'notice': '大版本升级'},
+        'config': <String, Object?>{
+          'minVersion': '9.9.9',
+          'notice': '大版本升级',
+          'iosUrl': 'https://apps.apple.com/cn/app/id1234',
+        },
       },
     );
 
     final config = await repository.remoteAppConfig();
     expect(config?.minVersion, '9.9.9');
     expect(config?.notice, '大版本升级');
+    expect(config?.iosUrl, 'https://apps.apple.com/cn/app/id1234');
     verifyNever(() => github.get<Object?>(any()));
   });
 

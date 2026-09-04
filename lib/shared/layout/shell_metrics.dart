@@ -14,9 +14,12 @@ const double kSidebarWidth = 232;
 const double kMiniPlayerDesktopInset = 76;
 
 // 窄屏悬浮玻璃 chrome（dock + mini 胶囊）：数值与 iOS 原生壳 GlassShellMetrics
-// 严格一致——Android/iOS<26 的 Flutter 回退壳要与 iOS 26+ 液态玻璃壳同形态，
-// 只是材质换成 BackdropFilter 毛玻璃。改动时两侧必须同步。
-const double kChromeDockHeight = 66;
+// 同形态——Android/iOS<26 的 Flutter 回退壳要与 iOS 26+ 液态玻璃壳同布局语言，
+// 只是材质换成 BackdropFilter 毛玻璃。
+// 2026-09-05 用户要求 dock 略薄：66→62，选中胶囊（52）尺寸不动（上下留白
+// 7→5 吸收），dock 不得矮于胶囊。iOS 26+ 原生 dock 由系统自绘（66），本常量
+// 只作用于 Flutter 回退壳，两侧允许这一处不一致。
+const double kChromeDockHeight = 62;
 // mini 比 dock 矮一档（50 vs 66）：dock 是导航主锚点，mini 是次级播放状态条。
 const double kChromeMiniHeight = 50;
 const double kChromeGap = 8;

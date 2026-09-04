@@ -13,6 +13,7 @@ class UpdateState {
     this.checkingApp = false,
     this.upgrading = false,
     this.netdiskUrl = kNetdiskDownloadUrl,
+    this.iosUrl = '',
     this.notice,
   });
 
@@ -31,6 +32,10 @@ class UpdateState {
   // 这条是那种情况下的退路。默认内置常量，app-config.json 下发的值优先。
   final String netdiskUrl;
 
+  // iOS 的 App Store / TestFlight 更新链接（app-config.json 下发；空 = 未上架，
+  // iOS 端不给下载动作，只展示说明）。
+  final String iosUrl;
+
   final HMusicNotice? notice;
 
   UpdateState copyWith({
@@ -42,6 +47,7 @@ class UpdateState {
     bool? checkingApp,
     bool? upgrading,
     String? netdiskUrl,
+    String? iosUrl,
     HMusicNotice? notice,
     bool clearServerUpdate = false,
     bool clearAppRelease = false,
@@ -58,6 +64,7 @@ class UpdateState {
       checkingApp: checkingApp ?? this.checkingApp,
       upgrading: upgrading ?? this.upgrading,
       netdiskUrl: netdiskUrl ?? this.netdiskUrl,
+      iosUrl: iosUrl ?? this.iosUrl,
       notice: clearNotice ? null : (notice ?? this.notice),
     );
   }

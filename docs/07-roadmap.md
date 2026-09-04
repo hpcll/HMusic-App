@@ -36,6 +36,15 @@
 
 - [x] 播放页封面、元数据、进度、音量、模式（封面矮屏自适应、200ms 实时进度、
       本机/远端音量分流、模式循环切换；歌词条 ShaderMask 按进度染色）
+- [x] Android Impeller 重启（2026-09-04：小米 spike 通过——零花屏、滚动帧
+      p95=2.38ms；附带 TopEdgeScrim 渐进模糊在 Android 生效；iQOO/Adreno
+      复测通过前不发版，见 docs/06）
+- [~] Android 液态玻璃 dock + 透镜胶囊（2026-09-04 尝试并**回退**：真机评审
+      视觉不如常规毛玻璃——亮色白底前折射不可见、整面发白，透镜泡过抢；
+      教训与重启条件记录在 docs/06，Impeller 保留为独立收益）
+- [~] iOS 原生 dock 滚动收起（2026-09-04：tabBarMinimizeBehavior .never →
+      .onScrollDown 已装机，待真机确认与 mini 胶囊/inset 联动，冲突则回退
+      .never 并回填 docs/06）
 - [ ] iOS 原生玻璃播放控制面板；Android 同构 Flutter 玻璃控制面板
       （现状：原生侧仅 mini 播控条，seek/dismiss intent 暂忽略；完整播放页为
       Flutter 实现且已随壳真机验收——是否仍需原生完整面板待产品决策）
@@ -121,7 +130,10 @@
       `install.sh --update`，轮询 `/system/info` 确认新版）；App 自查 GitHub
       Releases 跳浏览器下载。2026-08-17：强制升级门——Server `minAppVersion`
       + 仓库 `app-config.json`（raw/jsDelivr 双镜像）双通道，命中押全屏强升页。
-      剩余：各平台安装包内下载安装、iOS App Store 通道）
+      剩余：各平台安装包内下载安装、iOS App Store 通道。2026-09-03：iOS 通道的
+      App 侧骨架已通——`app-config.json` 新增 `iosUrl`（App Store/TestFlight 链接），
+      「关于与更新」与强升页 iOS 分支直达商店、未上架只给说明并隐藏网盘入口；
+      剩上架本身（TestFlight/App Store 过审后填链接）
 - [x] README 安装、连接和故障排查（2026-08-26：App/Server 快速开始、部署、升级和常见问题已公开）
 
 ## P6 - NAS 曲库与语音接管
@@ -152,6 +164,14 @@
 - [ ] M3 Server：conversation 轮询服务 + 指令解析 + 曲库优先搜歌 + 抢占播放 +
       可选 TTS 回执；开关与轮询间隔入 config
 - [ ] M3 App：设置页语音接管开关与状态展示
+
+- [~] Spotify 推荐（路线 B：个人自用非官方，2026-09-04 用户拍板）：
+      Server 已落地——`/api/v1/spotify` 会话绑定（sp_dc→web player token，
+      TOTP 算法对拍单测锁定）、Top 曲目/歌单/整单匹配播放（复用榜单播放
+      纪律），typecheck+80 测试全过，契约见 docs/02 §7½；
+      **待做**：App 接入（设置 Spotify 连接卡 + 榜单页推荐视图）、
+      Discover Weekly 等生成歌单（内部 pathfinder，本版未做）、
+      商店版确认禁用路径（BuildEdition）
 
 ## 风险登记
 

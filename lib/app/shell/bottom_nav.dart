@@ -52,7 +52,7 @@ const List<NavDestinationSpec> kNavDestinations = <NavDestinationSpec>[
 // SymbolConfiguration(pointSize:) 是渲染点尺寸，同一个数字下墨迹不等大——
 // 22 字号 Material 墨迹只有 ~18pt，而原生 22pt SF 墨迹 ~22.5pt，18.x 看起来
 // 比 26+ 小一档。28 字号实测墨迹 22.5pt，与原生四图标均值一致。
-// 改此值需同步核对 kChromeDockHeight(66) 的容纳：28 + 3 + 标签 ~15 ≈ 46。
+// 改此值需同步核对 kChromeDockHeight(62) 的容纳：28 + 3 + 标签 ~15 ≈ 46。
 const double kDockIconSize = 28;
 
 // 窄屏悬浮玻璃 dock，形态对齐 iOS 26+ 原生壳（GlassShellOverlay）：胶囊压进
@@ -205,7 +205,9 @@ class AppBottomNav extends StatelessWidget {
               widthFactor: 1 / kNavDestinations.length,
               heightFactor: 1,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
+                // 2026-09-05 dock 66→62：胶囊（椭圆）尺寸一毫米不动——高度钉在
+                // 52（62 - 上下留白 5×2），宽度本就不随高度变；留白只吸收高度差。
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
                     // 灰药丸只做「所在位置」提示，浓度压低不与青绿纪律抢戏。

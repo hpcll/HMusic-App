@@ -36,6 +36,22 @@ Android 默认由 Flutter `AdaptiveGlassSurface` 实现，与 iOS 保持相同�
 - 连续滚动时以稳定帧时间优先；若玻璃导致明显掉帧，自动降一级而不是降低内容刷新率。
 - 列表项和内容卡片禁止逐项 BackdropFilter，只允许 app chrome 使用共享模糊层。
 
+**Impeller 决策（2026-09-04）**：AndroidManifest 曾全局关闭 Impeller（iQOO Z10 Turbo Pro /
+骁龙 8s Gen 4 / Vulkan 上进出榜单详情整屏花屏，详见那里的注释）。小米 25019PNF3C
+（天玑 9400 / Mali）真机 spike：进出榜单详情 ×10 零花屏、logcat 零 GPU 报错，
+滚动帧 p95=2.38ms / max=3.73ms（120Hz 预算 8.33ms，0 帧超）——Impeller 保持开启，
+TopEdgeScrim 渐进模糊因此在 Android 生效。**约束：iQOO（Adreno）复测通过前，
+带此改动的构建不得进 release 发布**；若 Adreno 仍花屏，回退方案是
+`ImpellerBackend=opengles` 或按 GPU 降级到 Medium。
+
+**液态玻璃尝试（2026-09-04，已回退）**：曾以 `liquid_glass_renderer 0.2.0-dev.4`
+（Impeller 专用真折射）上 dock/mini + 选中胶囊改 iOS 透镜亮泡，帧率无压力
+（滚动 0 帧超预算），但真机评审**视觉不如常规毛玻璃**——亮色模式下白底白卡片
+前的折射几乎不可见、整面发白发平，透镜亮泡过抢，所有者拍板回退。保留的教训：
+①亮色暖纸底上液态玻璃天然吃亏，暗色才出效果，要做就分亮度定策略；
+②暗色低 α 下边缘高光会抖动成点环，色散必须归零、玻璃色须抬亮；
+③投影 DecoratedBox 记得带 borderRadius。若重启此方向，从暗色-only 起步。
+
 具体 manifest/service 项以锁定版本的 `audio_service` 官方安装说明为准，不能凭旧模板手写类名。
 
 ## 3. iOS

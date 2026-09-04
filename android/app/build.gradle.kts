@@ -58,6 +58,19 @@ android {
                     .also { signingConfig = it }
             }
         }
+        // debug/profile 包也用 release 签名：真机调试（flutter run --debug /
+        // --profile）要无损盖装 release 签名的正式安装，默认 debug 签名会撞
+        // 签名冲突导致必须卸载重装丢数据。
+        if (hasReleaseSigning) {
+            getByName("debug") {
+                signingConfigs.getByName("release")
+                    .also { signingConfig = it }
+            }
+            getByName("profile") {
+                signingConfigs.getByName("release")
+                    .also { signingConfig = it }
+            }
+        }
     }
 }
 

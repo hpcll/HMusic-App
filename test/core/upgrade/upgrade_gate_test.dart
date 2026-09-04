@@ -95,6 +95,7 @@ void main() {
         minVersion: '99.0.0',
         notice: '本版本存在严重问题，请务必升级',
         downloadUrl: 'https://example.com/download',
+        iosUrl: 'https://apps.apple.com/cn/app/id1234',
       );
     final container = _container(repository);
 
@@ -104,6 +105,7 @@ void main() {
     expect(state.fromServer, isFalse);
     expect(state.notice, contains('严重问题'));
     expect(state.downloadUrl, 'https://example.com/download');
+    expect(state.iosUrl, 'https://apps.apple.com/cn/app/id1234');
   });
 
   test('服务端探测失败 + 无远程配置：放行（门只在明确要求时关）', () async {
@@ -134,11 +136,15 @@ void main() {
     final store = _MemoryUpgradeConfigStore();
     final repository = _FakeUpdateRepository()
       ..info = _info('')
-      ..remoteConfig = const AppRemoteConfig(minVersion: '99.0.0');
+      ..remoteConfig = const AppRemoteConfig(
+        minVersion: '99.0.0',
+        iosUrl: 'https://apps.apple.com/cn/app/id1234',
+      );
     final container = _container(repository, store: store);
 
     await container.read(upgradeGateProvider.notifier).check();
     expect(store.saved?.minVersion, '99.0.0');
+    expect(store.saved?.iosUrl, 'https://apps.apple.com/cn/app/id1234');
   });
 
   test('拉不到配置但本地有旧配置：照样执行强制（断网躲不掉）', () async {

@@ -61,11 +61,15 @@ final class GlassShellHostController {
         },
         // systemTabs 与命中层都铺满 window；仍统一把系统回报的 window 坐标
         // 转成本层坐标，避免首次布局和收缩态混用两个原点。
-        onFrame: { [weak self, weak tabsPassthrough] windowFrame in
+        // 命中区用 tabBar 整框、几何用浮动 platter：见 reportTabBarFrame 的
+        // 拆分说明——platter 是私有子视图探测，iOS 大版本一变就可能选错，
+        // 拿它做命中区会把 tab 整个点不动（iOS 27 真机实况）。
+        onFrame: { [weak self, weak tabsPassthrough] platterFrame, tabBarFrame in
           guard let tabsPassthrough else { return }
-          let localFrame = tabsPassthrough.convert(windowFrame, from: nil)
-          tabsPassthrough.setInteractiveFrame(localFrame, for: "systemDock")
-          self?.handleSystemDockFrame(localFrame)
+          let localPlatter = tabsPassthrough.convert(platterFrame, from: nil)
+          let localTabBar = tabsPassthrough.convert(tabBarFrame, from: nil)
+          tabsPassthrough.setInteractiveFrame(localTabBar, for: "systemDock")
+          self?.handleSystemDockFrame(localPlatter)
         }
       )
       systemTabs.view.backgroundColor = .clear
@@ -227,10 +231,10 @@ private final class SystemGlassTabBarController: UITabBarController,
   UITabBarControllerDelegate
 {
   private let onSelect: (String) -> Void
-  private let onFrame: (CGRect) -> Void
+  private let onFrame: (CGRect, CGRect) -> Void
   private var applyingState = false
 
-  init(onSelect: @escaping (String) -> Void, onFrame: @escaping (CGRect) -> Void) {
+  init(onSelect: @escaping (String) -> Void, onFrame: @escaping (CGRect, CGRect) -> Void) {
     self.onSelect = onSelect
     self.onFrame = onFrame
     super.init(nibName: nil, bundle: nil)
@@ -246,7 +250,11 @@ private final class SystemGlassTabBarController: UITabBarController,
     super.viewDidLoad()
     view.backgroundColor = .clear
     mode = .tabBar
-    tabBarMinimizeBehavior = .never
+    // 滚动收起对齐 Apple Music（docs/06）：下滚时系统把 dock 收成小胶囊，
+    // platter frame / chrome insets 会经 onGeometryChange / layoutChanged
+    // 照常上报，Flutter 内容 inset 跟随系统行为。若与 mini 胶囊布局冲突，
+    // 回退 .never 并在 docs/06 记录原因。
+    tabBarMinimizeBehavior = .onScrollDown
     // iOS 26 Liquid Glass 忽略 unselectedItemTintColor，未选中会跟选中一样深。
     // 用 alwaysOriginal 烤 textStrong/muted（对齐 Flutter AppBottomNav）。
     // 关键约束：
@@ -367,24 +375,31 @@ private final class SystemGlassTabBarController: UITabBarController,
     reportTabBarFrame()
   }
 
+  // 上报两路 frame：
+  // - tabBar 整框（公开 API，任何系统版本都覆盖全部 tab 按钮）→ 命中区。
+  //   触摸能不能点进 dock 只允许依赖稳定接口；下面的 platter 探测在任何
+  //   系统版本都只许影响视觉几何，不许影响命中。
+  // - 浮动 platter（可见玻璃台面）→ mini/收缩圆钮贴齐的几何基线。
+  //   iOS 26 的 tabBar bounds 含 home indicator 安全区，platter 才是可见
+  //   部分；iOS 27 起内部子视图结构可能再变，探测失败退回 tabBar 整框，
+  //   代价只是 bottomOffset 多算一条安全区（视觉），命中不受影响。
   private func reportTabBarFrame() {
     guard !isTabBarHidden else {
-      onFrame(.zero)
+      onFrame(.zero, .zero)
       return
     }
     guard let window = view.window else { return }
-    // On iOS 26 the tab bar's bounds include the home-indicator safe area,
-    // while the floating platter is the visible/tappable chrome. Use that
-    // platter for the compact overlay's bottom edge; fall back to the public
-    // tab bar frame if UIKit changes the internal hierarchy.
-    let source = tabBar.subviews.first { subview in
+    let platter = tabBar.subviews.first { subview in
       let frame = subview.frame
       return frame.minY <= 0.5
         && frame.width < tabBar.bounds.width
         && frame.height > 0
         && frame.height < tabBar.bounds.height
     } ?? tabBar
-    onFrame(source.convert(source.bounds, to: window))
+    onFrame(
+      platter.convert(platter.bounds, to: window),
+      tabBar.convert(tabBar.bounds, to: window)
+    )
   }
 
   func apply(selectedTab id: String, visible: Bool, reduceMotion: Bool) {

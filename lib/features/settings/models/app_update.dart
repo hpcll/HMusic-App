@@ -92,6 +92,7 @@ class AppRemoteConfig {
     this.apkUrl,
     this.apkSize,
     this.netdiskUrl,
+    this.iosUrl,
   });
 
   factory AppRemoteConfig.fromJson(Map<String, Object?> json) {
@@ -105,6 +106,7 @@ class AppRemoteConfig {
       apkUrl: json['apkUrl'] == null ? null : '${json['apkUrl']}',
       apkSize: (json['apkSize'] as num?)?.toInt(),
       netdiskUrl: json['netdiskUrl'] == null ? null : '${json['netdiskUrl']}',
+      iosUrl: json['iosUrl'] == null ? null : '${json['iosUrl']}',
     );
   }
 
@@ -119,4 +121,8 @@ class AppRemoteConfig {
 
   // 网盘下载入口（没梯子时的退路；空则用内置的 kNetdiskDownloadUrl）。
   final String? netdiskUrl;
+
+  // iOS 的更新出口（App Store / TestFlight 页面链接；空 = 还没上架，
+  // iOS 端只展示说明、不给下载动作）。
+  final String? iosUrl;
 }

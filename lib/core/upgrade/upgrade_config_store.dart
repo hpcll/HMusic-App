@@ -60,6 +60,7 @@ class SharedPreferencesUpgradeConfigStore implements UpgradeConfigStore {
         'apkUrl': config.apkUrl,
         'apkSize': config.apkSize,
         'netdiskUrl': config.netdiskUrl,
+        'iosUrl': config.iosUrl,
       }),
     );
   }

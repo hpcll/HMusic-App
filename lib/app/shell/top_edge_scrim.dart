@@ -18,9 +18,8 @@ import '../../core/platform_shell/widgets/adaptive_glass_surface.dart';
 // 回退链：非 Impeller 后端（ImageFilter.isShaderFilterSupported=false）与
 // shader 异步编译完成前 → 纯纱帘（同样零缝，只是无磨砂）；off 档（高对比/
 // 减动效）→ 不透明渐变，可读性优先于透视。
-// Android 现在固定落在纯纱帘这一档：为绕开 Impeller 在部分 Adreno 驱动上的
-// 整屏花屏，AndroidManifest 里关掉了 Impeller（见那里的注释），而
-// isShaderFilterSupported 只在 Impeller 下为真。Windows/Linux 窄窗同理。
+// 2026-09-04 起 Android 重开 Impeller（docs/06），isShaderFilterSupported 为真，
+// Android 走真·渐进模糊；Windows/Linux 窄窗仍落纯纱帘档。
 // 静止时模糊与纱帘采样的都是纯背景，视觉上完全隐形；IgnorePointer 让位点击。
 class TopEdgeScrim extends StatefulWidget {
   const TopEdgeScrim({super.key});
