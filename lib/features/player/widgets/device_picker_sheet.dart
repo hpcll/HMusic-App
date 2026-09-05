@@ -63,10 +63,28 @@ class _DevicePickerSheetState extends ConsumerState<_DevicePickerSheet> {
             )
           else if (state.devices.isEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-              child: Text(
-                state.error ?? '没有可用设备',
-                style: TextStyle(color: palette.muted),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    state.error ?? '没有可用设备',
+                    style: TextStyle(color: palette.muted),
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: state.loading
+                          ? null
+                          : () => ref
+                                .read(devicePickerViewModelProvider.notifier)
+                                .load(),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('重新扫描'),
+                    ),
+                  ),
+                ],
               ),
             )
           else ...<Widget>[

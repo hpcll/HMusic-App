@@ -6,6 +6,7 @@ import '../core/upgrade/app_update_badge.dart';
 import '../core/upgrade/app_version_guard.dart';
 import '../features/settings/view_models/auto_archive_view_model.dart';
 import 'app_providers.dart';
+import 'shell/desktop_playback_shortcuts.dart';
 import 'theme/hmusic_theme.dart';
 
 class HMusicApp extends ConsumerWidget {
@@ -33,6 +34,9 @@ class HMusicApp extends ConsumerWidget {
       darkTheme: HMusicTheme.dark(),
       themeMode: ThemeMode.system,
       scrollBehavior: const _NoScrollbarBehavior(),
+      // 桌面键盘快捷键挂在 Navigator 之上：push 出去的播放页/弹层同样生效。
+      builder: (context, child) =>
+          DesktopPlaybackShortcuts(child: child ?? const SizedBox.shrink()),
       routerConfig: router,
     );
   }

@@ -10,6 +10,8 @@ import '../../../core/audio/models/hmusic_playback_state.dart' show PlayMode;
 import '../../../shared/widgets/view_title.dart';
 import '../models/queue_view_state.dart';
 import '../view_models/queue_view_model.dart';
+import '../widgets/queue_clear_confirm.dart';
+import '../widgets/queue_empty_state.dart';
 import '../widgets/queue_mode_tabs.dart';
 import '../widgets/queue_track_tile.dart';
 
@@ -78,7 +80,9 @@ class _QueuePageState extends ConsumerState<QueuePage> {
                 ),
                 if (state.items.isNotEmpty)
                   TextButton(
-                    onPressed: state.isMutating ? null : notifier.clear,
+                    onPressed: state.isMutating
+                        ? null
+                        : () => unawaited(_confirmClear(notifier)),
                     child: const Text('清空'),
                   ),
               ],
@@ -95,7 +99,9 @@ class _QueuePageState extends ConsumerState<QueuePage> {
         actions: <Widget>[
           if (state.items.isNotEmpty)
             TextButton(
-              onPressed: state.isMutating ? null : notifier.clear,
+              onPressed: state.isMutating
+                  ? null
+                  : () => unawaited(_confirmClear(notifier)),
               child: const Text('清空'),
             ),
         ],
@@ -105,6 +111,11 @@ class _QueuePageState extends ConsumerState<QueuePage> {
       // 让内容滑到屏幕最底，静止时的让位由下方 _list 的 padding 负责。
       body: SafeArea(bottom: false, child: _body(context, state, notifier)),
     );
+  }
+
+  // 清空不可恢复：与删歌单同一确认语言，防页头误触。
+  Future<void> _confirmClear(QueueViewModel notifier) async {
+    if (await confirmClearQueue(context)) await notifier.clear();
   }
 
   Widget _body(
@@ -153,7 +164,7 @@ class _QueuePageState extends ConsumerState<QueuePage> {
           children: <Widget>[
             SizedBox(
               height: constraints.maxHeight,
-              child: const Center(child: Text('队列是空的，去搜索里加几首歌吧')),
+              child: const Center(child: QueueEmptyState()),
             ),
           ],
         ),

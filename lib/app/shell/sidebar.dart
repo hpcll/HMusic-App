@@ -93,7 +93,7 @@ class AppSidebar extends ConsumerWidget {
 }
 
 // 侧栏导航项：hover 底→panel-2；active 墨底反白（bg 字 on text-strong 底）。
-class _SideItem extends StatelessWidget {
+class _SideItem extends StatefulWidget {
   const _SideItem({
     required this.icon,
     required this.label,
@@ -107,23 +107,39 @@ class _SideItem extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_SideItem> createState() => _SideItemState();
+}
+
+class _SideItemState extends State<_SideItem> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final active = widget.active;
     final fg = active ? palette.background : palette.mutedStrong;
-    return Material(
-      color: active ? palette.textStrong : Colors.transparent,
-      borderRadius: BorderRadius.circular(7),
-      child: InkWell(
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Material(
+        color: active
+            ? palette.textStrong
+            : _hover
+            ? palette.panelSecondary
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(7),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          child: Row(
-            children: <Widget>[
-              Icon(icon, size: 18, color: fg),
-              const SizedBox(width: 11),
-              Text(label, style: TextStyle(fontSize: 14, color: fg)),
-            ],
+        child: InkWell(
+          borderRadius: BorderRadius.circular(7),
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            child: Row(
+              children: <Widget>[
+                Icon(widget.icon, size: 18, color: fg),
+                const SizedBox(width: 11),
+                Text(widget.label, style: TextStyle(fontSize: 14, color: fg)),
+              ],
+            ),
           ),
         ),
       ),
