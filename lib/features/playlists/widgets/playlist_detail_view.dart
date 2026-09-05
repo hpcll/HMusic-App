@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../../../shared/widgets/back_link.dart';
 import '../../../shared/widgets/hmusic_icon_button.dart';
+import '../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../shared/widgets/hmusic_track_row.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/playlist.dart';
@@ -56,6 +58,11 @@ class PlaylistDetailView extends ConsumerWidget {
                   detail.description!,
                   style: TextStyle(fontSize: 13.5, color: palette.muted),
                 ),
+              ],
+              // 就地反馈：整单播放/移除失败显示在标题下方，不弹浮层。
+              if (state.errorMessage != null) ...<Widget>[
+                const SizedBox(height: 10),
+                HMusicInlineNotice(HMusicNotice.error(state.errorMessage!)),
               ],
             ],
           ),

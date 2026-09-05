@@ -4,7 +4,6 @@ import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/queue/api_queue_repository.dart';
-import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_library_repository.dart';
 import '../models/library_view_state.dart';
 
@@ -159,15 +158,15 @@ class LibraryViewModel extends Notifier<LibraryViewState> {
     }
   }
 
-  Future<void> enqueue(HMusicTrack track) async {
+  // 返回 true 供行尾按钮原地变 ✓（HMusicConfirmButton）。
+  Future<bool> enqueue(HMusicTrack track) async {
     try {
       await ref.read(queueRepositoryProvider).addTrack(track);
-      state = state.copyWith(
-        notice: HMusicNotice.success('已加入队列：${track.title}'),
-        clearError: true,
-      );
+      state = state.copyWith(clearError: true);
+      return true;
     } on ApiFailure catch (failure) {
       state = state.copyWith(errorMessage: failure.message);
+      return false;
     }
   }
 
@@ -175,7 +174,6 @@ class LibraryViewModel extends Notifier<LibraryViewState> {
   // isUploading 单飞，重复触发直接拒绝。
   Future<void> uploadFiles(List<({String path, String name})> files) async {
     if (files.isEmpty || state.isUploading) return;
-    var failed = 0;
     for (var i = 0; i < files.length; i++) {
       final file = files[i];
       state = state.copyWith(
@@ -195,20 +193,13 @@ class LibraryViewModel extends Notifier<LibraryViewState> {
               },
             );
       } on ApiFailure catch (failure) {
-        failed += 1;
         state = state.copyWith(
-          notice: HMusicNotice.error('「${file.name}」${failure.message}'),
+          errorMessage: '「${file.name}」${failure.message}',
         );
       }
     }
     state = state.copyWith(clearUploading: true);
-    if (failed < files.length) {
-      state = state.copyWith(
-        notice: HMusicNotice.success(
-          failed == 0 ? '已上传 ${files.length} 首' : '上传完成，$failed 首失败',
-        ),
-      );
-    }
+    // 结果本身就是反馈：上传横幅消失、列表刷新出新增曲目；失败明细留在错误行。
     await load();
   }
 
@@ -216,17 +207,9 @@ class LibraryViewModel extends Notifier<LibraryViewState> {
   Future<void> scan() async {
     try {
       final scan = await ref.read(libraryRepositoryProvider).startScan();
-      state = state.copyWith(
-        scan: scan,
-        notice: const HMusicNotice.success('已开始扫描曲库'),
-        clearError: true,
-      );
+      state = state.copyWith(scan: scan, clearError: true);
     } on ApiFailure catch (failure) {
       state = state.copyWith(errorMessage: failure.message);
     }
-  }
-
-  void clearNotice() {
-    if (state.notice != null) state = state.copyWith(clearNotice: true);
   }
 }

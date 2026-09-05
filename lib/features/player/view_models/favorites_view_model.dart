@@ -54,10 +54,11 @@ class FavoritesViewModel extends Notifier<FavoritesState> {
     }
   }
 
-  // 收藏/取消收藏当前曲目；ApiFailure 冒泡给按钮弹提示。
+  // 收藏/取消收藏当前曲目；失败落 state.error，播放页就地内联渲染
+  //（心形不变 = 失败，文字说明原因），不再冒泡给按钮弹浮层。
   Future<void> toggle(HMusicTrack track) async {
     if (state.busy) return;
-    state = state.copyWith(busy: true);
+    state = state.copyWith(busy: true, clearError: true);
     try {
       final existing = itemFor(track);
       if (existing != null) {
@@ -75,6 +76,8 @@ class FavoritesViewModel extends Notifier<FavoritesState> {
           playlist: await _repository.addTrack(playlist.id, track),
         );
       }
+    } on ApiFailure catch (failure) {
+      state = state.copyWith(error: failure.message);
     } finally {
       state = state.copyWith(busy: false);
     }

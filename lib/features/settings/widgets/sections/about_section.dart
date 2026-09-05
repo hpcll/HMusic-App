@@ -9,6 +9,7 @@ import '../../../../app/theme/hmusic_palette.dart';
 import '../../../../core/app_version.dart';
 import '../../../../shared/widgets/hmusic_card.dart';
 import '../../../../shared/widgets/hmusic_dialog.dart';
+import '../../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../models/app_update.dart';
 import '../../models/update_state.dart';
 import '../../view_models/app_download_view_model.dart';
@@ -45,6 +46,11 @@ class _AboutSectionViewState extends ConsumerState<AboutSectionView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
+        // 就地反馈：本节操作的结果/错误显示在顶部，不弹浮层。
+        if (state.notice != null) ...<Widget>[
+          HMusicInlineNotice(state.notice!),
+          const SizedBox(height: 12),
+        ],
         _ServerCard(state: state, notifier: notifier),
         const SizedBox(height: 14),
         _AppCard(state: state, notifier: notifier),

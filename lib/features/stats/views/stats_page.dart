@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
-import '../../../shared/widgets/hmusic_toast.dart';
+import '../../../shared/models/hmusic_notice.dart';
+import '../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/stats.dart';
 import '../models/stats_view_state.dart';
@@ -38,11 +39,6 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    ref.listen(statsViewModelProvider.select((s) => s.notice), (_, notice) {
-      if (notice == null) return;
-      showHMusicToast(context, notice);
-      ref.read(statsViewModelProvider.notifier).clearNotice();
-    });
     final state = ref.watch(statsViewModelProvider);
 
     // 下拉刷新重拉统计（docs/05 列表下拉手势）。
@@ -106,7 +102,14 @@ class _StatsPageState extends ConsumerState<StatsPage> {
         ),
       ];
     }
-    return _cards(stats, state.actingKey);
+    // 有数据时的就地反馈（Top 歌点播失败等）：显示在卡片上方，不弹浮层。
+    return <Widget>[
+      if (state.errorMessage != null) ...<Widget>[
+        HMusicInlineNotice(HMusicNotice.error(state.errorMessage!)),
+        const SizedBox(height: 12),
+      ],
+      ..._cards(stats, state.actingKey),
+    ];
   }
 
   List<Widget> _cards(Stats stats, String actingKey) {

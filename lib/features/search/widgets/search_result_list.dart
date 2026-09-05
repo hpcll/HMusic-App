@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
+import '../../../shared/widgets/hmusic_confirm_button.dart';
 import '../../../shared/widgets/hmusic_icon_button.dart';
 import '../../../shared/widgets/hmusic_track_row.dart';
 
@@ -28,7 +29,9 @@ class SearchResultList extends StatelessWidget {
   final DownloadIndex archive;
 
   final ValueChanged<HMusicTrack> onPlay;
-  final ValueChanged<HMusicTrack> onEnqueue;
+
+  // 返回成功与否：成功由行尾按钮原地变 ✓，不再发全局提示。
+  final Future<bool> Function(HMusicTrack) onEnqueue;
   final ValueChanged<HMusicTrack> onDownload;
 
   @override
@@ -66,10 +69,10 @@ class SearchResultList extends StatelessWidget {
             tooltip: archived ? '已入库' : '下载到服务器',
             onPressed: archived || !idle ? null : () => onDownload(track),
           ),
-        HMusicIconButton(
+        HMusicConfirmButton(
           icon: Icons.add_rounded,
           tooltip: '加入队列',
-          onPressed: idle ? () => onEnqueue(track) : null,
+          onAction: () => onEnqueue(track),
         ),
       ],
     );

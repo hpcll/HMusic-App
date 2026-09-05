@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/platform_shell/widgets/adaptive_glass_surface.dart';
-import '../../../shared/widgets/hmusic_toast.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/search_view_state.dart';
 import '../view_models/search_view_model.dart';
@@ -42,11 +41,6 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     // 行尾入库位的三态（↓ / 菊花 / 灰对勾）由共享索引决定，与榜单页同一份；
     // 这里 watch 一下，索引变了要重建结果行。
     ref.watch(downloadIndexProvider);
-    ref.listen(searchViewModelProvider.select((s) => s.notice), (_, notice) {
-      if (notice == null) return;
-      showHMusicToast(context, notice);
-      ref.read(searchViewModelProvider.notifier).clearNotice();
-    });
     // maybeOf 兜底：widget 测试直接挂 MaterialApp(home:) 时树里没有 GoRouter。
     final isTab =
         GoRouter.maybeOf(context) != null &&
@@ -171,7 +165,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     return ref.read(searchViewModelProvider.notifier).play(track);
   }
 
-  Future<void> _enqueue(HMusicTrack track) {
+  Future<bool> _enqueue(HMusicTrack track) {
     return ref.read(searchViewModelProvider.notifier).enqueue(track);
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/hmusic_palette.dart';
 import '../../../../shared/widgets/hmusic_card.dart';
+import '../../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../models/config_options.dart';
 import '../../models/server_config.dart';
 import '../../view_models/config_view_model.dart';
@@ -93,6 +94,12 @@ class _ConfigSectionViewState extends ConsumerState<ConfigSectionView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
+          // 就地反馈：保存结果/错误显示在卡片顶部，不弹浮层。
+          if (state.notice != null) ...<Widget>[
+            HMusicInlineNotice(state.notice!),
+            const SizedBox(height: 16),
+          ],
+
           SettingsField(
             label: '服务端名称',
             child: TextField(controller: _serverName),

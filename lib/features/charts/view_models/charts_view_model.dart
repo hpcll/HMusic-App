@@ -7,7 +7,6 @@ import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/queue/api_queue_repository.dart';
-import '../../../shared/models/hmusic_notice.dart';
 import '../../search/data/api_search_repository.dart';
 import '../../settings/data/api_downloads_repository.dart';
 import '../data/api_charts_repository.dart';
@@ -97,11 +96,11 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
       //（搜索结果页用同一份，见 core/downloads/download_index.dart）。
       unawaited(ref.read(downloadIndexProvider.notifier).refresh());
     } on ApiFailure catch (failure) {
-      // 详情拉取失败退回卡片墙并提示。
+      // 详情拉取失败退回卡片墙，错误就地内联在墙页头下。
       state = state.copyWith(
         clearActive: true,
         detailLoading: false,
-        notice: HMusicNotice.error(failure.message),
+        errorMessage: failure.message,
       );
     }
   }
@@ -117,13 +116,10 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
       await ref.read(downloadsRepositoryProvider).start(track);
       // 乐观标排队中 + 开表：下完这一行自己变成对勾，不用退出重进。
       ref.read(downloadIndexProvider.notifier).markQueued(track);
-      state = state.copyWith(
-        notice: HMusicNotice.success('已开始下载：${entry.title}'),
-      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: HMusicNotice.error(failure.message));
+      state = state.copyWith(errorMessage: failure.message);
     } on Exception catch (error) {
-      state = state.copyWith(notice: HMusicNotice.error('$error'));
+      state = state.copyWith(errorMessage: '$error');
     } finally {
       state = state.copyWith(actingRank: 0);
     }
@@ -141,31 +137,29 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
       final track = await _resolveEntry(entry);
       final handler = await ref.read(hmusicAudioHandlerProvider.future);
       await handler.playTrack(track);
-      state = state.copyWith(
-        notice: HMusicNotice.success('正在播放：${entry.title}'),
-      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: HMusicNotice.error(failure.message));
+      state = state.copyWith(errorMessage: failure.message);
     } on Exception catch (error) {
-      state = state.copyWith(notice: HMusicNotice.error('$error'));
+      state = state.copyWith(errorMessage: '$error');
     } finally {
       state = state.copyWith(actingRank: 0);
     }
   }
 
-  Future<void> enqueue(ChartEntry entry) async {
-    if (state.actingRank != 0) return;
+  // 返回 true 供行尾按钮原地变 ✓（HMusicConfirmButton）。
+  Future<bool> enqueue(ChartEntry entry) async {
+    if (state.actingRank != 0) return false;
     state = state.copyWith(actingRank: entry.rank, clearError: true);
     try {
       final track = await _resolveEntry(entry);
       await ref.read(queueRepositoryProvider).addTrack(track);
-      state = state.copyWith(
-        notice: HMusicNotice.success('已加入队列：${entry.title}'),
-      );
+      return true;
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: HMusicNotice.error(failure.message));
+      state = state.copyWith(errorMessage: failure.message);
+      return false;
     } on Exception catch (error) {
-      state = state.copyWith(notice: HMusicNotice.error('$error'));
+      state = state.copyWith(errorMessage: '$error');
+      return false;
     } finally {
       state = state.copyWith(actingRank: 0);
     }
@@ -183,20 +177,13 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
           .playAll(active.id);
       final handler = await ref.read(hmusicAudioHandlerProvider.future);
       await handler.applyRemotePlayback(playback);
-      state = state.copyWith(
-        notice: HMusicNotice.success('整榜播放：${active.name}'),
-      );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(notice: HMusicNotice.error(failure.message));
+      state = state.copyWith(errorMessage: failure.message);
     } on Exception catch (error) {
-      state = state.copyWith(notice: HMusicNotice.error('$error'));
+      state = state.copyWith(errorMessage: '$error');
     } finally {
       state = state.copyWith(actingRank: 0);
     }
-  }
-
-  void clearNotice() {
-    if (state.notice != null) state = state.copyWith(clearNotice: true);
   }
 
   // 榜单条目 → 可播曲目：带快照直接用；否则搜「歌名 歌手」取第一条（Apple 榜）。

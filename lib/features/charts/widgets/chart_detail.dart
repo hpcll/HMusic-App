@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../../../shared/widgets/back_link.dart';
+import '../../../shared/widgets/hmusic_confirm_button.dart';
 import '../../../shared/widgets/hmusic_icon_button.dart';
+import '../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../shared/widgets/hmusic_track_row.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../../player/view_models/player_view_model.dart';
@@ -73,6 +76,11 @@ class ChartDetailView extends ConsumerWidget {
                   active.description!,
                   style: TextStyle(fontSize: 13.5, color: palette.muted),
                 ),
+              ],
+              // 就地反馈：整榜播放/点播/下载失败显示在榜名下方，不弹浮层。
+              if (state.errorMessage != null) ...<Widget>[
+                const SizedBox(height: 10),
+                HMusicInlineNotice(HMusicNotice.error(state.errorMessage!)),
               ],
             ],
           ),
@@ -146,10 +154,10 @@ class ChartDetailView extends ConsumerWidget {
                     ? null
                     : () => notifier.download(entry),
               ),
-            HMusicIconButton(
+            HMusicConfirmButton(
               icon: Icons.add_rounded,
               tooltip: '加入队列',
-              onPressed: idle ? () => notifier.enqueue(entry) : null,
+              onAction: () => notifier.enqueue(entry),
             ),
           ],
         );

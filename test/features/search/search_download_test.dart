@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hmusic/core/downloads/download_index.dart';
 import 'package:hmusic/core/models/hmusic_track.dart';
 import 'package:hmusic/core/network/api_failure.dart';
 import 'package:hmusic/features/search/view_models/search_view_model.dart';
@@ -47,7 +48,7 @@ ProviderContainer _container(_FakeDownloadsRepository repo) {
 }
 
 void main() {
-  test('选具体音质下载：带 quality 发起，成功提示', () async {
+  test('选具体音质下载：带 quality 发起，行尾乐观转排队中', () async {
     final repo = _FakeDownloadsRepository();
     final container = _container(repo);
     final vm = container.read(searchViewModelProvider.notifier);
@@ -56,9 +57,10 @@ void main() {
 
     expect(repo.started.single.quality, 'flac');
     expect(repo.started.single.track.id, 'tx:1');
+    // 不再发全局提示：行尾三态（↓/菊花/✓）由入库索引驱动，发起即转菊花。
     expect(
-      container.read(searchViewModelProvider).notice?.message,
-      contains('已开始下载'),
+      container.read(downloadIndexProvider)[downloadKeyOf(_track)],
+      DownloadStatus.pending,
     );
   });
 
@@ -81,6 +83,5 @@ void main() {
 
     final state = container.read(searchViewModelProvider);
     expect(state.errorMessage, '下载失败');
-    expect(state.notice, isNull);
   });
 }

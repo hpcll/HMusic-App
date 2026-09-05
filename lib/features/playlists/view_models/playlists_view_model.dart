@@ -45,7 +45,7 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
     } on ApiFailure catch (failure) {
       state = state.copyWith(
         detailLoading: false,
-        notice: HMusicNotice.error(failure.message),
+        errorMessage: failure.message,
       );
     }
   }
@@ -72,15 +72,9 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
     try {
       await ref.read(playlistsRepositoryProvider).createPlaylist(trimmed);
       await _reloadKeepingBusy();
-      state = state.copyWith(
-        busy: false,
-        notice: const HMusicNotice.success('歌单已创建'),
-      );
+      state = state.copyWith(busy: false);
     } on ApiFailure catch (failure) {
-      state = state.copyWith(
-        busy: false,
-        notice: HMusicNotice.error(failure.message),
-      );
+      state = state.copyWith(busy: false, errorMessage: failure.message);
     }
   }
 
@@ -98,10 +92,7 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
         notice: HMusicNotice.success(_importMessage(result)),
       );
     } on ApiFailure catch (failure) {
-      state = state.copyWith(
-        busy: false,
-        notice: HMusicNotice.error(failure.message),
-      );
+      state = state.copyWith(busy: false, errorMessage: failure.message);
     }
   }
 
@@ -111,15 +102,9 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
     try {
       await ref.read(playlistsRepositoryProvider).deletePlaylist(id);
       await _reloadKeepingBusy();
-      state = state.copyWith(
-        busy: false,
-        notice: const HMusicNotice.success('歌单已删除'),
-      );
+      state = state.copyWith(busy: false);
     } on ApiFailure catch (failure) {
-      state = state.copyWith(
-        busy: false,
-        notice: HMusicNotice.error(failure.message),
-      );
+      state = state.copyWith(busy: false, errorMessage: failure.message);
     }
   }
 
@@ -135,10 +120,7 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
       state = state.copyWith(busy: false, detail: updated);
       return true;
     } on ApiFailure catch (failure) {
-      state = state.copyWith(
-        busy: false,
-        notice: HMusicNotice.error(failure.message),
-      );
+      state = state.copyWith(busy: false, errorMessage: failure.message);
       return false;
     }
   }
@@ -154,23 +136,13 @@ class PlaylistsViewModel extends Notifier<PlaylistsViewState> {
           .playAll(id, startIndex: startIndex);
       final handler = await ref.read(hmusicAudioHandlerProvider.future);
       await handler.applyRemotePlayback(playback);
-      state = state.copyWith(
-        busy: false,
-        notice: const HMusicNotice.success('开始播放歌单'),
-      );
+      state = state.copyWith(busy: false);
     } on ApiFailure catch (failure) {
-      state = state.copyWith(
-        busy: false,
-        notice: HMusicNotice.error(failure.message),
-      );
+      state = state.copyWith(busy: false, errorMessage: failure.message);
     } on Exception catch (error) {
-      // 本机装载失败（如直链坏源）也要如实提示，而不是谎报“开始播放”。
-      state = state.copyWith(busy: false, notice: HMusicNotice.error('$error'));
+      // 本机装载失败（如直链坏源）也要如实提示，而不是静默不动。
+      state = state.copyWith(busy: false, errorMessage: '$error');
     }
-  }
-
-  void clearNotice() {
-    if (state.notice != null) state = state.copyWith(clearNotice: true);
   }
 
   Future<void> _reloadKeepingBusy() async {

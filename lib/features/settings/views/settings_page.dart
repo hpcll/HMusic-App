@@ -5,20 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/upgrade/app_update_badge.dart';
-import '../../../shared/models/hmusic_notice.dart';
-import '../../../shared/widgets/hmusic_toast.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/settings_section.dart';
-import '../view_models/config_view_model.dart';
-import '../view_models/devices_view_model.dart';
-import '../view_models/diag_view_model.dart';
-import '../view_models/downloads_view_model.dart';
-import '../view_models/mi_account_view_model.dart';
-import '../view_models/security_view_model.dart';
 import '../view_models/settings_menu_view_model.dart';
-import '../view_models/sources_view_model.dart';
-import '../view_models/tracks_view_model.dart';
-import '../view_models/update_view_model.dart';
 import '../widgets/account_card.dart';
 import '../widgets/sections/about_section.dart';
 import '../widgets/sections/config_section.dart';
@@ -58,7 +47,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    _listenNotices();
     final state = ref.watch(settingsMenuViewModelProvider);
     final notifier = ref.read(settingsMenuViewModelProvider.notifier);
     final wide = MediaQuery.sizeOf(context).width >= 860;
@@ -169,58 +157,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         SettingsSection.tracks => const TracksSectionView(),
         SettingsSection.about => const AboutSectionView(),
       },
-    );
-  }
-
-  // 五个子页 VM 的 notice 统一在页面级转 toast（子页无各自 Scaffold）。
-  // flutter_riverpod 3.x 未导出 ProviderListenable 类型，无法抽公共参数，逐个内联。
-  void _listenNotices() {
-    void show(HMusicNotice? notice, void Function() clearNotice) {
-      if (notice == null) return;
-      showHMusicToast(context, notice);
-      clearNotice();
-    }
-
-    ref.listen(
-      devicesViewModelProvider.select((s) => s.notice),
-      (_, m) =>
-          show(m, ref.read(devicesViewModelProvider.notifier).clearNotice),
-    );
-    ref.listen(
-      configViewModelProvider.select((s) => s.notice),
-      (_, m) => show(m, ref.read(configViewModelProvider.notifier).clearNotice),
-    );
-    ref.listen(
-      diagViewModelProvider.select((s) => s.notice),
-      (_, m) => show(m, ref.read(diagViewModelProvider.notifier).clearNotice),
-    );
-    ref.listen(
-      securityViewModelProvider.select((s) => s.notice),
-      (_, m) =>
-          show(m, ref.read(securityViewModelProvider.notifier).clearNotice),
-    );
-    ref.listen(
-      tracksViewModelProvider.select((s) => s.notice),
-      (_, m) => show(m, ref.read(tracksViewModelProvider.notifier).clearNotice),
-    );
-    ref.listen(
-      sourcesViewModelProvider.select((s) => s.notice),
-      (_, m) =>
-          show(m, ref.read(sourcesViewModelProvider.notifier).clearNotice),
-    );
-    ref.listen(
-      downloadsViewModelProvider.select((s) => s.notice),
-      (_, m) =>
-          show(m, ref.read(downloadsViewModelProvider.notifier).clearNotice),
-    );
-    ref.listen(
-      miAccountViewModelProvider.select((s) => s.notice),
-      (_, m) =>
-          show(m, ref.read(miAccountViewModelProvider.notifier).clearNotice),
-    );
-    ref.listen(
-      updateViewModelProvider.select((s) => s.notice),
-      (_, m) => show(m, ref.read(updateViewModelProvider.notifier).clearNotice),
     );
   }
 }

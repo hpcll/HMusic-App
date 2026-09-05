@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/hmusic_palette.dart';
 import '../../../../shared/widgets/hmusic_card.dart';
 import '../../../../shared/widgets/hmusic_icon_button.dart';
+import '../../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../view_models/tracks_view_model.dart';
 import 'settings_field.dart';
 
@@ -61,6 +62,11 @@ class _TracksSectionViewState extends ConsumerState<TracksSectionView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
+        // 就地反馈：本节操作的结果/错误显示在顶部，不弹浮层。
+        if (state.notice != null) ...<Widget>[
+          HMusicInlineNotice(state.notice!),
+          const SizedBox(height: 12),
+        ],
         if (!state.loaded)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),

@@ -9,7 +9,6 @@ import '../../core/upgrade/upgrade_gate.dart';
 import '../../features/player/view_models/player_view_model.dart';
 import '../../features/player/widgets/mini_player.dart';
 import '../../features/settings/view_models/mi_session_watch_view_model.dart';
-import '../../shared/widgets/hmusic_toast.dart';
 import '../app_providers.dart';
 import '../theme/hmusic_palette.dart';
 import 'bottom_nav.dart';
@@ -42,16 +41,13 @@ class AppShell extends ConsumerWidget {
         ),
       );
     }
-    // 播放链路的全局失败通知：自动切歌等后台路径没有页面级 VM 兜着，只能在
-    // 常驻壳层统一弹 toast（各页自己的 notice 监听照旧）。isLoading 挡掉
-    // provider 重建时带旧值的过渡帧，避免旧通知重弹。
+    // 播放链路的全局失败：不再弹浮层（状态点/播放页状态承担反馈），这里只
+    // 做会话过期的限频快照回读——播放报错最常见根因是小米会话过期，Server
+    // 已在 401 时落库，让过期横幅当场出现。isLoading 挡掉 provider 重建时
+    // 带旧值的过渡帧。
     ref.listen(playbackNoticeProvider, (_, next) {
       if (next.isLoading) return;
-      final notice = next.value;
-      if (notice != null) {
-        showHMusicToast(context, notice);
-        // 播放报错常见根因是小米会话过期，Server 已在 401 时落库；
-        // 限频快照回读让过期横幅当场出现，不用等下次冷启动。
+      if (next.value != null) {
         unawaited(ref.read(miSessionWatchProvider.notifier).refreshQuick());
       }
     });

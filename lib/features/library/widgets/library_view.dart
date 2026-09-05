@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../../../shared/widgets/back_link.dart';
-import '../../../shared/widgets/hmusic_toast.dart';
+import '../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/library_view_state.dart';
 import '../view_models/library_view_model.dart';
@@ -28,6 +28,9 @@ class LibraryView extends ConsumerStatefulWidget {
 class _LibraryViewState extends ConsumerState<LibraryView> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
+
+  // 文件选择器打不开（权限/entitlement）这类 VM 管不到的失败，就地内联显示。
+  String? _pickerError;
 
   static const Map<LibrarySection, String> _sections = <LibrarySection, String>{
     LibrarySection.all: '全部',
@@ -80,12 +83,11 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
       );
     } on Exception catch (error) {
       // 平台选择器失败（权限/entitlement 等）如实提示，不让异常裸奔成崩溃日志。
-      if (mounted) {
-        showHMusicToast(context, HMusicNotice.error('无法打开文件选择器：$error'));
-      }
+      if (mounted) setState(() => _pickerError = '无法打开文件选择器：$error');
       return;
     }
     if (result == null) return;
+    if (mounted) setState(() => _pickerError = null);
     final files = <({String path, String name})>[
       for (final file in result.files)
         if (file.path != null) (path: file.path!, name: file.name),
@@ -97,11 +99,6 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
   Widget build(BuildContext context) {
     final state = ref.watch(libraryViewModelProvider);
     final notifier = ref.read(libraryViewModelProvider.notifier);
-    ref.listen(libraryViewModelProvider.select((s) => s.notice), (_, notice) {
-      if (notice == null) return;
-      showHMusicToast(context, notice);
-      notifier.clearNotice();
-    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,6 +152,11 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
               state.errorMessage!,
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
+          ),
+        if (_pickerError != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: HMusicInlineNotice(HMusicNotice.error(_pickerError!)),
           ),
         Expanded(
           child: state.showsGroups

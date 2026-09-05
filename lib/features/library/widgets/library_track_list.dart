@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/widgets/hmusic_confirm_button.dart';
 import '../../../shared/widgets/hmusic_track_row.dart';
 import '../models/library_item.dart';
 import '../models/library_view_state.dart';
@@ -170,10 +171,10 @@ class LibraryTrackList extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           )
         else
-          IconButton(
+          HMusicConfirmButton(
+            icon: Icons.playlist_add_rounded,
             tooltip: '加入队列',
-            onPressed: () => notifier.enqueue(item.track),
-            icon: const Icon(Icons.playlist_add_rounded),
+            onAction: () => notifier.enqueue(item.track),
           ),
       ],
     );

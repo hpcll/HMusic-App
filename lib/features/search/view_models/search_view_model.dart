@@ -7,7 +7,6 @@ import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
 import '../../../core/queue/api_queue_repository.dart';
-import '../../../shared/models/hmusic_notice.dart';
 import '../../settings/data/api_downloads_repository.dart';
 import '../data/api_search_repository.dart';
 import '../models/search_view_state.dart';
@@ -38,21 +37,21 @@ class SearchViewModel extends Notifier<SearchViewState> {
     }
   }
 
-  Future<void> enqueue(HMusicTrack track) async {
+  // 返回 true 供行尾按钮原地变 ✓（HMusicConfirmButton）。
+  Future<bool> enqueue(HMusicTrack track) async {
     try {
       await ref.read(queueRepositoryProvider).addTrack(track);
-      state = state.copyWith(
-        notice: HMusicNotice.success('已加入队列：${track.title}'),
-        clearError: true,
-      );
+      state = state.copyWith(clearError: true);
+      return true;
     } on ApiFailure catch (failure) {
       state = state.copyWith(errorMessage: failure.message);
+      return false;
     }
   }
 
   // 下载到服务器本地（对齐 web「下载到服务器」）：下载后这首歌播放走本地文件、
   // 免直链过期。quality 省略时服务端按默认音质下。发起是尽力而为，进度在设置
-  // 下载管理页看，这里只报「已开始」。
+  // 下载管理页看；发起成功行尾即转「下载中」，状态本身就是反馈，不再发提示。
   Future<void> download(HMusicTrack track, {String? quality}) async {
     try {
       await ref
@@ -60,17 +59,10 @@ class SearchViewModel extends Notifier<SearchViewState> {
           .start(track, quality: quality);
       // 乐观标排队中 + 开表：下完这一行自己变成对勾（榜单页同源索引）。
       ref.read(downloadIndexProvider.notifier).markQueued(track);
-      state = state.copyWith(
-        notice: HMusicNotice.success('已开始下载：${track.title}'),
-        clearError: true,
-      );
+      state = state.copyWith(clearError: true);
     } on ApiFailure catch (failure) {
       state = state.copyWith(errorMessage: failure.message);
     }
-  }
-
-  void clearNotice() {
-    if (state.notice != null) state = state.copyWith(clearNotice: true);
   }
 
   Future<void> search(String input) async {

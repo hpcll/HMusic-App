@@ -7,6 +7,7 @@ import '../../../../app/theme/hmusic_palette.dart';
 import '../../../../core/audio/models/hmusic_playback_state.dart';
 import '../../../../shared/widgets/hmusic_card.dart';
 import '../../../../shared/widgets/hmusic_icon_button.dart';
+import '../../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../../shared/widgets/state_dot.dart';
 import '../../models/download_record.dart';
 import '../../view_models/auto_archive_view_model.dart';
@@ -43,6 +44,11 @@ class _DownloadsSectionViewState extends ConsumerState<DownloadsSectionView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
+        // 就地反馈：本节操作的结果/错误显示在顶部，不弹浮层。
+        if (state.notice != null) ...<Widget>[
+          HMusicInlineNotice(state.notice!),
+          const SizedBox(height: 12),
+        ],
         Text(
           '下载到服务器本地的歌播放时直接走本地文件——不再依赖平台直链，永不过期。'
           '搜索结果和榜单行的下载图标都能加入。',

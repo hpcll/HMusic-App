@@ -9,8 +9,11 @@ import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/audio/models/hmusic_playback_state.dart';
 import '../../../core/models/hmusic_track.dart';
+import '../../../shared/models/hmusic_notice.dart';
+import '../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../shared/widgets/state_dot.dart';
 import '../../queue/views/queue_page.dart';
+import '../view_models/favorites_view_model.dart';
 import '../view_models/lyric_view_model.dart';
 import '../view_models/player_view_model.dart';
 import '../widgets/cover_swipe_area.dart';
@@ -440,28 +443,41 @@ class _ControlsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final handlerAsync = ref.watch(hmusicAudioHandlerProvider);
+    // 收藏失败就地内联：心形不变 + 控制行下方一行说明，不弹浮层。
+    final favoriteError = ref.watch(
+      favoritesViewModelProvider.select((s) => s.error),
+    );
     return handlerAsync.when(
       loading: () => const SizedBox(height: 72),
       error: (_, __) => const SizedBox(height: 72),
-      data: (handler) => StreamBuilder<PlaybackState>(
-        stream: handler.playbackState,
-        builder: (context, snapshot) {
-          final pbState = snapshot.data;
-          final isPlaying = pbState?.playing ?? fallbackPlaying;
-          final isBusy =
-              pbState?.processingState == AudioProcessingState.loading ||
-              pbState?.processingState == AudioProcessingState.buffering;
-          return PlayerControls(
-            isPlaying: isPlaying,
-            isBusy: isBusy,
-            mode: state.playMode,
-            onPlayPause: isPlaying ? controller.pause : controller.play,
-            onPrevious: controller.skipToPrevious,
-            onNext: controller.skipToNext,
-            onModeChanged: controller.setPlayMode,
-            favorite: PlayerFavoriteButton(track: state.track),
-          );
-        },
+      data: (handler) => Column(
+        children: <Widget>[
+          StreamBuilder<PlaybackState>(
+            stream: handler.playbackState,
+            builder: (context, snapshot) {
+              final pbState = snapshot.data;
+              final isPlaying = pbState?.playing ?? fallbackPlaying;
+              final isBusy =
+                  pbState?.processingState == AudioProcessingState.loading ||
+                  pbState?.processingState == AudioProcessingState.buffering;
+              return PlayerControls(
+                isPlaying: isPlaying,
+                isBusy: isBusy,
+                mode: state.playMode,
+                onPlayPause: isPlaying ? controller.pause : controller.play,
+                onPrevious: controller.skipToPrevious,
+                onNext: controller.skipToNext,
+                onModeChanged: controller.setPlayMode,
+                favorite: PlayerFavoriteButton(track: state.track),
+              );
+            },
+          ),
+          if (favoriteError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: HMusicInlineNotice(HMusicNotice.error(favoriteError)),
+            ),
+        ],
       ),
     );
   }

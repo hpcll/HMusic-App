@@ -52,7 +52,7 @@ glassBlurOff:    0（性能/降低透明度回退）
 玻璃 tint 必须保持中性，禁止把品牌青绿铺成整块玻璃。青绿仍只表达正在播放、成功和当前项。
 
 > **青绿 --accent 的铁律**（全站仅 5 处用它）：只表达「正在发生的事」——在播状态点、
-> 队列当前行、扫码成功、toast 成功、榜单播放次数计数。**从不用于装饰或静态强调**。
+> 队列当前行、扫码成功、行尾 ✓ 确认、榜单播放次数计数。**从不用于装饰或静态强调**。
 > 强调「第一名/焦点」一律用衬线 + 加深墨色（`.chart-rank.top` 范式），不用颜色。
 
 ### 字体
@@ -155,15 +155,18 @@ App 适配：Filled/Outlined 全胶囊（StadiumBorder、padding 水平 20）—
 `.modal-overlay` 全屏 `rgba(0,0,0,.42)` + `blur(2px)`，flex 居中，点遮罩关闭。
 `.modal-card` max-width420 radius10 shadow-pop，head(标题+✕) / body(滚动) / foot(右对齐按钮)。
 
-### Toast
-`position:fixed; bottom:28px(窄屏92px); 居中; padding:10px 20px; radius-sm; shadow-pop`
-左边框 3px 表意：info→muted-2 / success→accent / error→danger(且字变红)。3.2s 自动消失。
-App 适配（Apple Music 式玻璃胶囊，刻意偏离 web）：无 hairline、无左色条，语义改由
-leading 图标承担——success ✓ accent（accent 铁律 5 处之一）/ error ⚠ danger / info 无
-图标，文字恒墨色（错误不再整句变红）；180ms 淡入 + 上浮 8px 入场、140ms 淡出（减动效
-直切）。底距必须避让本壳底部 chrome——桌面抬到悬浮 mini 包络（76）+12 并水平居中于
-侧栏右侧内容区；窄屏抬到悬浮玻璃 chrome 完整包络之上（底距 + dock 62 + gap 8 +
-mini 50 + 呼吸距 8，随安全区上浮）。
+### 操作反馈（App：toast 已移除，2026-09-06 起对齐 Apple「就地反馈」）
+App 不再使用浮层 toast（浮层遮挡内容、与内容流脱节，用户评审定为「丑」）。反馈
+出现在它发生的上下文里：
+1. **行内操作成功** → 行尾按钮原地转青绿 ✓ 驻留 1.6s 回弹（`HMusicConfirmButton`，
+   Apple Music「已添加」同款）；下载另有 ↓/菊花/✓ 三态。
+2. **状态自明的成功**（创建/删除/刷新/播放开始等）→ 不出任何消息，状态变化即反馈。
+3. **错误与不可见结果**（导入统计、插件测试、收藏失败等）→ `HMusicInlineNotice`
+   就地内联一行（success ✓ accent / error ⚠ danger / info 灰字，13px），渲染在
+   所在 section 顶部、页面页头下方或播放控制行下；生命周期归 VM，下次动作覆盖。
+4. **播放链路全局失败** → 状态点/播放页状态承担反馈；壳层只保留小米会话过期的
+   限频回读让横幅（持久条件条，非 toast）及时出现。
+web 端不受此节约束，仍按下方原 Toast 规格执行；`hmusic_toast.dart` 仅存档待删。
 
 ### 输入
 `width:100%; border:1px line; radius-sm; padding:9px 12px; font14; focus 边→text-strong`
@@ -185,7 +188,7 @@ hairline 圈（违背无线北极星），故垫 panel-2 读作灰底填充；�
 | 歌词行 | color, font-size（当前行放大变衬线） | .25s ease |
 | 音量 flyout | opacity（悬浮展开，不占布局） | .2s ease |
 | track-actions 显隐 | opacity | .12s ease |
-| toast | web 无动画；App 180ms 淡入+上浮 8px / 140ms 淡出（减动效直切） | easeOutCubic / easeIn |
+| toast | web 无动画；App 已移除 toast（见「操作反馈」），行尾 ✓ 驻留/回弹 1.6s | easeOutCubic / easeIn |
 | 可点元素按压（App） | transform scale .97（`PressableScale`） | 120ms easeOut |
 | 骨架 → 内容（App） | opacity 交叉淡化（`AnimatedSwitcher`） | 180ms easeOut / easeIn |
 | 远程图首帧到达（App） | opacity 0→1，垫深色占位在底层防白闪 | 200ms easeOut |

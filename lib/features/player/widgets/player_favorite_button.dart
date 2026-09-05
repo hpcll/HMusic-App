@@ -1,12 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/hmusic_track.dart';
-import '../../../core/network/api_failure.dart';
-import '../../../shared/models/hmusic_notice.dart';
-import '../../../shared/widgets/hmusic_toast.dart';
 import '../view_models/favorites_view_model.dart';
 
 // 收藏态玫红对齐 web .ctrl-fav.active(#e0245e)；青绿纪律只属于「正在播放」，
@@ -37,11 +35,11 @@ class _PlayerFavoriteButtonState extends ConsumerState<PlayerFavoriteButton> {
   }
 
   Future<void> _toggle(HMusicTrack track) async {
-    try {
-      await ref.read(favoritesViewModelProvider.notifier).toggle(track);
-    } on ApiFailure catch (failure) {
-      if (!mounted) return;
-      showHMusicToast(context, HMusicNotice.error(failure.message));
+    await ref.read(favoritesViewModelProvider.notifier).toggle(track);
+    if (!mounted) return;
+    // 成功给轻触感；失败由播放页就地内联展示 error（心形不变即失败）。
+    if (ref.read(favoritesViewModelProvider).error == null) {
+      unawaited(HapticFeedback.selectionClick());
     }
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/hmusic_palette.dart';
 import '../../../../shared/widgets/hmusic_card.dart';
+import '../../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../view_models/security_view_model.dart';
 import 'settings_field.dart';
 
@@ -59,6 +60,12 @@ class _SecuritySectionViewState extends ConsumerState<SecuritySectionView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
+          // 就地反馈：保存结果/错误显示在卡片顶部，不弹浮层。
+          if (state.notice != null) ...<Widget>[
+            HMusicInlineNotice(state.notice!),
+            const SizedBox(height: 16),
+          ],
+
           SettingsField(
             label: '当前密码',
             child: TextField(

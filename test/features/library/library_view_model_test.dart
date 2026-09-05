@@ -158,11 +158,11 @@ void main() {
       repository.calls,
       containsAll(['upload:/tmp/a.mp3', 'upload:/tmp/b.flac']),
     );
-    // 结束后刷新列表且上传态复位。
+    // 结束后刷新列表且上传态复位；失败明细走内联错误行（无则 error 为空）。
     expect(repository.calls.last, startsWith('list:'));
     final state = container.read(libraryViewModelProvider);
     expect(state.isUploading, isFalse);
-    expect(state.notice?.message, contains('已上传 2 首'));
+    expect(state.errorMessage, isNull);
   });
 
   test('文件夹分段：拉 folder 聚合，点根目录（空名）按 folder="" 过滤', () async {

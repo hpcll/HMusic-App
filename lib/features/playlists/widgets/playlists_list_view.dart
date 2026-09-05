@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../shared/models/hmusic_notice.dart';
 import '../../../shared/widgets/hmusic_card.dart';
 import '../../../shared/widgets/hmusic_dialog.dart';
+import '../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/playlist.dart';
 import '../models/playlists_view_state.dart';
@@ -60,6 +62,16 @@ class PlaylistsListView extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 22),
+          // 就地反馈：错误与导入结果出现在页头下方（导入统计不可见于列表，
+          // 保留展示；其余成功由状态变化自身表达）。
+          if (state.errorMessage != null) ...<Widget>[
+            HMusicInlineNotice(HMusicNotice.error(state.errorMessage!)),
+            const SizedBox(height: 12),
+          ],
+          if (state.notice != null) ...<Widget>[
+            HMusicInlineNotice(state.notice!),
+            const SizedBox(height: 12),
+          ],
           // 系统视图入口（对齐 Apple Music「资料库」心智）：同页切换、不占底栏 tab。
           _LibraryEntry(onOpen: notifier.openLibrary),
           const SizedBox(height: 18),
@@ -84,9 +96,19 @@ class PlaylistsListView extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: 48),
               child: Center(
-                child: Text(
-                  '还没有歌单，创建一个吧',
-                  style: TextStyle(color: palette.muted),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text('还没有歌单', style: TextStyle(color: palette.muted)),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: state.busy
+                          ? null
+                          : () => _create(context, notifier),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('创建歌单'),
+                    ),
+                  ],
                 ),
               ),
             )

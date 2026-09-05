@@ -1,4 +1,3 @@
-import '../../../shared/models/hmusic_notice.dart';
 import 'chart.dart';
 
 enum ChartsStatus { initial, loading, loaded, error }
@@ -15,7 +14,6 @@ class ChartsViewState {
     this.detailLoading = false,
     this.actingRank = 0,
     this.errorMessage,
-    this.notice,
   });
 
   final ChartsStatus status;
@@ -31,7 +29,6 @@ class ChartsViewState {
   final int actingRank;
 
   final String? errorMessage;
-  final HMusicNotice? notice;
 
   bool get isWall => active == null;
 
@@ -44,11 +41,9 @@ class ChartsViewState {
     bool? detailLoading,
     int? actingRank,
     String? errorMessage,
-    HMusicNotice? notice,
     bool clearActive = false,
     bool clearDetail = false,
     bool clearError = false,
-    bool clearNotice = false,
   }) {
     return ChartsViewState(
       status: status ?? this.status,
@@ -59,7 +54,6 @@ class ChartsViewState {
       detailLoading: detailLoading ?? this.detailLoading,
       actingRank: actingRank ?? this.actingRank,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      notice: clearNotice ? null : (notice ?? this.notice),
     );
   }
 }

@@ -1,4 +1,3 @@
-import '../../../shared/models/hmusic_notice.dart';
 import 'library_item.dart';
 
 enum LibraryStatus { idle, loading, loaded }
@@ -23,7 +22,6 @@ class LibraryViewState {
     this.uploadProgress = 0,
     this.uploadRemaining = 0,
     this.errorMessage,
-    this.notice,
   });
 
   final LibraryStatus status;
@@ -45,7 +43,6 @@ class LibraryViewState {
   final double uploadProgress;
   final int uploadRemaining;
   final String? errorMessage;
-  final HMusicNotice? notice;
 
   bool get isLoading => status == LibraryStatus.loading;
 
@@ -72,12 +69,10 @@ class LibraryViewState {
     double? uploadProgress,
     int? uploadRemaining,
     String? errorMessage,
-    HMusicNotice? notice,
     bool clearPlayingTrack = false,
     bool clearUploading = false,
     bool clearActiveGroup = false,
     bool clearError = false,
-    bool clearNotice = false,
   }) {
     return LibraryViewState(
       status: status ?? this.status,
@@ -103,7 +98,6 @@ class LibraryViewState {
           ? 0
           : uploadRemaining ?? this.uploadRemaining,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
-      notice: clearNotice ? null : notice ?? this.notice,
     );
   }
 }

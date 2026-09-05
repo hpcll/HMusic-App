@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/platform_shell/widgets/adaptive_glass_surface.dart';
+import '../../../shared/models/hmusic_notice.dart';
+import '../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../shared/widgets/pressable_scale.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../../search/views/search_page.dart';
@@ -93,6 +95,15 @@ class ChartsWall extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 22),
+          // 就地反馈：详情拉取失败退回墙时，错误显示在页头下方（不弹浮层）。
+          if (state.errorMessage != null) ...<Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: HMusicInlineNotice(
+                HMusicNotice.error(state.errorMessage!),
+              ),
+            ),
+          ],
           if (featured.isNotEmpty) ...<Widget>[
             // 主打横滑带：四来源各一张主打卡，横滑 + 末尾露边（peek），
             // 与下方分组卡带同一套交互语法（对齐 Apple Music「广播」Hero 的骨架）。
@@ -142,6 +153,15 @@ class ChartsWall extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const SizedBox(height: 10),
+              // 就地反馈（窄屏）：详情拉取失败退回墙时显示在页头下。
+              if (state.errorMessage != null) ...<Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: HMusicInlineNotice(
+                    HMusicNotice.error(state.errorMessage!),
+                  ),
+                ),
+              ],
               if (featured.isNotEmpty) ...<Widget>[
                 ChartsHeroCarousel(
                   featured: featured,

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/hmusic_palette.dart';
 import '../../../../core/audio/models/hmusic_playback_state.dart';
 import '../../../../shared/widgets/hmusic_card.dart';
+import '../../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../../shared/widgets/state_dot.dart';
 import '../../models/mi_account_state.dart';
 import '../../view_models/mi_account_view_model.dart';
@@ -46,6 +47,11 @@ class _MiAccountSectionViewState extends ConsumerState<MiAccountSectionView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
+        // 就地反馈：本节操作的结果/错误显示在顶部，不弹浮层。
+        if (state.notice != null) ...<Widget>[
+          HMusicInlineNotice(state.notice!),
+          const SizedBox(height: 12),
+        ],
         _StatusCard(
           state: state,
           onLogout: notifier.logout,
