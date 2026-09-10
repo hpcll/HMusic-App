@@ -13,8 +13,13 @@ final class GlassShellState: ObservableObject {
   @Published var trackArtist: String = ""
   @Published var artworkUrl: URL?
   @Published var playing: Bool = false
-  // 滚动收缩态：Flutter 上报（向下滚收缩、滚回顶部展开）→ chrome 收成
-  // mini 内联 + 当前 tab 图标圆钮的一排（对齐 Apple Music 收纳行为）。
+  @Published var outputLabel: String = "未选择设备"
+  // 与 Flutter 两行 mini 的排版使用同一高度和缩放字号。
+  @Published var miniPlayerHeight: CGFloat = 50
+  @Published var miniTitleFontSize: CGFloat = 14
+  @Published var miniDetailFontSize: CGFloat = 12
+  @Published var allowMinimize: Bool = false
+  // Flutter 上报向下滚收起、向上滚展开；收起为左导航/中 mini/右搜索。
   @Published var minimized: Bool = false
   // Dart configure 下发的降级补充；系统开关另经 SwiftUI Environment 直接生效，
   // 二者取 or（docs/06 §3 回退策略 3/4）。
@@ -22,9 +27,7 @@ final class GlassShellState: ObservableObject {
   @Published var reduceTransparency: Bool = false
   // 底部安全区高度，由宿主从 UIKit window 注入（overlay 压安全区定位用）。
   @Published var bottomSafeArea: CGFloat = 0
-  // iOS 27+ 用系统 UITabBarController 画 dock；26.x 系统玻璃与 SwiftUI
-  // glassEffect 不同风格，由 overlay 自绘 dock 与 mini 统一材质。宿主 attach
-  // 时一次性写入。
+  // 当前 iOS 26+ 全部使用系统 UITabBarController，不启用旧的自绘 dock。
   @Published var usesSystemDock: Bool = true
   // UIKit 系统 tab bar 顶缘到屏幕底边的实际距离。
   @Published var systemDockClearance: CGFloat = 90
@@ -38,10 +41,9 @@ final class GlassShellState: ObservableObject {
 // 保证 Flutter 让位高度与实际渲染严格一致。
 enum GlassShellMetrics {
   static let dockHeight: CGFloat = 66
-  // 选中玻璃是独立于等分 tab 槽的超宽气泡；边缘项会自然伸出 dock 外沿。
-  // mini 比 dock 矮一档：dock 是导航主锚点，mini 是次级播放状态条
-  // （与 Dart kChromeMiniHeight 严格同步）。
+  // 两行 mini 基准高度，与 Dart kChromeMiniHeight 严格同步。
   static let miniHeight: CGFloat = 50
+  static let minimumCompactMiniWidth: CGFloat = 160
   static let gap: CGFloat = 8
   static let horizontalPadding: CGFloat = 16
   static let systemDockMinimumHorizontalInset: CGFloat = 20
@@ -55,22 +57,13 @@ enum GlassShellMetrics {
   }
 }
 
-// dock 4 tab 的 id/SF Symbol/标签，id 与 Dart kShellTabs 严格一致，
-// 图标语义对齐 Flutter bottom_nav（local_fire_department/library/insights/settings）。
-// 搜索并入榜单页头胶囊（Dart push 全屏搜索页），不占 dock 位。
+// 四个入口的 id 与 Dart kShellTabs 一致。
 struct GlassDockTab {
   let id: String
   let symbol: String
   let label: String
 
   static let all: [GlassDockTab] = [
-    // flame：榜单页实际内容是「热门歌曲 · 最热」，火焰直接对应「热度」。
-    // 逐个排除过的备选（都在 dock 真实的 22pt 下量过，别再回头选）：
-    // - list.number：1/2/3 在 22pt 糊成一团墨点，放大才认得出是数字；
-    // - chart.bar(.fill)：与统计的 chart.line.uptrend 同属图表族，相邻会撞；
-    // - trophy：表意偏「获奖/成就」，易读成徽章而非热度榜；
-    // - medal/rosette：Material 无对应字形，两代机会长得不一样。
-    // 另外 flame 渲染宽 23pt，接近原 trophy 的 27pt，换上不会让 dock 重心跳。
     GlassDockTab(id: "charts", symbol: "flame", label: "榜单"),
     GlassDockTab(id: "playlists", symbol: "music.note.list", label: "歌单"),
     GlassDockTab(id: "stats", symbol: "chart.line.uptrend.xyaxis", label: "统计"),

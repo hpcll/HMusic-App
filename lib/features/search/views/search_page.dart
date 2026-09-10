@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
-import '../../../core/platform_shell/widgets/adaptive_glass_surface.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../shared/widgets/view_title.dart';
 import '../models/search_view_state.dart';
 import '../view_models/search_view_model.dart';
@@ -28,6 +30,12 @@ class SearchPage extends ConsumerStatefulWidget {
 
 class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = ref.read(searchViewModelProvider).query;
+  }
 
   @override
   void dispose() {
@@ -97,61 +105,72 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     required Widget header,
     required double topPadding,
   }) {
-    return ListView(
-      // 水平只留 4：结果行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
-      // 封面左缘与页头/输入框同压 16 基线；头部块自行补 12。
-      // 顶/底累加环境 padding：顶部消融带与悬浮 mini/dock 之下让位，
-      // 内容仍可滚到玻璃后面（scroll-under）。
-      padding: EdgeInsets.fromLTRB(
-        4,
-        topPadding,
-        4,
-        32 + MediaQuery.paddingOf(context).bottom,
-      ),
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              header,
-              if (state.errorMessage != null) ...<Widget>[
-                const SizedBox(height: 16),
-                Text(
-                  state.errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1280),
+        child: ListView(
+          // 水平只留 4：结果行自带 12 内边距（hover/ink 出血位），4+12=16 使行内
+          // 封面左缘与页头/输入框同压 16 基线；头部块自行补 12。
+          // 顶/底累加环境 padding：顶部消融带与悬浮 mini/dock 之下让位，
+          // 内容仍可滚到玻璃后面（scroll-under）。
+          padding: EdgeInsets.fromLTRB(
+            4,
+            topPadding,
+            4,
+            32 + MediaQuery.paddingOf(context).bottom,
+          ),
+          children: <Widget>[
+            _searchHeader(context, state, header),
+            if (state.isSearching) ...<Widget>[
+              const SizedBox(height: 36),
+              const Center(child: CircularProgressIndicator()),
+            ] else if (state.hasSearched && state.tracks.isEmpty) ...<Widget>[
+              const SizedBox(height: 36),
+              const Center(child: Text('没有找到结果')),
+            ] else if (state.tracks.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 18),
+              Material(
+                color: context.palette.panel,
+                borderRadius: BorderRadius.circular(14),
+                child: SearchResultList(
+                  tracks: state.tracks,
+                  downloadsEnabled:
+                      ref.watch(playbackModeProvider) == PlaybackMode.server,
+                  playingTrackId: state.playingTrackId,
+                  archive: ref.read(downloadIndexProvider.notifier),
+                  onPlay: _play,
+                  onEnqueue: _enqueue,
+                  onDownload: _download,
                 ),
-              ],
-            ],
-          ),
-        ),
-        if (state.isSearching) ...<Widget>[
-          const SizedBox(height: 36),
-          const Center(child: CircularProgressIndicator()),
-        ] else if (state.hasSearched && state.tracks.isEmpty) ...<Widget>[
-          const SizedBox(height: 36),
-          const Center(child: Text('没有找到结果')),
-        ] else if (state.tracks.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 18),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: AdaptiveGlassSurface(
-              quality: resolveGlassQuality(context),
-              padding: EdgeInsets.zero,
-              borderRadius: const BorderRadius.all(Radius.circular(14)),
-              shadow: false,
-              child: SearchResultList(
-                tracks: state.tracks,
-                playingTrackId: state.playingTrackId,
-                archive: ref.read(downloadIndexProvider.notifier),
-                onPlay: _play,
-                onEnqueue: _enqueue,
-                onDownload: _download,
               ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _searchHeader(
+    BuildContext context,
+    SearchViewState state,
+    Widget header,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          header,
+          if (state.errorMessage != null) ...<Widget>[
+            const SizedBox(height: 16),
+            Text(
+              state.errorMessage!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 

@@ -6,6 +6,9 @@ import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/backend_request.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/queue/api_queue_repository.dart';
 import '../../settings/data/api_downloads_repository.dart';
 import '../data/api_search_repository.dart';
@@ -20,30 +23,41 @@ class SearchViewModel extends Notifier<SearchViewState> {
   int _requestId = 0;
 
   @override
-  SearchViewState build() => const SearchViewState();
+  SearchViewState build() {
+    ref.watch(searchRepositoryProvider);
+    _requestId++;
+    return const SearchViewState();
+  }
 
   Future<void> play(HMusicTrack track) async {
+    final request = BackendRequest(ref);
     if (state.playingTrackId != null) return;
     state = state.copyWith(playingTrackId: track.id, clearError: true);
     try {
       final handler = await ref.read(hmusicAudioHandlerProvider.future);
-      await handler.playTrack(track);
+      request.requireCurrent();
+      await handler.playTrack(track, stillCurrent: () => request.current);
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(errorMessage: failure.message);
     } on Exception catch (error) {
+      if (!request.current) return;
       state = state.copyWith(errorMessage: '播放失败：$error');
     } finally {
-      state = state.copyWith(clearPlayingTrack: true);
+      if (request.current) state = state.copyWith(clearPlayingTrack: true);
     }
   }
 
   // 返回 true 供行尾按钮原地变 ✓（HMusicConfirmButton）。
   Future<bool> enqueue(HMusicTrack track) async {
+    final request = BackendRequest(ref);
     try {
       await ref.read(queueRepositoryProvider).addTrack(track);
+      if (!request.current) return false;
       state = state.copyWith(clearError: true);
       return true;
     } on ApiFailure catch (failure) {
+      if (!request.current) return false;
       state = state.copyWith(errorMessage: failure.message);
       return false;
     }
@@ -53,19 +67,24 @@ class SearchViewModel extends Notifier<SearchViewState> {
   // 免直链过期。quality 省略时服务端按默认音质下。发起是尽力而为，进度在设置
   // 下载管理页看；发起成功行尾即转「下载中」，状态本身就是反馈，不再发提示。
   Future<void> download(HMusicTrack track, {String? quality}) async {
+    if (ref.read(playbackModeProvider) != PlaybackMode.server) return;
+    final request = BackendRequest(ref);
     try {
       await ref
           .read(downloadsRepositoryProvider)
           .start(track, quality: quality);
+      if (!request.current) return;
       // 乐观标排队中 + 开表：下完这一行自己变成对勾（榜单页同源索引）。
       ref.read(downloadIndexProvider.notifier).markQueued(track);
       state = state.copyWith(clearError: true);
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(errorMessage: failure.message);
     }
   }
 
   Future<void> search(String input) async {
+    final request = BackendRequest(ref);
     final query = input.trim();
     if (query.isEmpty || state.isSearching) return;
     final requestId = ++_requestId;
@@ -76,16 +95,18 @@ class SearchViewModel extends Notifier<SearchViewState> {
     );
     try {
       final result = await ref.read(searchRepositoryProvider).search(query);
-      if (requestId != _requestId) return;
+      if (!request.current || requestId != _requestId) return;
       state = state.copyWith(
         status: SearchStatus.loaded,
         tracks: result.tracks,
         clearError: true,
       );
       // 出结果就拉一次入库索引：行尾要标「已入库/下载中」（与榜单页同一份）。
-      unawaited(ref.read(downloadIndexProvider.notifier).refresh());
+      if (ref.read(playbackModeProvider) == PlaybackMode.server) {
+        unawaited(ref.read(downloadIndexProvider.notifier).refresh());
+      }
     } on ApiFailure catch (failure) {
-      if (requestId != _requestId) return;
+      if (!request.current || requestId != _requestId) return;
       state = state.copyWith(
         status: SearchStatus.loaded,
         tracks: const [],

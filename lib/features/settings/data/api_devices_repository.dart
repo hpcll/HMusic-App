@@ -1,13 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/models/hmusic_playback_state.dart';
+import '../../../core/direct/direct_providers.dart';
+import '../../../core/direct/mi_direct_providers.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import '../models/hmusic_device.dart';
 import 'devices_repository.dart';
+import 'direct_devices_repository.dart';
 
 final Provider<DevicesRepository> devicesRepositoryProvider =
     Provider<DevicesRepository>((ref) {
+      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+        return DirectDevicesRepository(
+          ref.watch(directDeviceRegistryProvider),
+          ref.watch(directPlaybackRepositoryProvider),
+          ref.watch(miMinaClientProvider),
+        );
+      }
       return ApiDevicesRepository(apiClient: ref.watch(apiClientProvider));
     });
 

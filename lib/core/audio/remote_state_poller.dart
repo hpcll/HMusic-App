@@ -22,6 +22,7 @@ class RemoteStatePoller {
 
   Timer? _timer;
   bool _inFlight = false;
+  int _generation = 0;
 
   // 每次服务端状态落地后由 handler 喂入：远端启动轮询，回到本机即停。
   // deviceId 为空 = 冷状态还没有播放目标（全新 Server 从未播放）：没有远端
@@ -35,6 +36,7 @@ class RemoteStatePoller {
   }
 
   void stop() {
+    _generation++;
     _timer?.cancel();
     _timer = null;
   }
@@ -42,8 +44,10 @@ class RemoteStatePoller {
   Future<void> _poll() async {
     if (_inFlight) return;
     _inFlight = true;
+    final generation = _generation;
     try {
-      _onState(await _repository.getState());
+      final state = await _repository.getState();
+      if (generation == _generation) _onState(state);
     } catch (_) {
       // 轮询尽力而为：失败退避到下一周期（断网/凭据暂不可用）。
     } finally {

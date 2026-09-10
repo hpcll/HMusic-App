@@ -3,9 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/features/charts/models/chart.dart';
 import 'package:hmusic/features/charts/widgets/charts_section_row.dart';
 
-// 榜单卡带是像素级等高包络（_cardHeight 162 / 预览区 78）：改动前在无障碍大字号下
-// 会精确溢出成黄黑警告条。这里把各字号档跑一遍，断言零溢出——纯 pixel 断言难覆盖，
-// 交给 widget 测守。
+// 卡片按字号计算包络，在可纵向滚动的页面中保留系统字号；三类预览都不得溢出。
 const Chart _chart = Chart(
   id: 'netease-hot',
   name: '云村飙升榜',
@@ -29,12 +27,14 @@ Future<void> _pumpRow(
       home: MediaQuery(
         data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
         child: Scaffold(
-          body: ChartsSectionRow(
-            label: '网易云音乐',
-            charts: const <Chart>[_chart],
-            previews: previews,
-            onOpen: (_) {},
-            onPlayEntry: (_) {},
+          body: SingleChildScrollView(
+            child: ChartsSectionRow(
+              label: '网易云音乐',
+              charts: const <Chart>[_chart],
+              previews: previews,
+              onOpen: (_) {},
+              onPlayEntry: (_) {},
+            ),
           ),
         ),
       ),
@@ -44,7 +44,38 @@ Future<void> _pumpRow(
 }
 
 void main() {
-  // iOS「更大字体」最大档约 3.1、Android 约 2.0；跨过钳制阈值 1.2 各取样点。
+  testWidgets('预览歌手位于歌名下方，点预览只播放而不打开整榜', (tester) async {
+    var opens = 0;
+    var plays = 0;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(400, 800);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ChartsSectionRow(
+              label: '网易云音乐',
+              charts: const <Chart>[_chart],
+              previews: const <String, List<ChartEntry>?>{'netease-hot': _top3},
+              onOpen: (_) => opens++,
+              onPlayEntry: (_) => plays++,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(find.text(_top3.first.artist)).dy,
+      greaterThan(tester.getTopLeft(find.text(_top3.first.title)).dy),
+    );
+    await tester.tap(find.text(_top3.first.title));
+    expect(plays, 1);
+    expect(opens, 0);
+  });
+
+  // 覆盖原 1.2 倍钳制边界，以及 Android/iOS 常见的大字号档位。
   const List<double> scales = <double>[1.0, 1.2, 1.3, 2.0, 3.1];
 
   for (final scale in scales) {
@@ -76,15 +107,15 @@ void main() {
     });
   }
 
-  testWidgets('字号钳到 1.2：卡带内文字不随系统字号无限放大', (tester) async {
+  testWidgets('卡内文字保留系统字号，靠布局增高容纳', (tester) async {
     await _pumpRow(
       tester,
       textScale: 3.1,
       previews: <String, List<ChartEntry>?>{_chart.id: _top3},
     );
 
-    // 卡内文本拿到的是钳后倍率，而非系统的 3.1。
+    // 不再牺牲无障碍字号来隐藏溢出。
     final context = tester.element(find.text('稻香'));
-    expect(MediaQuery.textScalerOf(context).scale(10), closeTo(12, 0.001));
+    expect(MediaQuery.textScalerOf(context).scale(10), closeTo(31, 0.001));
   });
 }

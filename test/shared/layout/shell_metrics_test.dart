@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/shared/layout/shell_metrics.dart';
 
@@ -28,5 +29,62 @@ void main() {
   test('iOS：保持与原生玻璃壳 GlassShellMetrics.bottomOffset 同式', () {
     expect(chromeBottomOffset(34, platform: TargetPlatform.iOS), 24);
     expect(chromeBottomOffset(0, platform: TargetPlatform.iOS), 10);
+  });
+
+  test('699/700/1023/1024 边界选择底栏、rail、完整侧栏', () {
+    expect(shellNavigationModeForWidth(699), ShellNavigationMode.bottom);
+    expect(shellNavigationWidth(699), 0);
+    expect(shellNavigationModeForWidth(700), ShellNavigationMode.rail);
+    expect(shellNavigationWidth(700), 80);
+    expect(shellNavigationModeForWidth(1023), ShellNavigationMode.rail);
+    expect(shellNavigationModeForWidth(1024), ShellNavigationMode.sidebar);
+    expect(shellNavigationWidth(1024), 232);
+  });
+
+  test('mini 保持原来的 50 高度，大字时与 dock 一起增加空间', () {
+    expect(mobileMiniPlayerHeight(TextScaler.noScaling), 50);
+    expect(mobileMiniPlayerHeight(const TextScaler.linear(1.5)), 63);
+    expect(mobileMiniPlayerHeight(const TextScaler.linear(2)), 79);
+    expect(mobileDockHeight(const TextScaler.linear(2)), greaterThan(62));
+  });
+
+  test('320/360 手机均可收起，超窄屏或大字保持展开', () {
+    for (final width in <double>[320, 360, 412]) {
+      expect(
+        canMinimizeBottomChrome(
+          viewportWidth: width,
+          textScaler: TextScaler.noScaling,
+        ),
+        isTrue,
+      );
+    }
+    expect(
+      canMinimizeBottomChrome(
+        viewportWidth: 280,
+        textScaler: TextScaler.noScaling,
+      ),
+      isFalse,
+    );
+    for (final scale in <double>[1.5, 2]) {
+      expect(
+        canMinimizeBottomChrome(
+          viewportWidth: 600,
+          textScaler: TextScaler.linear(scale),
+        ),
+        isFalse,
+      );
+    }
+  });
+
+  test('额外标题留白只属于 macOS，其他平台不重复预留', () {
+    expect(shellWindowTopInset(TargetPlatform.macOS), 28);
+    for (final platform in <TargetPlatform>[
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+      TargetPlatform.windows,
+      TargetPlatform.linux,
+    ]) {
+      expect(shellWindowTopInset(platform), 0);
+    }
   });
 }

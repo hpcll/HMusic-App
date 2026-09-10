@@ -8,6 +8,7 @@ class PlayerProgress extends StatefulWidget {
     required this.duration,
     required this.seekEnabled,
     required this.onSeek,
+    this.inlineTimes = false,
     super.key,
   });
 
@@ -15,6 +16,7 @@ class PlayerProgress extends StatefulWidget {
   final Duration duration;
   final bool seekEnabled;
   final ValueChanged<Duration> onSeek;
+  final bool inlineTimes;
 
   @override
   State<PlayerProgress> createState() => _PlayerProgressState();
@@ -52,46 +54,59 @@ class _PlayerProgressState extends State<PlayerProgress> {
         .clamp(0.0, hasDuration ? maxMs : 0.0)
         .toDouble();
 
+    final slider = SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        trackHeight: 3,
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+      ),
+      child: Slider(
+        value: hasDuration ? value : 0,
+        max: hasDuration ? maxMs : 1,
+        semanticFormatterCallback: (v) =>
+            formatDuration(Duration(milliseconds: v.round())),
+        onChanged: hasDuration && widget.seekEnabled
+            ? (v) => setState(() => _dragValue = v)
+            : null,
+        onChangeEnd: hasDuration && widget.seekEnabled
+            ? (v) {
+                final target = Duration(milliseconds: v.round());
+                setState(() {
+                  _dragValue = null;
+                  _pendingSeek = target;
+                });
+                widget.onSeek(target);
+              }
+            : null,
+      ),
+    );
+    final elapsed = Text(
+      formatDuration(Duration(milliseconds: value.round())),
+      maxLines: 1,
+      style: theme.textTheme.bodySmall?.copyWith(height: 1.25),
+    );
+    final total = Text(
+      formatDuration(widget.duration),
+      maxLines: 1,
+      style: theme.textTheme.bodySmall?.copyWith(height: 1.25),
+    );
+    if (widget.inlineTimes) {
+      return Row(
+        children: <Widget>[
+          elapsed,
+          Expanded(child: slider),
+          total,
+        ],
+      );
+    }
     return Column(
       children: <Widget>[
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 3,
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-          ),
-          child: Slider(
-            value: hasDuration ? value : 0,
-            max: hasDuration ? maxMs : 1,
-            onChanged: hasDuration && widget.seekEnabled
-                ? (v) => setState(() => _dragValue = v)
-                : null,
-            onChangeEnd: hasDuration && widget.seekEnabled
-                ? (v) {
-                    final target = Duration(milliseconds: v.round());
-                    setState(() {
-                      _dragValue = null;
-                      _pendingSeek = target;
-                    });
-                    widget.onSeek(target);
-                  }
-                : null,
-          ),
-        ),
+        slider,
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Widget>[
-              Text(
-                formatDuration(Duration(milliseconds: value.round())),
-                style: theme.textTheme.bodySmall,
-              ),
-              Text(
-                formatDuration(widget.duration),
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
+            children: <Widget>[elapsed, total],
           ),
         ),
       ],

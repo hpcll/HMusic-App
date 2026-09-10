@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/server_config_store.dart';
 import '../config/shared_preferences_server_config_store.dart';
 import '../network/api_client.dart';
+import '../playback/backend_request.dart';
+import '../playback/playback_mode_controller.dart';
 import '../security/secure_token_store.dart';
 import '../security/token_store.dart';
 import '../session/session_providers.dart';
@@ -51,5 +53,7 @@ final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
     serverConfigStore: ref.watch(serverConfigStoreProvider),
     tokenStore: ref.watch(tokenStoreProvider),
     onUnauthorized: () async => session.invalidate(),
+    beforeRequest: () => BackendRequest.requireServer(ref),
+    requestGeneration: () => ref.read(playbackModeProvider.notifier).generation,
   );
 });

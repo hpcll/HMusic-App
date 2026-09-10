@@ -4,29 +4,15 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/charts/views/charts_page.dart';
 import '../../features/player/view_models/player_view_model.dart';
 import '../../features/player/views/player_page.dart';
-import '../../features/playlists/views/playlists_page.dart';
-import '../../features/settings/views/settings_page.dart';
-import '../../features/stats/views/stats_page.dart';
+import '../../features/search/views/search_page.dart';
 import 'platform_shell_bridge.dart';
+import 'shell_navigation.dart';
 
-// tab id ↔ 路由 ↔ 标题的唯一映射，顺序与 bottom_nav 窄屏 4 tab 一致。
-// Swift dock 与 Flutter 底栏共用这套 id，原生 selectTab intent 的 value 必须在此表内。
-// 搜索并入榜单页头胶囊（push /search 全屏），不再是窄屏 dock tab。
-const List<(String id, String path, String title)> kShellTabs =
-    <(String, String, String)>[
-      ('charts', ChartsPage.path, '榜单'),
-      ('playlists', PlaylistsPage.path, '歌单'),
-      ('stats', StatsPage.path, '统计'),
-      ('settings', SettingsPage.path, '设置'),
-    ];
+export 'shell_navigation.dart' show kShellTabs;
 
-// Dart 侧 chrome 桥接与 intent 派发的单一出口：原生层只回传语义 intent，
-// 这里翻译成 Router/PlayerViewModel 调用。Swift 不持有业务状态，intent 必须回到这里。
-// 职责：路由变化 → updateNavigation/updateLayout；播放流 → updateNowPlaying；
-// 原生 ready/layoutChanged → 暴露给 AppShell 决定是否隐藏 Flutter chrome 并让出 inset。
+// Flutter 仍是路由与播放状态源；原生只接收展示数据并回传语义 intent。
 class PlatformShellController extends ChangeNotifier {
   PlatformShellController({
     required PlatformShellBridge bridge,
@@ -44,11 +30,9 @@ class PlatformShellController extends ChangeNotifier {
   final PlatformShellBridge _bridge;
   final GoRouter _router;
   final PlayerViewModel _playerViewModel;
-
   late final StreamSubscription<ShellIntent> _intentSubscription;
   late final StreamSubscription<ShellReady> _readySubscription;
   late final StreamSubscription<ShellLayout> _layoutSubscription;
-  StreamSubscription<MediaItem?>? _mediaItemSubscription;
   StreamSubscription<PlaybackState>? _playbackSubscription;
 
   bool _disposed = false;
@@ -56,18 +40,32 @@ class PlatformShellController extends ChangeNotifier {
   double _nativeBottomInset = 0;
   MediaItem? _track;
   bool _playing = false;
+  String _outputLabel = '未选择设备';
   bool _scrollMinimized = false;
-  (String?, String?, String?, String?, bool)? _sentNowPlaying;
+  var _viewport = (
+    useBottomChrome: false,
+    miniPlayerHeight: 50.0,
+    miniTitleFontSize: 14.0,
+    miniDetailFontSize: 12.0,
+    allowMinimize: false,
+  );
+  var _configuration = (
+    darkMode: PlatformDispatcher.instance.platformBrightness == Brightness.dark,
+    reduceMotion: false,
+    reduceTransparency: false,
+  );
+  (String?, String?, String?, String?, bool, String)? _sentNowPlaying;
   (String, String, bool)? _sentNavigation;
-  (bool, bool)? _sentLayout;
+  (bool, bool, double, double, double, bool)? _sentLayout;
 
-  // 原生壳声明了底栏 + mini player 才算接管；AppShell 据此隐藏 Flutter chrome。
+  // viewport 尚未送达时先使用 Flutter 壳，避免宽 iPad 在 ready 首帧出现双份导航。
   bool get nativeChromeActive =>
+      _viewport.useBottomChrome &&
       _capabilities.contains('bottomBar') &&
       _capabilities.contains('miniPlayer');
 
-  // 原生 chrome 占据的底部高度（含安全区），内容滚动区以此让位。
-  double get nativeBottomInset => _nativeBottomInset;
+  double get nativeBottomInset =>
+      _viewport.useBottomChrome ? _nativeBottomInset : 0;
 
   @override
   void dispose() {
@@ -76,21 +74,13 @@ class PlatformShellController extends ChangeNotifier {
     unawaited(_intentSubscription.cancel());
     unawaited(_readySubscription.cancel());
     unawaited(_layoutSubscription.cancel());
-    unawaited(_mediaItemSubscription?.cancel());
     unawaited(_playbackSubscription?.cancel());
     super.dispose();
   }
 
-  // audio handler 异步初始化完成后接入：mediaItem/playbackState 均为 BehaviorSubject，
-  // 订阅即得当前值，原生 mini player 冷启动也能拿到正在播的曲目。
   void attachAudioHandler(BaseAudioHandler handler) {
     if (_disposed) return;
-    unawaited(_mediaItemSubscription?.cancel());
     unawaited(_playbackSubscription?.cancel());
-    _mediaItemSubscription = handler.mediaItem.listen((item) {
-      _track = item;
-      _pushNowPlaying();
-    });
     _playbackSubscription = handler.playbackState.listen((state) {
       if (state.playing == _playing) return;
       _playing = state.playing;
@@ -98,23 +88,64 @@ class PlatformShellController extends ChangeNotifier {
     });
   }
 
+  // 展示曲目与输出同源于 Server；冷恢复时本机尚未装载 MediaItem 也能显示。
+  void updateMetadata({
+    required MediaItem? track,
+    required String outputLabel,
+  }) {
+    if (_disposed) return;
+    _track = track;
+    _outputLabel = outputLabel;
+    _pushNowPlaying();
+  }
+
+  void updateViewport({
+    required bool useBottomChrome,
+    required double miniPlayerHeight,
+    required double miniTitleFontSize,
+    required double miniDetailFontSize,
+    required bool allowMinimize,
+  }) {
+    if (_disposed) return;
+    final viewport = (
+      useBottomChrome: useBottomChrome,
+      miniPlayerHeight: miniPlayerHeight,
+      miniTitleFontSize: miniTitleFontSize,
+      miniDetailFontSize: miniDetailFontSize,
+      allowMinimize: allowMinimize,
+    );
+    if (viewport == _viewport) return;
+    _viewport = viewport;
+    if ((!useBottomChrome || !allowMinimize) && _scrollMinimized) {
+      _scrollMinimized = false;
+      unawaited(_bridge.updateScroll(minimized: false));
+    }
+    _onRouteChanged();
+    notifyListeners();
+  }
+
   Future<void> configure({
     required bool darkMode,
     required bool reduceMotion,
     required bool reduceTransparency,
   }) {
-    return _bridge.configure(
+    _configuration = (
       darkMode: darkMode,
       reduceMotion: reduceMotion,
       reduceTransparency: reduceTransparency,
     );
+    return _pushConfiguration();
   }
+
+  Future<void> _pushConfiguration() => _bridge.configure(
+    darkMode: _configuration.darkMode,
+    reduceMotion: _configuration.reduceMotion,
+    reduceTransparency: _configuration.reduceTransparency,
+  );
 
   @visibleForTesting
   void handleIntent(ShellIntent intent) => _handleIntent(intent);
 
-  // 原生壳就绪：记录能力供 AppShell 切换，并全量补发当前状态——
-  // ready 可能晚于路由/播放变化（Flutter 引擎先行），不能只靠增量。
   void _onReady(ShellReady ready) {
     _capabilities = ready.capabilities;
     _sentNavigation = null;
@@ -122,14 +153,7 @@ class PlatformShellController extends ChangeNotifier {
     _sentNowPlaying = null;
     _onRouteChanged();
     _pushNowPlaying();
-    unawaited(
-      configure(
-        darkMode:
-            PlatformDispatcher.instance.platformBrightness == Brightness.dark,
-        reduceMotion: false,
-        reduceTransparency: false,
-      ),
-    );
+    unawaited(_pushConfiguration());
     notifyListeners();
   }
 
@@ -139,32 +163,28 @@ class PlatformShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // AppShell 的滚动监听调用：向下滚 → chrome 收缩，滚回顶部 → 展开
-  //（触发语义见 ScrollMinimizeListener）。
-  // 去重后才过桥，滚动事件高频，不能每帧发 channel 消息。
   void reportScroll({required bool minimized}) {
-    if (!nativeChromeActive || minimized == _scrollMinimized) return;
+    if (!nativeChromeActive ||
+        (minimized && !_viewport.allowMinimize) ||
+        minimized == _scrollMinimized) {
+      return;
+    }
     _scrollMinimized = minimized;
     unawaited(_bridge.updateScroll(minimized: minimized));
   }
 
-  // 路由 → chrome 状态：5 个 tab 页显示 dock；player/lyrics/queue/连接/登录等
-  // 全屏页整体隐藏。未知路由按无 chrome 处理，宁可少画不可遮挡。
-  // 注意取末位 match：imperative push 不改 uri，只在 match 列表尾部追加。
-  void _onRouteChanged() {
+  String get _currentPath {
     final matches = _router.routerDelegate.currentConfiguration.matches;
-    final path = matches.isEmpty ? '' : matches.last.matchedLocation;
-    String? tabId;
-    var title = '';
-    for (final (id, tabPath, tabTitle) in kShellTabs) {
-      if (path == tabPath) {
-        tabId = id;
-        title = tabTitle;
-        break;
-      }
-    }
-    final isTab = tabId != null;
-    final navigation = (tabId ?? '', title, _router.canPop());
+    return matches.isEmpty ? '' : matches.last.matchedLocation;
+  }
+
+  void _openOverlay(String path) {
+    if (_currentPath != path) unawaited(_router.push(path));
+  }
+
+  void _onRouteChanged() {
+    final page = shellRoutePresentationForPath(_currentPath);
+    final navigation = (page?.tabId ?? '', page?.title ?? '', _router.canPop());
     if (navigation != _sentNavigation) {
       final tabChanged = navigation.$1 != _sentNavigation?.$1;
       _sentNavigation = navigation;
@@ -175,27 +195,42 @@ class PlatformShellController extends ChangeNotifier {
           canGoBack: navigation.$3,
         ),
       );
-      // 换 tab 后 dock 回到展开态并复位去重基线：新页面的滚动从头计。
       if (tabChanged && _scrollMinimized) {
         _scrollMinimized = false;
         unawaited(_bridge.updateScroll(minimized: false));
       }
     }
-    final layout = (isTab, isTab);
-    if (layout != _sentLayout) {
-      _sentLayout = layout;
-      unawaited(_bridge.updateLayout(showTabBar: isTab, showMiniPlayer: isTab));
-    }
+    final visible = _viewport.useBottomChrome && page != null;
+    final layout = (
+      visible,
+      visible && page.showMini,
+      _viewport.miniPlayerHeight,
+      _viewport.miniTitleFontSize,
+      _viewport.miniDetailFontSize,
+      _viewport.allowMinimize,
+    );
+    if (layout == _sentLayout) return;
+    _sentLayout = layout;
+    unawaited(
+      _bridge.updateLayout(
+        showTabBar: layout.$1,
+        showMiniPlayer: layout.$2,
+        miniPlayerHeight: layout.$3,
+        miniTitleFontSize: layout.$4,
+        miniDetailFontSize: layout.$5,
+        allowMinimize: layout.$6,
+      ),
+    );
   }
 
   void _pushNowPlaying() {
-    final track = _track;
     final snapshot = (
-      track?.id,
-      track?.title,
-      track?.artist,
-      track?.artUri?.toString(),
+      _track?.id,
+      _track?.title,
+      _track?.artist,
+      _track?.artUri?.toString(),
       _playing,
+      _outputLabel,
     );
     if (snapshot == _sentNowPlaying) return;
     _sentNowPlaying = snapshot;
@@ -206,18 +241,26 @@ class PlatformShellController extends ChangeNotifier {
         artist: snapshot.$3,
         artworkUrl: snapshot.$4,
         playing: snapshot.$5,
+        outputLabel: snapshot.$6,
       ),
     );
   }
 
-  // 语义 intent → 路由/播放命令。seek 与 dismiss 在 P0 忽略并保持静默，
-  // 不抛异常以免原生壳崩溃拖垮 Flutter 帧树。
   void _handleIntent(ShellIntent intent) {
     switch (intent.type) {
       case ShellIntentType.selectTab:
-        _selectTab(intent.value);
+        for (final (id, path, _) in kShellTabs) {
+          if (id == intent.value) {
+            _router.go(path);
+            break;
+          }
+        }
       case ShellIntentType.openNowPlaying:
-        unawaited(_router.push(PlayerPage.path));
+        _openOverlay(PlayerPage.path);
+      case ShellIntentType.openSearch:
+        _openOverlay(SearchPage.path);
+      case ShellIntentType.openOutputPicker:
+        _openOverlay(kOutputPickerPath);
       case ShellIntentType.playPause:
         unawaited(
           _playing ? _playerViewModel.pause() : _playerViewModel.play(),
@@ -227,20 +270,10 @@ class PlatformShellController extends ChangeNotifier {
       case ShellIntentType.next:
         unawaited(_playerViewModel.skipToNext());
       case ShellIntentType.expandDock:
-        // 原生已本地展开；仅复位去重基线，让下一次下滑能再收缩。
         _scrollMinimized = false;
       case ShellIntentType.seek:
       case ShellIntentType.dismiss:
         break;
-    }
-  }
-
-  void _selectTab(String? tabId) {
-    for (final (id, path, _) in kShellTabs) {
-      if (id == tabId) {
-        _router.go(path);
-        return;
-      }
     }
   }
 }

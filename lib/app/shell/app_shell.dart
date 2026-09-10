@@ -5,26 +5,23 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/playback/playback_mode.dart';
+import '../../core/playback/playback_mode_controller.dart';
 import '../../core/upgrade/upgrade_gate.dart';
 import '../../features/player/view_models/player_view_model.dart';
-import '../../features/player/widgets/mini_player.dart';
 import '../../features/settings/view_models/mi_session_watch_view_model.dart';
+import '../../shared/layout/shell_metrics.dart';
 import '../app_providers.dart';
-import '../theme/hmusic_palette.dart';
-import 'bottom_nav.dart';
 import 'flutter_glass_shell.dart';
+import 'home_back_fallback.dart';
 import 'mi_session_banner.dart';
-import 'sidebar.dart';
-import 'top_edge_scrim.dart';
+import 'native_glass_body.dart';
+import 'platform_shell_viewport.dart';
+import 'side_navigation_shell.dart';
 
-// 自适应导航外壳：承载 7 个 StatefulShellRoute 分支，统一提供 chrome + mini player。
-// 断点 860px（与 web 一致）：
-//   窄屏 → 顶部滚动消融（无常驻顶栏）+ 内容 + 底部悬浮玻璃 chrome
-//   （mini 胶囊 + dock 胶囊）。
-//   宽屏 → 左侧栏 232 + 内容（mini 悬浮内容底部，让位走 MediaQuery 注入）。
-// iOS 26+ 原生玻璃壳 ready 后接管窄屏 dock + mini：Flutter 隐藏自绘 chrome，
-// 内容底部让出原生回报的 inset；原生不可用/低版本走 FlutterGlassShell 毛玻璃
-// 回退壳，形态与原生壳一致（悬浮胶囊 + 滚动收缩），仅材质不同。
+export 'home_back_fallback.dart';
+
+// 外壳负责三档导航与平台 chrome；各页依据剩余内容宽度选择自己的布局。
 class AppShell extends ConsumerWidget {
   const AppShell({required this.navigationShell, super.key});
 
@@ -32,192 +29,70 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 强制升级门：进壳后查一次（服务端 minAppVersion + 远程配置），命中由
-    // router redirect 押入强升页。checked 后不再重查（重新检测在强升页）。
-    if (!ref.watch(upgradeGateProvider.select((s) => s.checked))) {
+    final serverMode = ref.watch(playbackModeProvider) == PlaybackMode.server;
+    if (serverMode &&
+        !ref.watch(upgradeGateProvider.select((s) => s.checked))) {
       unawaited(
         Future<void>.microtask(
           () => ref.read(upgradeGateProvider.notifier).check(),
         ),
       );
     }
-    // 播放链路的全局失败：不再弹浮层（状态点/播放页状态承担反馈），这里只
-    // 做会话过期的限频快照回读——播放报错最常见根因是小米会话过期，Server
-    // 已在 401 时落库，让过期横幅当场出现。isLoading 挡掉 provider 重建时
-    // 带旧值的过渡帧。
     ref.listen(playbackNoticeProvider, (_, next) {
-      if (next.isLoading) return;
-      if (next.value != null) {
+      if (serverMode && !next.isLoading && next.value != null) {
         unawaited(ref.read(miSessionWatchProvider.notifier).refreshQuick());
       }
     });
-    final isDesktop = MediaQuery.sizeOf(context).width >= 860;
-    // 正在播放分支（branch 0）本身就是完整播放视图，mini player 冗余，隐藏。
-    final onPlayerTab = navigationShell.currentIndex == 0;
-    final miniActive = ref.watch(miniPlayerActiveProvider).value ?? false;
-
-    if (isDesktop) {
-      final media = MediaQuery.of(context);
-      final showMini = !onPlayerTab;
-      final bottomInset = showMini && miniActive
-          ? MiniPlayer.desktopInset
-          : 0.0;
-      // macOS 窗体是窗后毛玻璃（MainFlutterWindow 垫 NSVisualEffectView），
-      // 外壳不铺底色让半透明侧栏透出壁纸；内容区自己铺回不透明暖纸。
-      final macGlassWindow = Theme.of(context).platform == TargetPlatform.macOS;
-      return HomeBackFallback(
-        shell: navigationShell,
-        child: Scaffold(
-          backgroundColor: macGlassWindow ? Colors.transparent : null,
-          body: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              AppSidebar(shell: navigationShell),
-              Expanded(
-                child: ColoredBox(
-                  color: context.palette.background,
-                  child: Stack(
-                    children: <Widget>[
-                      // 让位走 MediaQuery padding 注入而非留白，内容可滚到窗口
-                      // 上沿/mini 之下（scroll-under）：顶部 28 = 隐藏系统标题栏
-                      // 的让位基线（红绿灯悬浮区），底部 = 悬浮 mini 的包络高度。
-                      Positioned.fill(
-                        child: MediaQuery(
-                          data: media.copyWith(
-                            padding: media.padding.copyWith(
-                              top: media.padding.top + 28,
-                              bottom: media.padding.bottom + bottomInset,
-                            ),
-                          ),
-                          child: navigationShell,
-                        ),
-                      ),
-                      if (showMini)
-                        const Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: MiniPlayer(),
-                        ),
-                      // 过期横幅悬浮内容区顶缘：36 = 隐藏标题栏让位 28 + 8 呼吸距。
-                      Positioned(
-                        top: 36,
-                        left: 16,
-                        right: 16,
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 480),
-                            child: const MiSessionBanner(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // 无常驻顶栏后状态栏图标亮暗没人代管（原来由 Material AppBar 隐式标注），
-    // 壳层按主题显式声明：亮色主题深图标、暗色主题浅图标；statusBarColor
-    // 透明，消融带之上不垫系统色条（Android 15+ 本就强制透明，此处兼容旧版）。
+    final mode = shellNavigationModeForWidth(MediaQuery.sizeOf(context).width);
+    final miniActive = ref.watch(miniPlayerActiveProvider);
     final overlay =
         (Theme.of(context).brightness == Brightness.dark
                 ? SystemUiOverlayStyle.light
                 : SystemUiOverlayStyle.dark)
             .copyWith(statusBarColor: Colors.transparent);
-    final shellController = ref.watch(platformShellControllerProvider);
-    return HomeBackFallback(
-      shell: navigationShell,
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: overlay,
-        // 过期横幅压在两种窄屏壳（原生 chrome / Flutter 回退壳）之上，
-        // 悬浮于状态栏下缘；胶囊外区域不吃点击。
-        child: Stack(
-          children: <Widget>[
-            ListenableBuilder(
-              listenable: shellController,
-              builder: (context, _) {
-                if (shellController.nativeChromeActive) {
-                  // 原生 dock/mini 悬浮在 Flutter 层之上；内容经 MediaQuery padding 让位——
-                  // 各页 ListView 的底部 padding 需累加 MediaQuery.paddingOf(context).bottom，
-                  // 玻璃下仍有内容滚动（scroll-under），列表末尾不被遮挡。
-                  // 滚动经 controller 上报原生：向下滚收缩，滚回顶部才展开
-                  //（ScrollMinimizeListener 两壳统一语义）。
-                  final media = MediaQuery.of(context);
-                  return MediaQuery(
-                    data: media.copyWith(
-                      padding: media.padding.copyWith(
-                        bottom: shellController.nativeBottomInset,
-                      ),
-                    ),
-                    child: Scaffold(
-                      // 无常驻顶栏：与回退壳一致，顶部只留滚动消融 scrim。
-                      body: Stack(
-                        children: <Widget>[
-                          Positioned.fill(
-                            child: ScrollMinimizeListener(
-                              onMinimized: (minimized) => shellController
-                                  .reportScroll(minimized: minimized),
-                              child: navigationShell,
-                            ),
-                          ),
-                          const Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            child: TopEdgeScrim(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-                return FlutterGlassShell(
+    return PlatformShellViewport(
+      child: HomeBackFallback(
+        shell: navigationShell,
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlay,
+          child: mode == ShellNavigationMode.bottom
+              ? _bottomShell(context, ref, miniActive)
+              : SideNavigationShell(
                   shell: navigationShell,
-                  showMini: !onPlayerTab,
+                  mode: mode,
                   miniActive: miniActive,
-                );
-              },
-            ),
-            Positioned(
-              top: MediaQuery.paddingOf(context).top + 8,
-              left: 16,
-              right: 16,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: const MiSessionBanner(),
                 ),
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
-}
 
-// 系统返回的壳层兜底（分支页内二级态的 PopScope 优先于此拦截）：
-// 非主页 tab 的一级页按返回先收敛回榜单主页，主页再返回才冒泡交还系统退出 App
-//（对齐 Android「起点目的地」返回语义；iOS/桌面无系统返回事件，此层惰性无害）。
-class HomeBackFallback extends StatelessWidget {
-  const HomeBackFallback({required this.shell, required this.child, super.key});
-
-  final StatefulNavigationShell shell;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: shell.currentIndex == kHomeBranch,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) shell.goBranch(kHomeBranch);
-      },
-      child: child,
+  Widget _bottomShell(BuildContext context, WidgetRef ref, bool miniActive) {
+    final controller = ref.watch(platformShellControllerProvider);
+    return Stack(
+      children: <Widget>[
+        ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => controller.nativeChromeActive
+              ? NativeGlassBody(shell: navigationShell, controller: controller)
+              : FlutterGlassShell(
+                  shell: navigationShell,
+                  showMini: navigationShell.currentIndex != 0,
+                ),
+        ),
+        if (ref.watch(playbackModeProvider) == PlaybackMode.server)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            left: 16,
+            right: 16,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: const MiSessionBanner(),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

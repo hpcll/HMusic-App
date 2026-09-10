@@ -4,22 +4,19 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../app/theme/hmusic_palette.dart';
-import '../../../shared/models/hmusic_notice.dart';
-import '../../../shared/widgets/back_link.dart';
-import '../../../shared/widgets/hmusic_inline_notice.dart';
-import '../../../shared/widgets/view_title.dart';
 import '../models/library_view_state.dart';
 import '../view_models/library_view_model.dart';
+import 'library_browser_header.dart';
 import 'library_group_list.dart';
+import 'library_toolbar.dart';
 import 'library_track_list.dart';
 
-// NAS 曲库系统视图（歌单页内同页切换，窄屏/桌面同一形态——壳的 dock/侧栏常驻）。
-// 页头对齐歌单详情：BackLink + 大标题；分段「全部/歌手/专辑」聚合浏览。
+// 可嵌入曲库根页的 NAS 内容，分组/搜索/分页仍由现有 VM 持有。
 class LibraryView extends ConsumerStatefulWidget {
-  const LibraryView({required this.onBack, super.key});
+  const LibraryView({this.onBack, this.embedded = false, super.key});
 
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
+  final bool embedded;
 
   @override
   ConsumerState<LibraryView> createState() => _LibraryViewState();
@@ -27,32 +24,31 @@ class LibraryView extends ConsumerStatefulWidget {
 
 class _LibraryViewState extends ConsumerState<LibraryView> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _debounce;
 
   // 文件选择器打不开（权限/entitlement）这类 VM 管不到的失败，就地内联显示。
   String? _pickerError;
 
-  static const Map<LibrarySection, String> _sections = <LibrarySection, String>{
-    LibrarySection.all: '全部',
-    LibrarySection.artists: '歌手',
-    LibrarySection.albums: '专辑',
-    LibrarySection.folders: '文件夹',
-  };
-
   @override
   void initState() {
     super.initState();
-    unawaited(
-      Future<void>.microtask(
-        () => ref.read(libraryViewModelProvider.notifier).load(),
-      ),
-    );
+    final state = ref.read(libraryViewModelProvider);
+    _searchController.text = state.query;
+    if (state.status == LibraryStatus.idle) {
+      unawaited(
+        Future<void>.microtask(
+          () => ref.read(libraryViewModelProvider.notifier).load(),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -99,132 +95,64 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
   Widget build(BuildContext context) {
     final state = ref.watch(libraryViewModelProvider);
     final notifier = ref.read(libraryViewModelProvider.notifier);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        _header(context, state, notifier),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(
-            spacing: 8,
-            children: <Widget>[
-              for (final entry in _sections.entries)
-                ChoiceChip(
-                  label: Text(entry.value),
-                  selected: state.section == entry.key,
-                  onSelected: (_) => unawaited(notifier.setSection(entry.key)),
-                ),
-            ],
-          ),
-        ),
-        if (!state.showsGroups)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-            child: LibrarySearchField(
-              controller: _searchController,
-              onChanged: _onQueryChanged,
-            ),
-          ),
-        if (state.activeGroup != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 2, 16, 0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: notifier.closeGroup,
-                icon: const Icon(Icons.chevron_left_rounded, size: 18),
-                // 空组名是合法值（根目录 / 无歌手），给个可读回退。
-                label: Text(
-                  state.activeGroup!.isEmpty
-                      ? (state.section == LibrarySection.folders ? '根目录' : '未知')
-                      : state.activeGroup!,
-                ),
-              ),
-            ),
-          ),
-        if (state.isUploading) LibraryUploadBanner(state: state),
-        if (state.errorMessage != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Text(
-              state.errorMessage!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
-        if (_pickerError != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: HMusicInlineNotice(HMusicNotice.error(_pickerError!)),
-          ),
-        Expanded(
-          child: state.showsGroups
-              ? LibraryGroupList(state: state, notifier: notifier)
-              : LibraryTrackList(state: state, notifier: notifier),
-        ),
-      ],
-    );
-  }
-
-  Widget _header(
-    BuildContext context,
-    LibraryViewState state,
-    LibraryViewModel notifier,
-  ) {
-    final scanning = state.scan?.isScanning ?? false;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        12 + MediaQuery.paddingOf(context).top,
-        16,
-        0,
+    ref.listen(
+      libraryViewModelProvider.select(
+        (state) => (state.section, state.activeGroup),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Widget>[
-              BackLink(label: '返回', onTap: widget.onBack),
-              Row(
-                children: <Widget>[
-                  OutlinedButton.icon(
-                    onPressed: state.isUploading
-                        ? null
-                        : () => _pickAndUpload(notifier),
-                    icon: const Icon(Icons.upload_file_rounded, size: 18),
-                    label: const Text('上传'),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: scanning ? null : notifier.scan,
-                    icon: scanning
-                        ? const SizedBox.square(
-                            dimension: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.radar_rounded, size: 18),
-                    label: Text(scanning ? '扫描中…' : '扫描'),
-                  ),
-                ],
+      (_, __) => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
+      }),
+    );
+
+    return RefreshIndicator.adaptive(
+      onRefresh: () =>
+          state.showsGroups ? notifier.loadGroups() : notifier.load(),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.depth == 0 &&
+              notification.metrics.axis == Axis.vertical &&
+              !ref.read(libraryViewModelProvider).showsGroups &&
+              notification.metrics.extentAfter < 400) {
+            unawaited(notifier.loadMore());
+          }
+          return false;
+        },
+        // 工具、检索与结果共同滚动，短视口也能将操作滚到常驻播放区上方。
+        child: CustomScrollView(
+          key: const PageStorageKey<String>('nas-browser'),
+          controller: _scrollController,
+          primary: false,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: <Widget>[
+            SliverToBoxAdapter(
+              child: LibraryBrowserHeader(
+                state: state,
+                notifier: notifier,
+                searchController: _searchController,
+                onQueryChanged: _onQueryChanged,
+                pickerError: _pickerError,
+                toolbar: LibraryToolbar(
+                  state: state,
+                  embedded: widget.embedded,
+                  onBack: widget.onBack,
+                  onUpload: () => _pickAndUpload(notifier),
+                  onScan: notifier.scan,
+                ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: <Widget>[
-              const ViewTitle('NAS 曲库'),
-              const SizedBox(width: 10),
-              Text(
-                '${state.total} 首',
-                style: TextStyle(fontSize: 13, color: context.palette.muted),
+            ),
+            if (state.showsGroups)
+              LibraryGroupList(state: state, notifier: notifier)
+            else
+              LibraryTrackList(state: state, notifier: notifier),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 12 + MediaQuery.paddingOf(context).bottom,
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

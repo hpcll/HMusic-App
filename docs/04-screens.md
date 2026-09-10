@@ -2,30 +2,34 @@
 
 > 读者：写页面的人。每屏给：布局块（从上到下）/ 交互动作→API / 状态与轮询 / 特殊机制。
 > 来源：`HMusic-Server/web/views/*.js` + `main.js`。Flutter 原生复刻其行为和视觉，不复用代码。
+> App 的导航、分栏与播放条已按 [13 全平台 UI 方案](13-ui-modernization-plan.md) 更新；
+> Web 的页面结构仅作为行为参考，不能覆盖客户端实际路由和平台能力。
 
 ## 全局外壳（Web 参考：main.js）
 
 - **路由**：go_router 定义 `player search queue playlists charts stats settings` + `login/connection/lyrics`；
   受保护页未登录跳 login，无 server base 跳 connection。
-- **桌面外壳**：`Sidebar`（品牌 + 7 导航 + 用户名/退出）+ `content`（底部悬浮 mini 玻璃控制条，
-  见 03；web 侧边栏内的 mini 播放态不复刻——桌面 mini 承载控制，不只指示）。
-  mini 悬浮在内容之上，让位走 MediaQuery padding 注入（顶部 28 标题栏基线 +
-  底部 mini 包络高度），内容从玻璃下滚过；macOS 窗体垫窗后毛玻璃，侧栏半透明透出壁纸。
+- **中屏/桌面外壳**：700–1023 使用 80 宽 rail，≥1024 使用 232 宽分组 `Sidebar`，
+  保留七条 branch。底部 `DesktopPlaybackBar` 提供曲目/收藏、前后切歌/播放/进度、
+  设备/音量/队列；小内容区或大字时多行，完整播放页不重复显示。
+  内容按同一个高度函数预留播放条包络。额外 28 标题栏留白只用于 macOS；其侧栏继续透出窗后材质。
 - **窄屏外壳**：无常驻顶栏（对齐 Apple Music）——顶部只有 `TopEdgeScrim` 滚动消融
   （状态栏区渐进模糊 + 轻提亮，内容透见不遮挡；off 档退不透明渐变），
   品牌见登录页、退出登录在设置菜单底部；
-  `content` + 底部悬浮玻璃 chrome（mini 胶囊 + 5-tab dock 胶囊，对齐 iOS 26+
-  原生壳形态；压进安全区悬浮，向下滚收缩为「mini 内联 + 当前 tab 图标圆钮」
-  一排，滚回顶部才展开）。底部 chrome 高度由 Scaffold（extendBody）注入 body
-  的 MediaQuery padding，各页 paddingOf.top/bottom 让位。
-- **iOS 27 窄屏 chrome**：底部导航、mini player 由 Swift/SwiftUI NativeGlassShell 覆盖在
+  `content` + 底部悬浮玻璃 chrome（mini 胶囊 + 原榜单/歌单/统计/设置四入口 dock）。
+  向下滚收为「左侧当前导航圆钮 / 中间 mini / 右侧搜索圆钮」，向上滚立即展开。
+  底部 chrome 高度由 Scaffold（extendBody）注入 body 的 MediaQuery padding，各页让位。
+  mini 恢复基础高 50 的曲名/歌手两行，收起只留封面、曲名和播放；无曲目显示“未在播放”。
+  设备选择在完整播放器中；高度随系统字号变化，大字或收缩空间不足时保持展开。
+- **iOS 26+ 窄屏 chrome**：底部导航、mini player 由 Swift/SwiftUI NativeGlassShell 覆盖在
   Flutter 内容层之上；动态高度和安全区回报给 Flutter。iOS<26 走与 Android 相同的
-  Flutter 毛玻璃回退壳，形态一致、仅材质不同。
+  Flutter 毛玻璃回退壳。到 rail/sidebar 时隐藏 native 底栏与 mini，旋转时同步重算 inset。
 - **Android 窄屏 chrome**：结构与 iOS 一致，由 Flutter AdaptiveGlassShell 渲染；根据性能档位关闭
   动态模糊，但尺寸、交互和信息层级不得变化。
 - **全局轮询**：应用前台时由 playback provider 每 3-10 秒刷新；后台正确性由 AudioHandler 承担。
 - **应用状态**：Riverpod 分离 connection/auth/playback/queue，不创建万能 store。
-- **Toast**：`showHMusicToast` 全局出口（root Overlay 直插，无动画、不挡点击，替代 SnackBar），默认 3.2 秒。
+- **操作反馈**：成功使用状态变化或按钮原地 ✓；错误与导入结果使用就地 `HMusicInlineNotice`，
+  不新增全局 toast，详见 03。
 
 ### ★ Flutter 本机播放契约
 后端把「本机播放」当虚拟设备（deviceId=`local-browser`）记账，Flutter 由全局
@@ -37,6 +41,8 @@
 - seek/play/pause/position/duration 全部经同一个 AudioHandler；无需 Web 手势解锁。
 - streamUrl 保留 path/query，但 host 必须重绑定到当前 server base。
 - UI 挂起后后台 handler 仍须独立完成 report、ended 和系统媒体按钮，详见 08。
+- Android/iOS/macOS 已有本机后端；Windows/Linux 暂禁用本机目标选择与音源装载，说明原因并
+  保留音箱遥控。不得将上述契约误读为五端本机播放均已完成。
 
 ---
 
@@ -61,15 +67,17 @@
   常驻。设置菜单有「更换服务器」入口回本页（换网不重启）。未认证探测撞上陌生设备的
   401 不清 token（ApiClient 只在带凭据请求收到 401 时才失效会话）。
 
-## 屏 2 · 正在播放 player.js（桌面双栏，1023px 转单列）
+## 屏 2 · 正在播放（按可用内容宽高布局）
 
-- **桌面布局（≥1024）**：`.np-grid` = 左封面舞台 + 右歌词。
+- **宽内容布局**：`PlayerBody` 在实际内容区足够宽高时使用左封面舞台 + 右歌词；
+  系统大字时允许回到单栏。不能拿整机宽度代替扣除侧栏后的空间。
   - **左 .np-stage**：大封面（`aspect-ratio:1` max420 shadow-pop）+ 曲名(衬线26)/歌手·专辑/状态点 +
     进度条 + 单行主控。
   - **右 .np-lyrics**：同步歌词，当前行衬线放大加深，上下 mask 渐隐，`min-height:420 max-height:640`。
-- **★ 窄屏单屏模式（≤1023，移动端规范交互，Flutter 照此实现）**：
-  不内联歌词栏——封面限高（≤44vh），布局为「封面 → 曲名/歌手 →（遥控模式）设备状态行 →
-  **染色歌词条** → 进度 → 主控 → 音量行」一屏放下（QQ 音乐同构），底部导航保持可见；
+- **★ 手机与窄内容模式**：不内联独立歌词栏；封面按可用高度收缩，布局为
+  「封面 → 曲名/歌手 → 设备状态 → 染色歌词条 → 进度 → 主控 → 音量」。
+  手机 `/player` 为全屏 push，rail/sidebar 从 `/now` 进入；矮横屏可左右排布并滚动，
+  360×640、844×390 及 2 倍字均须保持控制可到达，不能强制单屏造成溢出。
   **点歌词条或点封面 → 进独立歌词页（屏 2b）**。
   设备状态行（仅播放目标为音箱时占行，本机是默认心智不渲染）：StateDot + 「正在播放 · 客厅音箱」
   12.5px muted，整行可点弹**播放设备 sheet**；宽屏状态行常驻（同 web），同样可点。
@@ -81,8 +89,8 @@
   100ms 定时器只有 10fps 肉眼卡顿，CSS transition 则换行回扫/行末染不满——两坑都踩过）；
   Flutter 用 Ticker/AnimationController 驱动 ShaderMask。无歌词时显示「暂无歌词」。
   歌词本体即入口，不加额外按钮装饰。
-  iOS 27 的底部主控可由 SwiftUI 原生液态玻璃控制面板承载；Flutter 向原生层发送播放状态、
-  `seekEnabled` 和音量能力，原生按钮只回传 intent。Android 使用同尺寸 Flutter 玻璃控制面板。
+  本轮完整播放器仍由 Flutter 渲染；所有控制复用同一 `PlayerViewModel/AudioHandler`，
+  不改变后台播放生命周期。
   > 教训一：早期把桌面双栏直接塌缩成单列，歌词栏在手机上撑出一屏空白、导航被顶出视野——
   > 播放页是全站唯一需要移动专属交互模式的页面，勿再直接塌缩。
   > 教训二：全屏歌词第一版做成 overlay 浮层，被否——**独立路由页**才对：
@@ -90,8 +98,8 @@
 
 ## 屏 2b · 歌词页（`/lyrics`，窄屏专用沉浸式路由）
 
-- **形态**：沉浸式独立页——外壳在该路由下**隐藏侧栏/底部导航**（routes 表 `immersive: true`）。
-  桌面（≥1024）访问自动跳回播放页（桌面已有双栏歌词）。
+- **形态**：`/lyrics` 为独立全屏 push 路由，不承载侧栏/底部导航。
+  宽内容播放器已内联歌词；窄内容或大字时仍可打开本页，窗口变化不强制重定向。
 - **布局（上→下）**：头部（收起键 chevronDown + 曲名/歌手衬线居中，右侧等宽 spacer 保证绝对居中）
   / 全屏歌词滚动（复用歌词组件：当前行衬线放大、上下 mask 渐隐、行点 seek、自动跟随 +
   进页即定位当前行）/ 迷你播控（进度条可拖 + 上一曲·播放暂停·下一曲三键）。
@@ -99,33 +107,29 @@
   下方经过。开启“降低透明度”时切为不透明 panel，不改变可用空间。
 - **进入/退出**：播放页点封面或歌词条 `push` 进入；收起键 `pop` 或**系统返回手势**退出。
   真路由天然维护历史，这是“页面优于浮层”的核心理由。
-- **状态**：与播放页共享 `lyric-state.js` 歌词缓存（同曲不重复请求）；自带 1s 本地插值 +
-  5s 服务端校准（与播放页同款双定时器）。
+- **状态**：与播放页共享 `lyricViewModelProvider` 缓存及 `playbackPositionOf` 位置；
+  本机取 just_audio 真值，音箱取现有远端进度投影，不另建 Widget 定时器。
 - **交互→API**：三键 → 统一 PlaybackCoordinator → `POST /playback/{previous|pause|resume|next}`；
   进度拖动/行点 → coordinator seek + `POST /playback/seek`。
-- **单行主控**（五键对称）：收藏 / 上一曲 / 播放暂停(64px主键) / 下一曲 / 音量（悬浮展开滑块）。
-- **交互→API**：
-  - 播放暂停/上下曲 → PlaybackCoordinator + `POST /playback/{resume|pause|previous|next}`
-  - 进度条拖动 onChange → AudioHandler seek + `POST /playback/seek {positionMs}`
-  - 音量 onChange → `POST /playback/volume {volume}`
-  - 收藏心 → 「我喜欢的音乐」歌单：无则先 `POST /playlists{name}`，再 `POST /playlists/:id/tracks` 或 `DELETE .../tracks/:itemId`
-  - 歌词行点击 → seek 到该行 timeMs（`seekEnabled` 时）
-- **状态/轮询**：`syncTimer 5s`（refreshPlayback + 校准进度/音量）+ `localTimer 1s`（本地插值推进进度/歌词）。
-  本机播放时进度真相源是 `just_audio`，不用服务端 positionMs 校准（否则会回跳）。
-- **歌词加载**：track 变化 watch → `POST /tracks/lyrics {track}`；当前行 = 最后一个 `timeMs<=pos` 的行 → smooth scrollIntoView center。
+- **控制绑定**：与完整播放器复用 `PlayerSeekBar` 和 `PlayerTransportControls`，歌词页只显示
+  前后切歌/播放暂停；设备不支持本机播放时同时禁用相关控制与歌词行 seek。
+- **歌词加载**：track 变化 → `POST /tracks/lyrics {track}`；按当前 position 选择行，
+  通过真实布局几何滚动到视口 0.4 锚点。
 
 ## 屏 3 · 搜索 search.js
 
 - **布局**：标题 + 搜索框 + 结果列表（track-row）。App 搜索框为玻璃胶囊 +
   放大镜前缀（对齐 Apple Music），不搬 web 的独立主按钮——Enter/键盘搜索键提交，
   搜索中的进度反馈由结果区 spinner 承担。
-- **材质**：搜索输入使用平台自适应玻璃胶囊；结果列表共用一块玻璃面板，禁止逐行叠加
+- **材质**：搜索输入使用平台自适应玻璃胶囊；结果列表使用稳定内容面板，禁止逐行叠加
   BackdropFilter。iOS 内容层仍由 Flutter 合成，不冒充 UIKit 原生 Liquid Glass 控件。
 - **状态放模块级**（keyword/tracks/searched）：切页再回来不丢，刷新才重置。
+- **宽屏曲目行**：与 NAS 共用自适应行组件，按真实内容宽度展示歌曲、歌手/专辑、时长、来源，
+  手机保留封面与两行信息；动作区固定宽度，长文字省略，未知字段不虚构。
 - **交互→API**：
   - 搜索（回车/按钮）→ `GET /search?q=`
-  - 每行三键：播放 `POST /playback/play{track}` / 加队列 `POST /queue/items{track}` / 加歌单（开弹窗）
-  - 加歌单弹窗（Modal）：列已有歌单 `GET /playlists` → 点选 `POST /playlists/:id/tracks`；或输入新名 `POST /playlists` 后再加曲。
+  - 点行播放 `POST /playback/play{track}`；行尾加队列 `POST /queue/items{track}`。
+  - 下载按钮打开音质选择，交既有下载 VM 保存到服务器；提交中禁用，结果使用行内确认。
 
 ## 屏 4 · 队列 queue.js
 
@@ -140,37 +144,50 @@
   - 清空 → `POST /queue/clear`
 - **加载**：页面 provider 首次激活时 `GET /queue`。
 
-## 屏 5 · 歌单 playlists.js（列表 ↔ 详情二级）
+## 屏 5 · 曲库（歌单 / NAS 歌曲）
 
-- **列表**：页头（导入歌单 + 创建歌单 两按钮）+ 歌单卡网格（`playlist-grid` auto-fill minmax300）。
-  卡片：图标 + 名 + N首 + 播放/删除键。
+- **入口**：`/playlists` 保留路径，app 层 `MusicLibraryPage` 组合歌单与 NAS 两个 feature。
+  根分段直接显示“歌单 / NAS 歌曲”，提供听歌统计入口；两边保持独立状态，NAS 首次访问才加载。
+- **歌单列表**：导入/创建 + 歌单卡网格。卡片使用 id/name 确定的可辨识占位封面，
+  主要动作为打开/播放；“删除歌单”进入更多菜单，保留二次确认。
 - **详情**：`‹ 返回` + `播放全部` / 歌单名 / 曲目列表（`.track-cols` 双列，每行序号 + 信息 + 移除键）。
 - **交互→API**：
   - 创建（Modal）→ `POST /playlists{name}`
-  - 导入（Modal 粘贴链接）→ `POST /playlists/import{url}` → toast 报告导入 N 首 + 跳过明细
+  - 导入（Modal 粘贴链接）→ `POST /playlists/import{url}` → 页内报告导入 N 首及跳过明细
   - 打开详情 → `GET /playlists/:id`
   - 播放全部/从某首 → `POST /playlists/:id/play{startIndex}`（先 prime）
   - 删歌单 → `DELETE /playlists/:id`；移除曲 → `DELETE /playlists/:id/tracks/:itemId`
+- **NAS 歌曲**：保留全部/歌手/专辑/文件夹、搜索、分页、上传和扫描；分组详情返回当前 NAS 根页。
+  根分段切换不增加返回层级，隐藏分段不能拦截当前页面返回。
+- 本轮不逐张请求歌单/专辑详情获取真实封面；数据任务见 13 §8。
 
 ## 屏 6 · 榜单 charts.js（卡片墙 ↔ 详情）
 
-- **卡片墙**：按来源分组（本站/网易云/QQ/Apple），每组卡片网格（`chart-wall` auto-fill minmax230）。
-  **卡片 = 卡头(#1封面 44px + 衬线榜名) + Top3 预览(可点播) + 「查看全部 ›」**。
-  > App 适配：卡内删「查看全部 ›」行、分区标题不带 chevron——整卡点击已是同一目的地，
-  > 重复入口不加信息（详见 `docs/03-design-system.md` §3 榜单卡）。加载中走三行骨架条
-  > （非「加载中…」文案），骨架↔内容 180ms 交叉淡化。
+- 手机入口和页头为“找歌”，保留搜索胶囊；桌面独立入口为榜单，并提供刷新按钮。
+- 封面保留方形比例，Top3 歌名和歌手分层；卡高随系统字号增大，桌面使用完整网格。
+
+- **卡片墙**（2026-09-08）：已连接 Spotify 时首先显示“我的 Spotify 榜单”三个周期，
+  下面为“发现榜单”。默认精选每来源一个榜（含家庭榜），通过 Spotify/网易云/QQ/Apple/HMusic
+  筛选浏览完整目录，移除重复主推。来源标签单行排列，超出宽度时横向滑动。
+  点选靠右的标签后自动平移，露出后续分类；首尾限位，仅移动标签行。
+  Spotify 账号目前在 Server Web 设置中连接，App 原生账号页尚未接入；榜单页没有 Spotify 设置入口。
+  卡片 = 48px 方封面 + 来源/时段 + 衬线榜名 + 可点播 Top3；整卡打开详情，没有重复“查看全部”。
+  个人区手机横滑、桌面并列；发现区纵向网格。加载显示三行骨架，失败在卡内显示原因与重试。
 - **详情**：`‹ 返回` + `播放全部`(任意非空榜；Apple 榜服务端搜索匹配后开播) / 榜名 / 描述 / 曲目列表（chart-rank 前三衬线加深；**当前播放的条目排名位换青绿均衡器图标**标识）。
 - **交互→API**：
-  - 首次加载 `GET /charts` → 有并发上限地预取 `GET /charts/:id` 填 Top3 预览（顺带焐热后端 6h 缓存）
+  - 首次加载 `GET /charts` → 最多两个请求并发预取所有个人榜和当前筛选可见榜，填 Top3。
+    预览与详情复用同一个完整页面及在途请求；刷新代数和详情代数阻止迟到响应回写。
   - 卡片 Top3 行点歌名 → 直接播（stopPropagation 防冒泡进详情）
   - 点卡片其他区 → 进详情（`GET /charts/:id`）
   - 详情行：播放 `POST /playback/play`（榜条目带 track 直接播；apple 榜 resolveEntry 先 `GET /search`）/ 加队列
   - 播放全部 → `POST /charts/:id/play`（Apple 榜条目无 track：服务端逐条搜「歌名 歌手」匹配，
     首命中即替换队列开播，其余后台补进队列——按钮不等 50 次搜索）
-- **状态**：`previews{}`（id→Top3，undefined=加载中，null=失败回退描述），全局防连点 `actingRank`。
+- **状态**：`previews{}`（id→Top3，缺键=加载中，空列表=空记录，null=失败）、
+  `previewErrors{}`（单卡错误）、`selectedSource`（默认精选），全局防连点 `actingRank`。
 
 ## 屏 7 · 统计（成熟图表组件 + HMusic 主题，纯墨配色）
 
+- 手机从曲库进入 `/stats`，底栏选中曲库，显式返回与系统返回均回曲库；桌面保留独立侧栏入口。
 - **布局（从上到下）**：4 个大数字卡（衬线，总览+近30天增量）/ 听歌趋势折线(近30天) /
   听歌时段柱状(24段，峰值柱最深墨) / 来源平台环形图+图例 /
   Top艺术家条 / Top歌曲(可点播) / Top专辑条。
@@ -181,7 +198,9 @@
 
 ## 屏 8 · 设置 settings.js（桌面双栏 / 窄屏两级）
 
-- **桌面（≥860）**：左菜单常驻 + 右内容双栏；**窄屏**：菜单页 ↔ 子页。
+- **宽内容**：菜单宽 `240 * max(1, scale(14)/14)`，加两侧 32、间距 32、正文至少 480 后
+  才形成双栏（基础字需 784、2 倍字需 1024 内容宽）；不足则菜单页 ↔ 子页。
+  切窗口大小保留已选 section 与未提交表单输入。
 - **材质**：窄屏子页导航使用平台玻璃；账号、密码、token、插件代码等表单使用不透明 panel。
 - **菜单**四组七项，每行带实时摘要（登录态/设备数/插件数/曲目数/配置）：
   账号与设备（小米账号·播放设备）/ 音源与内容（LX插件·手工曲目）/ 播放与诊断（运行配置·链路诊断）/ 安全（修改密码）。
@@ -192,6 +211,8 @@
     - 导入会话：`POST /mi/session/import{webCredentials}`。
     - 退出：`POST /mi/logout`。页面/controller dispose 时清定时器。
   - **播放设备** DevicesSection：`GET /devices`；刷新 `POST /devices/refresh`；选默认 `/:id/select`；探测 `/:id/probe`。
+    主要展示名称、在线状态、当前输出；本机能力门禁给出可理解的原因，内部型号不是主要说明。
+  - **服务器下载**：查看已有任务、失败重试和删除；明确保存到已连接的服务器，不等同手机离线下载。
   - **LX 插件** settings-sources.js SourcesSection：列表(开关/测试/编辑/更新/删除) + 三通道添加
     （订阅链接 `POST /lx-plugins/fetch` 拉取预填 / 文件选择器读取 .js / 粘贴代码）→ `POST /lx-plugins` 保存。
     开关/删除/测试/更新对应各端点（见 02 章 §13）。
@@ -205,4 +226,4 @@
 2. Flutter 扫码页用本地二维码组件渲染 `loginUrl`，不加载远程脚本。
 3. 队列删除用 PUT 整体替换（无单曲删接口）。
 4. 模块级搜索状态（切页不丢）。
-5. 设置页用 `LayoutBuilder` 在 860px 切桌面/窄屏两种布局。
+5. 外壳只负责 700/1024 三档导航；设置、播放器和曲目列用 `LayoutBuilder` 的实际可用空间。

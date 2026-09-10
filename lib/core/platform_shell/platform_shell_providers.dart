@@ -40,12 +40,17 @@ class NoOpPlatformShellBridge implements PlatformShellBridge {
     required String? artist,
     required String? artworkUrl,
     required bool playing,
+    required String outputLabel,
   }) async {}
 
   @override
   Future<void> updateLayout({
     required bool showTabBar,
     required bool showMiniPlayer,
+    required double miniPlayerHeight,
+    required double miniTitleFontSize,
+    required double miniDetailFontSize,
+    required bool allowMinimize,
   }) async {}
 
   @override

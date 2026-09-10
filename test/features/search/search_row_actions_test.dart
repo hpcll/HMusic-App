@@ -9,8 +9,8 @@ import 'package:hmusic/features/search/views/search_page.dart';
 import 'package:hmusic/features/settings/data/api_downloads_repository.dart';
 import 'package:hmusic/features/settings/data/downloads_repository.dart';
 import 'package:hmusic/features/settings/models/download_record.dart';
+import 'package:hmusic/shared/widgets/hmusic_adaptive_track_row.dart';
 import 'package:hmusic/shared/widgets/hmusic_icon_button.dart';
-import 'package:hmusic/shared/widgets/hmusic_track_row.dart';
 
 const HMusicTrack _archived = HMusicTrack(
   id: 'wy-1',
@@ -100,10 +100,10 @@ void main() {
   testWidgets('搜索结果行：整行即播放键，行上不再有播放钮', (tester) async {
     await _search(tester, _FakeDownloadsRepository());
 
-    expect(find.byType(HMusicTrackRow), findsNWidgets(2));
+    expect(find.byType(HMusicAdaptiveTrackRow), findsNWidgets(2));
     expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
-    for (final row in tester.widgetList<HMusicTrackRow>(
-      find.byType(HMusicTrackRow),
+    for (final row in tester.widgetList<HMusicAdaptiveTrackRow>(
+      find.byType(HMusicAdaptiveTrackRow),
     )) {
       expect(row.onTap, isNotNull);
     }

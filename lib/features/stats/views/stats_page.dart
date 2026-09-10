@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../../../shared/widgets/hmusic_inline_notice.dart';
 import '../../../shared/widgets/view_title.dart';
@@ -55,6 +57,13 @@ class _StatsPageState extends ConsumerState<StatsPage> {
         ),
         children: <Widget>[
           const ViewTitle('听歌统计'),
+          if (ref.watch(playbackModeProvider) == PlaybackMode.direct) ...[
+            const SizedBox(height: 8),
+            Text(
+              '直连模式 · 仅统计本机最近 5000 条播放记录',
+              style: TextStyle(color: palette.muted),
+            ),
+          ],
           const SizedBox(height: 22),
           ..._content(context, state, palette),
         ],

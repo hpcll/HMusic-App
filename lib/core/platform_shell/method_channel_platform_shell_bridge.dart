@@ -87,6 +87,7 @@ class MethodChannelPlatformShellBridge implements PlatformShellBridge {
     required String? artist,
     required String? artworkUrl,
     required bool playing,
+    required String outputLabel,
   }) {
     return _methodChannel
         .invokeMethod<void>('shell.updateNowPlaying', <String, Object?>{
@@ -95,6 +96,7 @@ class MethodChannelPlatformShellBridge implements PlatformShellBridge {
           'artist': artist,
           'artworkUrl': artworkUrl,
           'playing': playing,
+          'outputLabel': outputLabel,
         });
   }
 
@@ -102,14 +104,20 @@ class MethodChannelPlatformShellBridge implements PlatformShellBridge {
   Future<void> updateLayout({
     required bool showTabBar,
     required bool showMiniPlayer,
+    required double miniPlayerHeight,
+    required double miniTitleFontSize,
+    required double miniDetailFontSize,
+    required bool allowMinimize,
   }) {
-    return _methodChannel.invokeMethod<void>(
-      'shell.updateLayout',
-      <String, Object?>{
-        'showTabBar': showTabBar,
-        'showMiniPlayer': showMiniPlayer,
-      },
-    );
+    return _methodChannel
+        .invokeMethod<void>('shell.updateLayout', <String, Object?>{
+          'showTabBar': showTabBar,
+          'showMiniPlayer': showMiniPlayer,
+          'miniPlayerHeight': miniPlayerHeight,
+          'miniTitleFontSize': miniTitleFontSize,
+          'miniDetailFontSize': miniDetailFontSize,
+          'allowMinimize': allowMinimize,
+        });
   }
 
   @override

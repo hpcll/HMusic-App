@@ -2,7 +2,7 @@ import 'settings_section.dart';
 import 'settings_summary.dart';
 
 // 设置中心框架状态：当前子页 + 菜单摘要。
-// section 为 null 表示窄屏菜单页；桌面双栏下 View 回退渲染第一项，不写回状态。
+// section 为 null 表示窄屏菜单页；宽布局展示默认项后记录选择，以便缩窄时保留表单。
 class SettingsMenuState {
   const SettingsMenuState({
     this.section,

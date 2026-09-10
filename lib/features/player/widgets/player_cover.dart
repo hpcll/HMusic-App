@@ -45,6 +45,9 @@ class PlayerCover extends StatelessWidget {
                       child: child,
                     );
                   },
+                  // 加载期间给音符占位，不再是空白方块。
+                  loadingBuilder: (context, child, progress) =>
+                      progress == null ? child : _fallback(scheme),
                   errorBuilder: (_, __, ___) => _fallback(scheme),
                 ),
         ),

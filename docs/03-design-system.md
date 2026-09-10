@@ -3,8 +3,10 @@
 > 读者：写 UI 的人。数值源自 `HMusic-Server/web/styles.css`，Flutter 需映射为 ThemeExtension、
 > 组件约束与 golden test；不直接复用 CSS。
 > 风格自述：**feather.computer 风 —— 暖纸色底 / 墨色文字 / 细边框 / 衬线展示标题 / 克制阴影**。
-> 平台增强：内容层保持上述品牌；iOS 27 的系统 chrome 使用 Swift/SwiftUI 原生液态玻璃，
+> 平台增强：内容层保持上述品牌；iOS 26+ 的系统 chrome 使用 Swift/SwiftUI 原生液态玻璃，
 > Android 使用 Flutter 同构玻璃材质。玻璃是导航与控制层，不替代内容设计。
+> 2026-09-07：App 的导航与响应式规格以本章及 [13 实施方案](13-ui-modernization-plan.md) 为准，
+> Web 的 CSS 数值只作为品牌参考，不再作为客户端断点或交互约束。
 
 ## 1. 设计 token
 
@@ -37,7 +39,7 @@
 
 ### 平台玻璃 token
 
-这些 token 只用于 Android/旧 iOS 回退；iOS 27 原生材质优先由系统决定折射、模糊与高光：
+这些 token 只用于 Android/旧 iOS 回退；iOS 26+ 原生材质优先由系统决定折射、模糊与高光：
 
 ```text
 glassTintLight:  rgba(255,255,255,.62)
@@ -63,35 +65,35 @@ glassBlurOff:    0（性能/降低透明度回退）
 
 ## 2. 布局骨架与响应式
 
-**唯一断点：860px**（`max-width:859px` 窄屏 / `min-width:860/861px` 桌面）。另有 520px（表单 split 转单列）、1023px（播放页双栏转单列）。
+App 外壳按视口宽度分三档，统一由 `shared/layout/shell_metrics.dart` 决定：
 
-- **桌面（≥860px）**：`grid-template-columns: 232px 1fr` = 左固定侧边栏 + 右内容区。
-  侧边栏 `position:sticky; height:100vh`，含：品牌 / 导航（7 项）/ 底部 mini 播放状态 + 用户。
-- **窄屏（<860px）**：**内滚动应用壳**——壳 = 视口高（`100dvh`，旧 iOS 回退
-  `-webkit-fill-available`），flex 纵排：顶栏（`.topbar`，毛玻璃）→ 内容区
-  （`flex:1; overflow-y:auto`，唯一滚动者）→ 底部导航。
-  > web 的「流内底栏、勿用 position:fixed」铁律是浏览器内核特有顾虑，App 端不适用。
-  > App 端也不设 web `.topbar` 的常驻顶栏：品牌/退出不搬（登录页与设置菜单底部
-  > 承接），顶部只留 `TopEdgeScrim` 滚动消融——状态栏区渐进模糊 + 轻提亮，
-  > 内容透过顶缘仍可见（不用不透明色带，避免「被遮挡」感），任何状态无条
-  > 无线（对齐 Apple Music）；off 档退不透明渐变。
-  > App 底部导航为**悬浮玻璃胶囊 dock**（对齐 iOS 26+ 原生液态玻璃壳形态）：
-  > 胶囊压进安全区、悬在 home indicator 上方，mini player 胶囊叠在 dock 上方；
-  > 仍挂 `Scaffold(bottomNavigationBar:)` 槽位，骨架恒在——tab 页内 dock 永远
-  > 可见，不整体消失：向下滚收缩为「mini 内联 + 当前 tab 图标圆钮」等高一排，
-  > 只有滚回顶部（或点圆钮/切 tab）才展开，中途向上滚保持收缩。
-- 内容区 `.view`：`padding:40px 48px 56px; max-width:880px; margin:0 auto; gap:22px`。
-  窄屏 `padding:18px 16px 32px; gap:16px`。
-- **grid 子项防溢出**：`.view > * { min-width:0 }`，配合 `.track-row{min-width:0}`——否则
-  超长歌名（nowrap）会撑宽整页，破坏 `text-overflow:ellipsis`。**移植时必须保留。**
+| 视口宽度（逻辑像素） | 导航 | 内容 |
+|---|---|---|
+| <700 | 底部恢复原四入口：榜单 / 歌单 / 统计 / 设置 | 页面滚动，底部 mini + dock |
+| 700–1023 | 80 宽 rail | 保留七条路由，图标有 tooltip 与语义标签 |
+| ≥1024 | 232 宽分组侧栏 | 浏览、曲库与回顾、播放、设置；底部常驻桌面播放条 |
+
+- 保留原七条 branch 的索引、路径及 native id；统计恢复独立底栏入口，歌单内的 NAS 内容继续可达。
+- 页面分栏用 `LayoutBuilder` 的实际内容宽高，不能再次按整机宽度推断可用空间。
+  设置菜单宽为 `240 * max(1, scale(14)/14)`，双栏还须容纳间距 32、正文至少 480 和两侧 32；
+  基础字时内容宽需 784、2 倍字时需 1024，否则用菜单→详情。
+- 手机顶部保留 `TopEdgeScrim` 渐进模糊与轻提亮；品牌在登录页，退出在设置菜单。
+  Flutter dock 位于 `Scaffold(bottomNavigationBar:)`，内容通过注入的 padding 避开 chrome。
+- mini 和 dock 展开/收缩共用尺寸函数。字号超过 1.2 倍，或收缩后 mini 宽不足 160 时，
+  始终展开；普通手机向下滚收起，向上滚、点导航圆钮或切 tab 展开，横滑不影响底栏。
+- iPad 切到 rail/sidebar 时同步隐藏 native dock/mini；旋转也要重新报告 inset，避免双层导航。
+- 只有 macOS 为现有隐藏标题栏额外预留 28；Windows/Linux/iPad 不统一添加该空白。
+- 桌面恢复适用的滚动条；榜单改完整网格，嵌套列表不共用错误的 ScrollController。
+- 长曲名用 `Flexible/Expanded` 和 ellipsis 约束，表单和控制区按内容宽度换行；字体允许到 2 倍，
+  不通过缩小系统文字掩盖溢出。
 
 ### 平台 chrome 分层
 
 | 区域 | iOS 26+ | Android / iOS<26 | 内容原则 |
 |---|---|---|---|
 | 顶部边缘 | 无 chrome：滚动消融（TopEdgeScrim 渐进模糊 + 轻纱帘） | 同左（shader 逐像素变径的单层 backdrop，结构零缝；非 Impeller/编译前退纯纱帘，off 档退不透明渐变） | 无常驻顶栏；品牌见登录页、退出在设置菜单底部；内容透过状态栏区仍可见，越靠顶越糊越淡，无条无线 |
-| 底部导航 | 原生液态玻璃悬浮 dock | Flutter 毛玻璃悬浮 dock（同形态） | 高 62（2026-09-05 由 66 收窄，选中胶囊 52 不动），导航主锚点；胶囊压安全区悬浮，滚动收缩为图标圆钮（高 50，与内联 mini 等高一排） |
-| mini player | 原生玻璃胶囊（dock 上方） | Flutter 毛玻璃胶囊（同形态） | 高 50、封面 32——比 dock 矮一档的次级状态条；封面、题/歌手、播放与下一曲，收缩时内联到圆钮左侧、内容不裁剪 |
+| 底部导航 | UIKit 系统液态玻璃 dock | Flutter 毛玻璃 dock | 原四入口；Flutter 基础高 62、大字按 `mobileDockHeight` 增高；原生 dock 高度由 UIKit 回报，收起圆钮与 mini 等高 |
+| mini player | 原生玻璃胶囊（dock 上方） | Flutter 毛玻璃胶囊（同形态） | 恢复基础高 50 的封面、曲名/歌手、播放和下一首；收起时只留封面、曲名和播放，无曲目显示“未在播放” |
 | 播放主控/音量浮层 | 原生材质优先 | Flutter 玻璃面板 | 控件尺寸固定，不因状态位移 |
 | 模态/菜单 | 原生玻璃或系统 sheet | Flutter 玻璃 overlay | 表单主体可保持不透明以保证可读性 |
 | 歌单卡、曲目行、统计图 | 不使用玻璃 | 不使用玻璃 | 延续暖纸/墨色内容风格 |
@@ -102,6 +104,13 @@ glassBlurOff:    0（性能/降低透明度回退）
 `AdaptiveGlassSurface`（blur + 提饱和 + 顶缘高光）；macOS 窗体另垫窗后毛玻璃
 （`NSVisualEffectView.sidebar`），侧栏半透明透出壁纸；Windows/Linux 无窗后采样能力，
 侧栏保持不透明暖纸。高对比/减动效环境下玻璃统一降级为不透明面板（off 档）。
+
+手机 mini 保持原来的两行外观，字号为 14/12、行高 1.25；高度统一为
+`max(50, ceil(14 + (scale(14) + scale(12))*1.25))`，1.5 倍字为 63、2 倍为 79。
+收起态为左侧当前导航圆钮、中间 mini、右侧搜索圆钮；圆钮与 mini 等高。
+移除手机 mini 上额外增加的设备行和输出按钮，设备选择保留在完整播放器中。
+Swift 消费 Flutter 传入的高度和缩放字号，不另算一套。桌面使用 `DesktopPlaybackBar`，
+按实际内容宽度排为三段或多行，外壳通过同一个 `desktopPlaybackBarHeight` 预留完整包络。
 
 ## 3. 核心组件规格
 
@@ -127,17 +136,37 @@ App 适配：Filled/Outlined 全胶囊（StadiumBorder、padding 水平 20）—
 - `.track-actions` 桌面 hover 才显（`@media (hover:hover) and (min-width:860px)` opacity 0→1），触屏常显
 - `.track-cols`（≥861px）：`grid 1fr 1fr; column-gap:28px` 宽屏双列（榜单/歌单详情，50 首减半滚动）
 
+以上 CSS 为 Web 参考。App 搜索与 NAS 复用 `HMusicAdaptiveTrackRow`：手机为封面与两行信息，
+宽屏按歌曲、歌手/专辑、时长、已有来源分列；列数取决于内容宽度，动作区保留固定宽度。
+不存在的元数据不虚构；操作延续原 VM 的在途禁用、行内确认和错误反馈。
+
 ### 榜单卡 .chart-card（App 端偏离）
-卡头（#1 封面 44 + 衬线榜名）+ Top3 可点播预览。**整卡点击进详情，卡内不放「查看全部」
+2026-09-08：榜单页统一为“我的 Spotify 榜单”和“发现榜单”两层。个人榜三个周期
+进入页面即预取；发现区默认每个来源只展示一个精选榜，点击来源筛选浏览完整目录。
+不再用主推轮播重复展示后面的榜单，也不在榜单页放账号设置入口。
+卡头增加来源/统计时段小字；失败时在卡内给出原因与重试，空记录与加载失败分开显示。
+个人区手机可横滑、宽屏并列；发现区使用随内容宽度和字号调整的网格。
+来源标签保持单行，窄屏横向滑动，宽屏空间足够时完整平铺；保留至少 44px 触达高度，
+标签随系统字号增大，不折成多排挤占榜单内容。
+点选后只平移标签行，将选中项移向中间并露出邻近分类；首尾停在内容边界，
+不移动页面的纵向位置。过渡 220ms，遵循系统减动效设置立即定位。
+
+卡头（#1 封面 48 + 衬线榜名）+ Top3 可点播预览。**整卡点击进详情，卡内不放「查看全部」
 文字行**——与整卡点击同义的第二入口，删掉换来预览区呼吸。分区小节标题同理不带 chevron：
 卡带已陈列该来源全部榜单，分区层级没有「更多」目的地（Apple Music 的「›」都真的可点进
 下级页，有指无路是假承诺）。
-预览区固定 78 包络保证网格等高，包络随 textScaler 等比伸缩；横滑卡带把字号钳到 1.2 倍
-（`MediaQuery.withClampedTextScaling`），避免像素级等高在无障碍大字号下溢出。
+封面为 48×48 方形；Top3 的歌名、歌手分层。卡片及预览包络随 `TextScaler` 增高，
+不钳制系统字号；桌面改完整网格，所有榜单可随页面垂直滚动到达。
+
+### 歌单占位封面
+按歌单 id/name 确定字形、几何和墨色层次，同一歌单展示稳定，浅深色均可读。
+本轮不逐张请求详情获取封面；真实摘要封面数据任务见 13 §8。删除放在“更多”菜单，保留确认。
 
 ### 圆形图标按钮
 - `.icon-btn` 34×34 圆 / line 边 / hover 边→strong；svg 16px
 - 播放页主控 `.ctrl-btn` 46×46 圆；`.ctrl-btn.primary` 64×64 ink 底白字（播放键），active `scale(.95)`
+- App 小圆按钮视觉可为 34，但整个至少 44×44 区域必须响应点击；tooltip 与语义保留。
+  `HMusicConfirmButton` 复用同一命中实现，在途及确认驻留期间禁止重复提交。
 
 ### 导航项
 - 桌面 `.side-item`：flex，muted-2 字，hover 底→panel-2；**active：底→text-strong，字→bg（墨底反白）**
@@ -166,14 +195,14 @@ App 不再使用浮层 toast（浮层遮挡内容、与内容流脱节，用户�
    所在 section 顶部、页面页头下方或播放控制行下；生命周期归 VM，下次动作覆盖。
 4. **播放链路全局失败** → 状态点/播放页状态承担反馈；壳层只保留小米会话过期的
    限频回读让横幅（持久条件条，非 toast）及时出现。
-web 端不受此节约束，仍按下方原 Toast 规格执行；`hmusic_toast.dart` 仅存档待删。
+web 端不受此节约束；`hmusic_toast.dart` 仅存档，不作为新页面的反馈出口。
 
 ### 输入
 `width:100%; border:1px line; radius-sm; padding:9px 12px; font14; focus 边→text-strong`
 App 适配：灰底（panel-2）无描边、radius 14、padding 14/12，focus 不加描边
 （可见性由光标承担，与搜索框同纪律）——移动端软表单款，web 描边款不变。
-搜索页例外：搜索框使用平台自适应玻璃胶囊，结果列表共用一块玻璃面板；禁止逐行建立
-BackdropFilter。
+搜索页例外：搜索框使用平台自适应玻璃胶囊，结果列表使用稳定内容面板；禁止逐行建立
+BackdropFilter，玻璃只用于导航、输入与控制层。
 榜单页头搜索胶囊：材质随吸顶进度过渡——展开态背后是纯暖纸，玻璃无内容可采样、只剩
 hairline 圈（违背无线北极星），故垫 panel-2 读作灰底填充；吸顶后垫层随 progress 淡出，
 玻璃直接采样滚过的内容。hairline 恒关（同 toast/横幅的 Apple Music 无线语言）。
@@ -203,7 +232,7 @@ hairline 圈（违背无线北极星），故垫 panel-2 读作灰底填充；�
 |---|---|---|
 | tab 切换 | `UITabBarController` 系统默认 Liquid Glass 选择、按住滑动与吸附；不维护自定义曲线 | 260ms easeOutCubic 药丸滑动（AnimatedAlign）+ 颜色过渡 |
 | mini player 显隐 | 系统 spring/玻璃容器尺寸变化 | 220ms easeOut 高度过渡 |
-| dock/mini 滚动收缩、展开 | 系统 spring（response .42 / damping .86） | 320ms easeOutCubic 几何插值：dock 向右缩短成圆钮、mini 同步下落同排（宽/高/圆角连续 + 两层交叉淡化） |
+| dock/mini 滚动收缩、展开 | SwiftUI 容器过渡与系统 dock；真机效果单独验收 | 320ms easeOutCubic，共用一条进度：dock 收到左侧圆钮，mini 缩窄居中下落，右侧搜索淡入；歌手和下一首同步让位 |
 | 按压 | 系统液态反馈 | 100-140ms scale 0.97 + 高光变化 |
 | 滚动经过 chrome | 系统自动采样背景 | 动态模糊仅高画质开启 |
 
@@ -221,12 +250,12 @@ App 适配：按真实渲染几何（ensureVisible）把当前行钉在视口 0.
 - 衬线展示标题是灵魂，别用无衬线糊弄
 - 青绿的「仅点缀」纪律是这套设计的克制感来源，最易被破坏，重点守住
 - 用 golden test 固定手机/平板/桌面关键宽度，和 Server web 截图并排验收
-- iOS 27 使用真实系统材质截图验收，golden test 只覆盖 Flutter 内容与回退壳
+- iOS 26+ 使用真实系统材质截图验收，golden test 只覆盖 Flutter 内容与回退壳
 - Android 至少验证高画质、普通画质、无模糊三档，文字对比和布局必须一致
 
 ## 实现状态
 - [x] token/组件/动效 全量记录（源：web/styles.css）
 - [ ] Flutter ThemeExtension 与字体资产落盘
 - [ ] 深浅色 golden test
-- [ ] iOS 27 Swift/SwiftUI 液态玻璃 shell 视觉 spike
+- [ ] iOS 26+ Swift/SwiftUI 液态玻璃 shell 真机视觉验收（本轮结果见 13 交付记录）
 - [ ] Android AdaptiveGlassSurface 三档降级 spike

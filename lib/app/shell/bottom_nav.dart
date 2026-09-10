@@ -5,126 +5,44 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/platform_shell/widgets/adaptive_glass_surface.dart';
 import '../../shared/layout/shell_metrics.dart';
-import '../theme/hmusic_palette.dart';
+import 'bottom_nav_transition.dart';
 
-// 导航项定义：icon + label + 对应 shell branch index（7 分支顺序对齐 web 侧栏）。
-class NavDestinationSpec {
-  const NavDestinationSpec(this.icon, this.label, this.branch);
-  final IconData icon;
-  final String label;
+export 'bottom_nav_item.dart' show kDockIconSize;
+export 'navigation_destinations.dart';
 
-  // StatefulShellRoute 分支下标（app_router 分支顺序）。
-  final int branch;
-}
-
-// 桌面侧栏 7 项，对齐 web .sidebar：正在播放/搜索/队列/歌单/榜单/统计/设置。
-const List<NavDestinationSpec> kSidebarDestinations = <NavDestinationSpec>[
-  NavDestinationSpec(Icons.play_circle_outline_rounded, '正在播放', 0),
-  NavDestinationSpec(Icons.search_rounded, '搜索', 1),
-  NavDestinationSpec(Icons.queue_music_rounded, '队列', 2),
-  NavDestinationSpec(Icons.library_music_rounded, '歌单', 3),
-  NavDestinationSpec(Icons.local_fire_department_rounded, '榜单', 4),
-  NavDestinationSpec(Icons.insights_rounded, '统计', 5),
-  NavDestinationSpec(Icons.settings_rounded, '设置', kSettingsBranch),
-];
-
-// 主页分支 = 榜单（登录后落点、dock 首项）：系统返回的壳层兜底目标——
-// 非主页 tab 一级页按返回先回这里，主页再返回才交还系统退出 App。
-const int kHomeBranch = 4;
-
-// 设置分支：更新红点挂在这个 tab 上（唯一的「有新版」提示位）。
-const int kSettingsBranch = 6;
-
-// 窄屏 dock 4 tab 精选（播放/队列走 mini player push 全屏页；搜索并入
-// 榜单页头胶囊 push 全屏页——搜索页内容太薄，不值一个常驻 tab）。
-const List<NavDestinationSpec> kNavDestinations = <NavDestinationSpec>[
-  // local_fire_department（火焰）= 榜单页的「最热歌曲」，与原生 dock 的 SF
-  // flame 同一表意——否则 iOS 26 走原生壳、18.x 走本回退，两代机图标不一致。
-  // 排除 format_list_numbered / leaderboard / emoji_events 的理由见 Swift 侧
-  // GlassDockTab.all 注释（都在 22pt 实测过）。
-  NavDestinationSpec(Icons.local_fire_department_rounded, '榜单', kHomeBranch),
-  NavDestinationSpec(Icons.library_music_rounded, '歌单', 3),
-  NavDestinationSpec(Icons.insights_rounded, '统计', 5),
-  NavDestinationSpec(Icons.settings_rounded, '设置', 6),
-];
-
-// dock 图标字号 28 而非 22：Flutter 的 Icon(size:) 是字形框，UIKit 的
-// SymbolConfiguration(pointSize:) 是渲染点尺寸，同一个数字下墨迹不等大——
-// 22 字号 Material 墨迹只有 ~18pt，而原生 22pt SF 墨迹 ~22.5pt，18.x 看起来
-// 比 26+ 小一档。28 字号实测墨迹 22.5pt，与原生四图标均值一致。
-// 改此值需同步核对 kChromeDockHeight(62) 的容纳：28 + 3 + 标签 ~15 ≈ 46。
-const double kDockIconSize = 28;
-
-// 窄屏悬浮玻璃 dock，形态对齐 iOS 26+ 原生壳（GlassShellOverlay）：胶囊压进
-// 安全区、悬在 home indicator 上方。展开 = 5 tab 等分胶囊条，选中态是会在
-// tab 间滑动的灰药丸（对齐 Apple Music tab bar，与 Swift 侧
-// matchedGeometryEffect 同纪律）；滚动收缩 = 胶囊「向右缩短」成当前 tab 的
-// 图标圆钮——右缘钉住、宽高圆角连续插值、整条 tab 层与圆钮交叉淡化，端点
-// 只挂单层（点圆钮只展开，不切 tab）。图标 22px、标签 11px。
-// 材质差异是唯一的平台分叉：iOS 26+ 由原生壳接管（本组件不渲染），
-// Android/iOS<26 在此用 AdaptiveGlassSurface 毛玻璃，off 档退不透明面板。
+// 外壳统一驱动收纳进度；展开布局不变，收起时导航落在左侧圆钮。
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({
     required this.shell,
-    this.minimized = false,
+    this.progress = 0,
     this.onExpand,
     this.updateAvailable = false,
     super.key,
   });
 
   final StatefulNavigationShell shell;
-
-  // 滚动收缩态，由外壳依滚动方向驱动（对齐 GlassShellState.minimized）。
-  final bool minimized;
-
-  // 收缩态点圆钮的展开回调（对齐原生 expandDock intent）。
+  final double progress;
   final VoidCallback? onExpand;
-
-  // 有 App 新版可下：设置 tab 图标点红点（唯一的更新提示位，外壳读
-  // appUpdateBadgeProvider 后传入；本组件不碰 provider，保持可单独 pump）。
   final bool updateAvailable;
 
   @override
   Widget build(BuildContext context) {
-    final disableAnimations = MediaQuery.disableAnimationsOf(context);
     return LayoutBuilder(
-      builder: (context, constraints) {
-        final fullWidth = constraints.maxWidth;
-        // 与外壳的收纳插值同目标/同时长/同曲线，逐帧几何自然对得上。
-        return TweenAnimationBuilder<double>(
-          tween: Tween<double>(end: minimized ? 1 : 0),
-          duration: disableAnimations ? Duration.zero : kChromeMorphDuration,
-          curve: kChromeMorphCurve,
-          builder: (context, t, _) => _buildDock(
-            context,
-            t,
-            fullWidth,
-            badgedBranch: updateAvailable ? kSettingsBranch : null,
-          ),
-        );
-      },
+      builder: (context, constraints) =>
+          _buildDock(context, progress, constraints.maxWidth),
     );
   }
 
-  // t=0 展开条 / t=1 收缩圆钮；中途宽高圆角插值 + 两层交叉淡化。
-  Widget _buildDock(
-    BuildContext context,
-    double t,
-    double fullWidth, {
-    int? badgedBranch,
-  }) {
-    final height = lerpDouble(kChromeDockHeight, kChromeMiniHeight, t)!;
-    final width = lerpDouble(fullWidth, kChromeCompactDockWidth, t)!;
+  Widget _buildDock(BuildContext context, double t, double fullWidth) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final height = lerpDouble(
+      mobileDockHeight(scaler),
+      mobileMiniPlayerHeight(scaler),
+      t,
+    )!;
+    final compactSize = mobileMiniPlayerHeight(scaler);
+    final width = lerpDouble(fullWidth, compactSize, t)!;
     final radius = BorderRadius.circular(height / 2);
-    final active = kNavDestinations.firstWhere(
-      (spec) => spec.branch == shell.currentIndex,
-      orElse: () => kNavDestinations.first,
-    );
-    // 端点只挂对应单层：语义树干净（收缩态查不到 5 tab），命中判定无歧义。
-    final showRow = t < 1;
-    final showCompact = t > 0;
-    final rowOpacity = (1 - t / 0.55).clamp(0.0, 1.0);
-    final compactOpacity = ((t - 0.45) / 0.55).clamp(0.0, 1.0);
     return AdaptiveGlassSurface(
       quality: resolveGlassQuality(context),
       padding: EdgeInsets.zero,
@@ -136,205 +54,16 @@ class AppBottomNav extends StatelessWidget {
         child: SizedBox(
           width: width,
           height: height,
-          child: Stack(
-            children: <Widget>[
-              // 整条 tab 层右缘钉在胶囊右缘、保持全宽不压缩：胶囊缩短时内容
-              // 原地不动、从左侧被裁掉，读作「dock 向右收拢」而非挤压变形。
-              if (showRow)
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: fullWidth,
-                  child: IgnorePointer(
-                    ignoring: t > 0.5,
-                    child: Opacity(
-                      opacity: rowOpacity,
-                      child: _row(context, badgedBranch),
-                    ),
-                  ),
-                ),
-              if (showCompact)
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: kChromeCompactDockWidth,
-                  child: IgnorePointer(
-                    ignoring: t <= 0.5,
-                    child: Opacity(
-                      opacity: compactOpacity,
-                      child: _NavItem(
-                        spec: active,
-                        active: true,
-                        compact: true,
-                        badged: badgedBranch == active.branch,
-                        onTap: () => onExpand?.call(),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          child: BottomNavTransition(
+            shell: shell,
+            progress: t,
+            fullWidth: fullWidth,
+            compactSize: compactSize,
+            updateAvailable: updateAvailable,
+            onExpand: onExpand,
           ),
         ),
       ),
-    );
-  }
-
-  // 展开条：底层灰药丸滑到选中 tab（AnimatedAlign 从 A 滑到 B），上层 5 等分项。
-  Widget _row(BuildContext context, int? badgedBranch) {
-    final palette = context.palette;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final activeIndex = kNavDestinations.indexWhere(
-      (spec) => spec.branch == shell.currentIndex,
-    );
-    return Stack(
-      children: <Widget>[
-        // 当前分支不在 dock 5 tab 内（如全屏播放页分支）时无选中项，不画药丸。
-        if (activeIndex >= 0)
-          AnimatedAlign(
-            alignment: Alignment(
-              -1 + activeIndex * 2 / (kNavDestinations.length - 1),
-              0,
-            ),
-            duration: MediaQuery.disableAnimationsOf(context)
-                ? Duration.zero
-                : kDockPillDuration,
-            curve: Curves.easeOutCubic,
-            child: FractionallySizedBox(
-              widthFactor: 1 / kNavDestinations.length,
-              heightFactor: 1,
-              child: Padding(
-                // 2026-09-05 dock 66→62：胶囊（椭圆）尺寸一毫米不动——高度钉在
-                // 52（62 - 上下留白 5×2），宽度本就不随高度变；留白只吸收高度差。
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                child: DecoratedBox(
-                  decoration: ShapeDecoration(
-                    // 灰药丸只做「所在位置」提示，浓度压低不与青绿纪律抢戏。
-                    color: palette.textStrong.withValues(
-                      alpha: dark ? 0.12 : 0.07,
-                    ),
-                    shape: const StadiumBorder(),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        Row(
-          children: <Widget>[
-            for (final spec in kNavDestinations)
-              Expanded(
-                child: _NavItem(
-                  spec: spec,
-                  active: shell.currentIndex == spec.branch,
-                  badged: badgedBranch == spec.branch,
-                  onTap: () => _go(spec.branch),
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // goBranch: 再次点当前 tab 回到该分支初始位置（对齐常见底栏交互）。
-  void _go(int index) {
-    shell.goBranch(index, initialLocation: index == shell.currentIndex);
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.spec,
-    required this.active,
-    required this.onTap,
-    this.badged = false,
-    this.compact = false,
-  });
-
-  final NavDestinationSpec spec;
-  final bool active;
-  final VoidCallback onTap;
-
-  // 图标右上角的红点（当前只有「设置」用：有新版可下）。
-  final bool badged;
-
-  // 收缩圆钮形态：只留图标（标签语义交给 Semantics），不等分拉伸，
-  // 按内容宽 + 左右 26 内边距（对齐 Swift DockItem compact）。
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final color = active ? palette.textStrong : palette.muted;
-    final icon = _BadgedIcon(
-      icon: spec.icon,
-      color: color,
-      badged: badged,
-      badgeColor: Theme.of(context).colorScheme.error,
-    );
-    final content = compact
-        ? Center(widthFactor: 1, child: icon)
-        : Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              icon,
-              const SizedBox(height: 3),
-              Text(spec.label, style: TextStyle(fontSize: 11, color: color)),
-            ],
-          );
-    // 点按反馈由滑动药丸承担，压掉矩形水波纹（「正方形」高亮的来源）。
-    final item = InkWell(
-      onTap: onTap,
-      splashFactory: NoSplash.splashFactory,
-      highlightColor: Colors.transparent,
-      hoverColor: Colors.transparent,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: compact ? 26 : 0),
-        child: content,
-      ),
-    );
-    if (!compact) return item;
-    return Semantics(label: spec.label, button: true, child: item);
-  }
-}
-
-// dock 图标 + 右上角红点：红点画在图标框外沿（clipBehavior none），不挤压
-// 图标尺寸，收缩圆钮态同样带得上。
-class _BadgedIcon extends StatelessWidget {
-  const _BadgedIcon({
-    required this.icon,
-    required this.color,
-    required this.badged,
-    required this.badgeColor,
-  });
-
-  final IconData icon;
-  final Color color;
-  final bool badged;
-  final Color badgeColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final glyph = Icon(icon, size: kDockIconSize, color: color);
-    if (!badged) return glyph;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: <Widget>[
-        glyph,
-        Positioned(
-          right: 1,
-          top: 3,
-          child: Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              color: badgeColor,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

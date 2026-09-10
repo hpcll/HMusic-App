@@ -62,31 +62,45 @@ final class NativeGlassShellChannel: NSObject, FlutterStreamHandler {
       host.syncSystemTabBar()
       result(nil)
     case "shell.updateNowPlaying":
-      host.state.trackId = args["trackId"] as? String
-      host.state.trackTitle = args["title"] as? String ?? ""
-      host.state.trackArtist = args["artist"] as? String ?? ""
-      host.state.playing = args["playing"] as? Bool ?? false
-      if let raw = args["artworkUrl"] as? String, let url = URL(string: raw) {
-        host.state.artworkUrl = url
-      } else {
-        host.state.artworkUrl = nil
-      }
-      host.reportInsetIfNeeded()
+      applyNowPlaying(args, to: host)
       result(nil)
     case "shell.updateLayout":
       host.state.showTabBar = args["showTabBar"] as? Bool ?? false
       host.state.showMiniPlayer = args["showMiniPlayer"] as? Bool ?? false
+      host.state.miniPlayerHeight = CGFloat(args["miniPlayerHeight"] as? Double ?? 50)
+      host.state.miniTitleFontSize = CGFloat(args["miniTitleFontSize"] as? Double ?? 14)
+      host.state.miniDetailFontSize = CGFloat(args["miniDetailFontSize"] as? Double ?? 12)
+      host.state.allowMinimize = args["allowMinimize"] as? Bool ?? false
+      if !host.state.showTabBar || !host.state.allowMinimize {
+        host.state.minimized = false
+      }
       host.syncSystemTabBar()
       host.reportInsetIfNeeded()
       result(nil)
     case "shell.updateScroll":
-      host.state.minimized = args["minimized"] as? Bool ?? false
+      host.state.minimized = (args["minimized"] as? Bool ?? false)
+        && host.state.allowMinimize && host.state.showTabBar
       host.syncSystemTabBar()
       host.reportInsetIfNeeded()
       result(nil)
     default:
       result(FlutterMethodNotImplemented)
     }
+  }
+
+  @available(iOS 26.0, *)
+  private func applyNowPlaying(_ args: [String: Any], to host: GlassShellHostController) {
+    host.state.trackId = args["trackId"] as? String
+    host.state.trackTitle = args["title"] as? String ?? ""
+    host.state.trackArtist = args["artist"] as? String ?? ""
+    host.state.playing = args["playing"] as? Bool ?? false
+    host.state.outputLabel = args["outputLabel"] as? String ?? "未选择设备"
+    if let raw = args["artworkUrl"] as? String, let url = URL(string: raw) {
+      host.state.artworkUrl = url
+    } else {
+      host.state.artworkUrl = nil
+    }
+    host.reportInsetIfNeeded()
   }
 
   func onListen(

@@ -12,6 +12,7 @@ import 'package:hmusic/features/player/models/hmusic_lyric.dart';
 import 'package:hmusic/features/player/view_models/player_view_model.dart';
 import 'package:hmusic/features/player/views/player_page.dart';
 import 'package:hmusic/features/player/widgets/lyric_strip.dart';
+import 'package:hmusic/features/player/widgets/player_output_button.dart';
 import 'package:hmusic/features/settings/data/api_devices_repository.dart';
 import 'package:hmusic/features/settings/data/devices_repository.dart';
 import 'package:hmusic/features/settings/models/hmusic_device.dart';
@@ -156,14 +157,14 @@ void main() {
     );
 
     expect(find.text('正在播放 · 客厅音箱'), findsOneWidget);
-    expect(find.byIcon(Icons.speaker_group_rounded), findsOneWidget);
+    expect(find.byType(PlayerOutputButton), findsOneWidget);
   });
 
   testWidgets('本机播放：不占设备状态行，输出钮仍在（本机切音箱的入口）', (tester) async {
     await _pump(tester, _state(track: _track));
 
     expect(find.textContaining('正在播放 ·'), findsNothing);
-    expect(find.byIcon(Icons.speaker_group_rounded), findsOneWidget);
+    expect(find.byType(PlayerOutputButton), findsOneWidget);
   });
 
   testWidgets('点输出钮弹设备 sheet：标题 + 设备列表 + 当前设备勾选', (tester) async {
@@ -172,7 +173,7 @@ void main() {
       _state(track: _track, deviceId: 'speaker-1', deviceName: '客厅音箱'),
     );
 
-    await tester.tap(find.byIcon(Icons.speaker_group_rounded));
+    await tester.tap(find.byType(PlayerOutputButton));
     // LyricStrip 的 Ticker 永不静止,不能 pumpAndSettle,定长推帧过 sheet 动画。
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));

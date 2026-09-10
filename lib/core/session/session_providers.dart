@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../audio/hmusic_audio_handler.dart';
+import '../playback/playback_mode.dart';
+import '../playback/playback_mode_controller.dart';
 import 'session_controller.dart';
 
 final Provider<SessionController> sessionControllerProvider =
@@ -18,13 +20,27 @@ final Provider<SessionController> sessionControllerProvider =
 // 避免 ViewModel 监听器里持有 BuildContext。
 final Provider<void> sessionGuardProvider = Provider<void>((ref) {
   final controller = ref.watch(sessionControllerProvider);
-  controller.addListener(() {
-    if (!controller.isInvalid) return;
+  void onChange() {
+    if (!controller.isInvalid ||
+        ref.read(playbackModeProvider) != PlaybackMode.server ||
+        !ref.exists(hmusicAudioHandlerProvider)) {
+      return;
+    }
     unawaited(
       ref
           .read(hmusicAudioHandlerProvider.future)
-          .then((handler) => handler.stop())
+          .then(
+            (handler) => handler.resetSession(
+              stillInvalid: () =>
+                  ref.mounted &&
+                  controller.isInvalid &&
+                  ref.read(playbackModeProvider) == PlaybackMode.server,
+            ),
+          )
           .catchError((Object _) {}),
     );
-  });
+  }
+
+  controller.addListener(onChange);
+  ref.onDispose(() => controller.removeListener(onChange));
 });

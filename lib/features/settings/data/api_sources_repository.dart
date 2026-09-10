@@ -1,12 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/direct/direct_providers.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import '../models/lx_plugin.dart';
+import 'direct_sources_repository.dart';
 import 'sources_repository.dart';
 
 final Provider<SourcesRepository> sourcesRepositoryProvider =
     Provider<SourcesRepository>((ref) {
+      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+        return DirectSourcesRepository(ref.watch(directLxSourcesProvider));
+      }
       return ApiSourcesRepository(apiClient: ref.watch(apiClientProvider));
     });
 

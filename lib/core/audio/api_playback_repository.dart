@@ -1,14 +1,23 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../direct/direct_providers.dart';
 import '../models/hmusic_track.dart';
 import '../network/api_client.dart';
+import '../playback/playback_mode.dart';
+import '../playback/playback_mode_controller.dart';
 import '../providers/infrastructure_providers.dart';
 import 'models/hmusic_playback_state.dart';
 import 'playback_repository.dart';
+import 'routed_playback_repository.dart';
 
 final Provider<PlaybackRepository> playbackRepositoryProvider =
     Provider<PlaybackRepository>((ref) {
-      return ApiPlaybackRepository(apiClient: ref.watch(apiClientProvider));
+      return RoutedPlaybackRepository(() async {
+        await ref.read(playbackModeProvider.notifier).restore();
+        return ref.read(playbackModeProvider) == PlaybackMode.direct
+            ? ref.read(directPlaybackRepositoryProvider)
+            : ApiPlaybackRepository(apiClient: ref.read(apiClientProvider));
+      });
     });
 
 class ApiPlaybackRepository implements PlaybackRepository {

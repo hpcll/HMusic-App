@@ -6,21 +6,16 @@ import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/downloads/download_index.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/backend_request.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/queue/api_queue_repository.dart';
 import '../../search/data/api_search_repository.dart';
 import '../../settings/data/api_downloads_repository.dart';
 import '../data/api_charts_repository.dart';
+import '../data/chart_detail_loader.dart';
 import '../models/chart.dart';
 import '../models/charts_view_state.dart';
-
-// 榜单条目的入库键：与服务端 downloads.trackKey 同口径（source:sourceTrackId）。
-// 无 track 快照的条目（Apple 榜）拿不到键——它们的曲目要点了才由搜索匹配出来，
-// 所以索引里不会有它们，行上一律显示可下载。
-String? chartEntryTrackKey(ChartEntry entry) {
-  final track = entry.track;
-  if (track == null) return null;
-  return '${track.source}:${track.sourceTrackId}';
-}
 
 final NotifierProvider<ChartsViewModel, ChartsViewState>
 chartsViewModelProvider = NotifierProvider<ChartsViewModel, ChartsViewState>(
@@ -30,57 +25,116 @@ chartsViewModelProvider = NotifierProvider<ChartsViewModel, ChartsViewState>(
 class ChartsViewModel extends Notifier<ChartsViewState> {
   // 预取代数：reload 时自增，丢弃旧代回填的预览，避免竞态。
   int _generation = 0;
+  int _detailRevision = 0;
+  bool _disposed = false;
+  late ChartDetailLoader _loader;
 
   @override
-  ChartsViewState build() => const ChartsViewState();
+  ChartsViewState build() {
+    _disposed = false;
+    _loader = ChartDetailLoader(ref.watch(chartsRepositoryProvider));
+    ref.onDispose(() {
+      _disposed = true;
+      _generation++;
+      _detailRevision++;
+      _loader.clear();
+    });
+    return const ChartsViewState();
+  }
+
+  bool _isCurrent(int generation) => !_disposed && generation == _generation;
 
   Future<void> load() async {
     final generation = ++_generation;
-    state = state.copyWith(status: ChartsStatus.loading, clearError: true);
+    _detailRevision++;
+    _loader.clear();
+    state = state.copyWith(
+      status: ChartsStatus.loading,
+      clearError: true,
+      clearActive: true,
+      clearDetail: true,
+      detailLoading: false,
+    );
     final List<Chart> charts;
     try {
       charts = await ref.read(chartsRepositoryProvider).getCharts();
     } on ApiFailure catch (failure) {
+      if (!_isCurrent(generation)) return;
       state = state.copyWith(
         status: ChartsStatus.error,
         errorMessage: failure.message,
       );
       return;
     }
+    if (!_isCurrent(generation)) return;
     state = state.copyWith(
       status: ChartsStatus.loaded,
       charts: charts,
       previews: const <String, List<ChartEntry>?>{},
+      previewErrors: const <String, String>{},
+      selectedSource: charts.any((chart) => chart.kind == state.selectedSource)
+          ? state.selectedSource
+          : 'featured',
     );
-    _prefetchPreviews(charts, generation);
+    await _prefetchPreviews([
+      ...state.personalCharts,
+      ...state.discovery,
+    ], generation);
   }
 
-  // 并发预取各榜前 3 首做卡片预览，顺带焐热后端 6h 缓存（进详情秒开），对齐 web。
-  void _prefetchPreviews(List<Chart> charts, int generation) {
-    for (final chart in charts) {
-      unawaited(
-        ref
-            .read(chartsRepositoryProvider)
-            .getChart(chart.id)
-            .then((detail) {
-              if (generation != _generation) return;
-              _writePreview(chart.id, detail.entries.take(3).toList());
-            })
-            .catchError((Object _) {
-              if (generation != _generation) return;
-              _writePreview(chart.id, null);
-            }),
-      );
+  // 只预取当前可见卡片（包含全部三个个人榜），最多两个请求在途。
+  Future<void> _prefetchPreviews(List<Chart> charts, int generation) async {
+    var cursor = 0;
+    Future<void> worker() async {
+      while (_isCurrent(generation) && cursor < charts.length) {
+        final chart = charts[cursor++];
+        if (state.previews.containsKey(chart.id)) continue;
+        try {
+          final detail = await _loader.read(chart.id);
+          if (_isCurrent(generation)) {
+            _writePreview(chart.id, detail.entries.take(3).toList());
+          }
+        } catch (error) {
+          if (_isCurrent(generation)) {
+            _writePreview(
+              chart.id,
+              null,
+              error is ApiFailure ? error.message : '暂时无法加载，稍后重试',
+            );
+          }
+        }
+      }
     }
+
+    await Future.wait([worker(), worker()]);
   }
 
-  void _writePreview(String id, List<ChartEntry>? top) {
+  void _writePreview(String id, List<ChartEntry>? top, [String? error]) {
+    final errors = {...state.previewErrors}..remove(id);
+    if (error != null) errors[id] = error;
     state = state.copyWith(
       previews: <String, List<ChartEntry>?>{...state.previews, id: top},
+      previewErrors: errors,
     );
+  }
+
+  Future<void> selectSource(String source) async {
+    state = state.copyWith(selectedSource: source);
+    await _prefetchPreviews(state.discovery, _generation);
+  }
+
+  Future<void> retryPreview(Chart chart) async {
+    _loader.invalidate(chart.id);
+    state = state.copyWith(
+      previews: {...state.previews}..remove(chart.id),
+      previewErrors: {...state.previewErrors}..remove(chart.id),
+    );
+    await _prefetchPreviews([chart], _generation);
   }
 
   Future<void> openChart(Chart summary) async {
+    final revision = ++_detailRevision;
+    final generation = _generation;
     state = state.copyWith(
       active: summary,
       clearDetail: true,
@@ -88,105 +142,124 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
       clearError: true,
     );
     try {
-      final detail = await ref
-          .read(chartsRepositoryProvider)
-          .getChart(summary.id);
+      final detail = await _loader.read(summary.id);
+      if (!_isCurrent(generation) || revision != _detailRevision) return;
       state = state.copyWith(detail: detail, detailLoading: false);
-      // 行上要标「已入库/下载中」：索引与轮询由共享的 downloadIndex 负责
-      //（搜索结果页用同一份，见 core/downloads/download_index.dart）。
+      _writePreview(summary.id, detail.entries.take(3).toList());
       unawaited(ref.read(downloadIndexProvider.notifier).refresh());
-    } on ApiFailure catch (failure) {
+    } catch (error) {
+      if (!_isCurrent(generation) || revision != _detailRevision) return;
       // 详情拉取失败退回卡片墙，错误就地内联在墙页头下。
       state = state.copyWith(
         clearActive: true,
         detailLoading: false,
-        errorMessage: failure.message,
+        errorMessage: error is ApiFailure ? error.message : '榜单加载失败，请稍后重试',
       );
     }
   }
 
-  // 下载到服务器曲库（对齐搜索页的「下载到服务器」）：不选音质，按服务端默认
-  // 下——榜单是一眼十几行的场景，多一次弹窗不值。发起后乐观标成排队中，真实
-  // 进度在设置的「本地下载」页。
+  // 服务器下载不开放到直连模式。
   Future<void> download(ChartEntry entry) async {
+    if (ref.read(playbackModeProvider) != PlaybackMode.server) return;
+    final request = BackendRequest(ref);
     if (state.actingRank != 0) return;
     state = state.copyWith(actingRank: entry.rank, clearError: true);
     try {
       final track = await _resolveEntry(entry);
+      request.requireCurrent();
       await ref.read(downloadsRepositoryProvider).start(track);
+      if (!request.current) return;
       // 乐观标排队中 + 开表：下完这一行自己变成对勾，不用退出重进。
       ref.read(downloadIndexProvider.notifier).markQueued(track);
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(errorMessage: failure.message);
     } on Exception catch (error) {
+      if (!request.current) return;
       state = state.copyWith(errorMessage: '$error');
     } finally {
-      state = state.copyWith(actingRank: 0);
+      if (request.current) state = state.copyWith(actingRank: 0);
     }
   }
 
   void back() {
+    _detailRevision++;
     ref.read(downloadIndexProvider.notifier).stop();
-    state = state.copyWith(clearActive: true, clearDetail: true);
+    state = state.copyWith(
+      clearActive: true,
+      clearDetail: true,
+      detailLoading: false,
+    );
   }
 
   Future<void> play(ChartEntry entry) async {
+    final request = BackendRequest(ref);
     if (state.actingRank != 0) return;
     state = state.copyWith(actingRank: entry.rank, clearError: true);
     try {
       final track = await _resolveEntry(entry);
+      request.requireCurrent();
       final handler = await ref.read(hmusicAudioHandlerProvider.future);
-      await handler.playTrack(track);
+      request.requireCurrent();
+      await handler.playTrack(track, stillCurrent: () => request.current);
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(errorMessage: failure.message);
     } on Exception catch (error) {
+      if (!request.current) return;
       state = state.copyWith(errorMessage: '$error');
     } finally {
-      state = state.copyWith(actingRank: 0);
+      if (request.current) state = state.copyWith(actingRank: 0);
     }
   }
 
-  // 返回 true 供行尾按钮原地变 ✓（HMusicConfirmButton）。
   Future<bool> enqueue(ChartEntry entry) async {
+    final request = BackendRequest(ref);
     if (state.actingRank != 0) return false;
     state = state.copyWith(actingRank: entry.rank, clearError: true);
     try {
       final track = await _resolveEntry(entry);
+      request.requireCurrent();
       await ref.read(queueRepositoryProvider).addTrack(track);
-      return true;
+      return request.current;
     } on ApiFailure catch (failure) {
+      if (!request.current) return false;
       state = state.copyWith(errorMessage: failure.message);
       return false;
     } on Exception catch (error) {
+      if (!request.current) return false;
       state = state.copyWith(errorMessage: '$error');
       return false;
     } finally {
-      state = state.copyWith(actingRank: 0);
+      if (request.current) state = state.copyWith(actingRank: 0);
     }
   }
 
-  // 整榜播放：服务端整榜灌队列开播，返回的权威状态立即喂给 AudioHandler
-  // 在本机装载出声，不等前台轮询。
+  // 整榜播放与模式切换共用 Handler 命令队列。
   Future<void> playAll() async {
+    final request = BackendRequest(ref);
     final active = state.active;
     if (active == null || state.actingRank != 0) return;
     state = state.copyWith(actingRank: -1, clearError: true);
     try {
-      final playback = await ref
-          .read(chartsRepositoryProvider)
-          .playAll(active.id);
+      final repository = ref.read(chartsRepositoryProvider);
       final handler = await ref.read(hmusicAudioHandlerProvider.future);
-      await handler.applyRemotePlayback(playback);
+      request.requireCurrent();
+      await handler.executePlayback(() {
+        request.requireCurrent();
+        return repository.playAll(active.id);
+      });
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(errorMessage: failure.message);
     } on Exception catch (error) {
+      if (!request.current) return;
       state = state.copyWith(errorMessage: '$error');
     } finally {
-      state = state.copyWith(actingRank: 0);
+      if (request.current) state = state.copyWith(actingRank: 0);
     }
   }
 
-  // 榜单条目 → 可播曲目：带快照直接用；否则搜「歌名 歌手」取第一条（Apple 榜）。
   Future<HMusicTrack> _resolveEntry(ChartEntry entry) async {
     final track = entry.track;
     if (track != null) return track;

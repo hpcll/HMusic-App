@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/backend_request.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_settings_repository.dart';
 import '../models/server_config.dart';
@@ -12,13 +13,19 @@ final NotifierProvider<TracksViewModel, TracksState> tracksViewModelProvider =
 // 手工曲目：读走 /config，改走 PATCH manualTracks 全量替换（对齐 web TracksSection）。
 class TracksViewModel extends Notifier<TracksState> {
   @override
-  TracksState build() => const TracksState();
+  TracksState build() {
+    ref.watch(settingsRepositoryProvider);
+    return const TracksState();
+  }
 
   Future<void> load() async {
+    final request = BackendRequest(ref);
     try {
       final config = await ref.read(settingsRepositoryProvider).getConfig();
+      if (!request.current) return;
       state = state.copyWith(tracks: config.manualTracks, loaded: true);
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(
         loaded: true,
         notice: HMusicNotice.error(failure.message),
@@ -62,10 +69,12 @@ class TracksViewModel extends Notifier<TracksState> {
   }
 
   Future<bool> _save(List<ManualTrack> next, String successNotice) async {
+    final request = BackendRequest(ref);
     try {
       final config = await ref
           .read(settingsRepositoryProvider)
           .patchConfig(manualTracks: next);
+      if (!request.current) return false;
       state = state.copyWith(
         tracks: config.manualTracks,
         busy: false,
@@ -73,6 +82,7 @@ class TracksViewModel extends Notifier<TracksState> {
       );
       return true;
     } on ApiFailure catch (failure) {
+      if (!request.current) return false;
       state = state.copyWith(
         busy: false,
         notice: HMusicNotice.error(failure.message),

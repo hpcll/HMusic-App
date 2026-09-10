@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/models/hmusic_track.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import '../data/api_downloads_repository.dart';
 
@@ -48,11 +50,14 @@ class AutoArchiveSetting extends Notifier<bool> {
 // /proxy/local/…，说明曲库里已经有了）；同一 trackKey 本次会话只发一次
 // ——服务端对同一 trackKey 幂等，这条只是省掉重复请求。
 final Provider<void> autoArchiveWatcherProvider = Provider<void>((ref) {
+  if (ref.watch(playbackModeProvider) != PlaybackMode.server) return;
   final Set<String> attempted = <String>{};
   StreamSubscription<void>? subscription;
   unawaited(
     ref.read(hmusicAudioHandlerProvider.future).then((handler) {
+      if (!ref.mounted) return;
       subscription = handler.serverStateStream.listen((state) {
+        if (ref.read(playbackModeProvider) != PlaybackMode.server) return;
         if (!ref.read(autoArchiveEnabledProvider)) return;
         final HMusicTrack? track = state.track;
         if (track == null) return;

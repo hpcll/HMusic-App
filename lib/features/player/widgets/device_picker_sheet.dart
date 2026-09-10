@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
-import '../../settings/models/hmusic_device.dart';
 import '../view_models/device_picker_view_model.dart';
+import 'device_picker_row.dart';
 
 // 播放设备选择 sheet（对齐 Apple Music 输出按钮的位置逻辑）：从播放页音量行尾
 // 输出钮/设备状态行唤起，纯列表点选即切换（服务端停旧起新是现成语义）。
@@ -14,18 +14,25 @@ Future<void> showDevicePickerSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    builder: (context) => const _DevicePickerSheet(),
+    isScrollControlled: true,
+    constraints: const BoxConstraints(maxWidth: 520),
+    builder: (context) => ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .8,
+      ),
+      child: const DevicePickerSheet(),
+    ),
   );
 }
 
-class _DevicePickerSheet extends ConsumerStatefulWidget {
-  const _DevicePickerSheet();
+class DevicePickerSheet extends ConsumerStatefulWidget {
+  const DevicePickerSheet({super.key});
 
   @override
-  ConsumerState<_DevicePickerSheet> createState() => _DevicePickerSheetState();
+  ConsumerState<DevicePickerSheet> createState() => _DevicePickerSheetState();
 }
 
-class _DevicePickerSheetState extends ConsumerState<_DevicePickerSheet> {
+class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
   @override
   void initState() {
     super.initState();
@@ -40,7 +47,6 @@ class _DevicePickerSheetState extends ConsumerState<_DevicePickerSheet> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(devicePickerViewModelProvider);
-    final palette = context.palette;
 
     return SafeArea(
       child: Column(
@@ -51,57 +57,49 @@ class _DevicePickerSheetState extends ConsumerState<_DevicePickerSheet> {
             padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
             child: Text('播放设备', style: Theme.of(context).textTheme.titleMedium),
           ),
-          if (state.loading && state.devices.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: SizedBox.square(
-                  dimension: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                ),
-              ),
-            )
-          else if (state.devices.isEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          Flexible(
+            child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Text(
-                    state.error ?? '没有可用设备',
-                    style: TextStyle(color: palette.muted),
-                  ),
-                  const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: state.loading
+                  if (state.loading && state.devices.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Center(
+                        child: SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        ),
+                      ),
+                    )
+                  else if (state.devices.isEmpty)
+                    _DevicePickerEmptyState(
+                      message: state.error ?? '没有可用设备',
+                      onRetry: state.loading
                           ? null
                           : () => ref
                                 .read(devicePickerViewModelProvider.notifier)
                                 .load(),
-                      icon: const Icon(Icons.refresh_rounded, size: 18),
-                      label: const Text('重新扫描'),
-                    ),
-                  ),
+                    )
+                  else ...<Widget>[
+                    for (final device in state.devices)
+                      DevicePickerRow(device: device, actingId: state.actingId),
+                    if (state.error != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
+                        child: Text(
+                          state.error!,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                  ],
                 ],
               ),
-            )
-          else ...<Widget>[
-            for (final device in state.devices)
-              _DeviceRow(device: device, actingId: state.actingId),
-            if (state.error != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
-                child: Text(
-                  state.error!,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                ),
-              ),
-          ],
+            ),
+          ),
           const SizedBox(height: 8),
         ],
       ),
@@ -109,55 +107,31 @@ class _DevicePickerSheetState extends ConsumerState<_DevicePickerSheet> {
   }
 }
 
-class _DeviceRow extends ConsumerWidget {
-  const _DeviceRow({required this.device, required this.actingId});
+class _DevicePickerEmptyState extends StatelessWidget {
+  const _DevicePickerEmptyState({required this.message, required this.onRetry});
 
-  final HMusicDevice device;
-  final String actingId;
+  final String message;
+  final VoidCallback? onRetry;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = context.palette;
-    final acting = actingId == device.id;
-    // 本机虚拟设备恒可用；音箱离线仍可点（切换失败会如实报错）。
-    final dimmed = !device.isOnline && device.type != 'browser';
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-      visualDensity: VisualDensity.compact,
-      leading: SizedBox.square(
-        dimension: 22,
-        child: acting
-            ? const Padding(
-                padding: EdgeInsets.all(2),
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : device.isDefault
-            ? Icon(Icons.check_rounded, size: 20, color: palette.textStrong)
-            : null,
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(message, style: TextStyle(color: context.palette.muted)),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('重新扫描'),
+            ),
+          ),
+        ],
       ),
-      title: Text(
-        device.name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: dimmed ? palette.muted : palette.textStrong),
-      ),
-      trailing: Text(
-        device.type == 'browser'
-            ? '本机'
-            : device.isOnline
-            ? '在线'
-            : '离线',
-        style: TextStyle(fontSize: 12.5, color: palette.muted),
-      ),
-      onTap: acting
-          ? null
-          : () async {
-              final ok = await ref
-                  .read(devicePickerViewModelProvider.notifier)
-                  .select(device);
-              if (ok && context.mounted) Navigator.of(context).pop();
-            },
     );
   }
 }

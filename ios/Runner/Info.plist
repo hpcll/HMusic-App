@@ -36,7 +36,7 @@
 		<string>_hmusic._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>HMusic 需要连接你在 NAS 或家庭服务器上运行的 HMusic Server。</string>
+	<string>HMusic 需要连接家庭网络中的 HMusic Server，并让直连模式下的小爱音箱访问本机音频代理。</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

@@ -1,6 +1,8 @@
 enum ShellIntentType {
   selectTab,
   openNowPlaying,
+  openSearch,
+  openOutputPicker,
   playPause,
   previous,
   next,
@@ -53,22 +55,27 @@ abstract interface class PlatformShellBridge {
     required bool canGoBack,
   });
 
-  // trackId 为 null 表示当前无曲目，原生隐藏 mini player 内容。
+  // trackId 为 null 表示当前无曲目，mini 保留“未在播放”占位。
   Future<void> updateNowPlaying({
     required String? trackId,
     required String? title,
     required String? artist,
     required String? artworkUrl,
     required bool playing,
+    required String outputLabel,
   });
 
-  // showTabBar 随路由：5 个 tab 页显示 dock，全屏页（player/lyrics/连接/登录）整体隐藏。
+  // 四个入口及其父路由归属显示 dock；宽屏侧导航与独立全屏页面隐藏原生 chrome。
   Future<void> updateLayout({
     required bool showTabBar,
     required bool showMiniPlayer,
+    required double miniPlayerHeight,
+    required double miniTitleFontSize,
+    required double miniDetailFontSize,
+    required bool allowMinimize,
   });
 
-  // 内容垂直滚动 → 原生 chrome 收缩/展开：向下滚收缩、滚回顶部展开
+  // 内容垂直滚动 → 原生 chrome 收缩/展开：向下滚收缩、向上滚展开
   //（对齐 Apple Music 滚动收纳行为）。
   // 原生 ScrollView 看不见 Flutter 滚动，必须由 Dart 上报。
   Future<void> updateScroll({required bool minimized});

@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/hmusic_audio_handler.dart';
 import '../../../core/audio/models/hmusic_playback_state.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/backend_request.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../shared/models/hmusic_notice.dart';
 
 final Provider<PlayerViewModel> playerViewModelProvider =
@@ -12,20 +15,23 @@ final Provider<PlayerViewModel> playerViewModelProvider =
       return PlayerViewModel(ref);
     });
 
+// 播控只投影既有 handler 的状态；手机、桌面和完整播放器订阅同一流。
+final StreamProvider<PlaybackState> playbackControlsStateProvider =
+    StreamProvider<PlaybackState>((ref) async* {
+      final handler = await ref.watch(hmusicAudioHandlerProvider.future);
+      yield* handler.playbackState;
+    });
+
 // 服务端权威播放状态流：播放页/mini player 订阅它渲染封面、曲目、模式、队列指针。
 final StreamProvider<HMusicPlaybackState> serverPlaybackStateProvider =
     StreamProvider<HMusicPlaybackState>((ref) async* {
+      ref.watch(playbackModeProvider);
       final handler = await ref.watch(hmusicAudioHandlerProvider.future);
+      // 同样经过命令队列：模式通知可能早于切换清理完成，不能直接读取旧后端快照。
+      // 有当前态时此操作不请求网络；冷启动/切模式后才加载目标仓库。
+      await handler.ensureServerState();
       final current = handler.serverState;
-      if (current != null) {
-        yield current;
-      } else {
-        // 冷启动无缓存状态：主动拉一次，否则流永不产出、订阅方无限 loading。
-        // 拉取失败异常自然冒出 → StreamProvider 错误态（播放页渲染错误，不卡转圈）。
-        await handler.ensureServerState();
-        final fetched = handler.serverState;
-        if (fetched != null) yield fetched;
-      }
+      if (current != null) yield current;
       yield* handler.serverStateStream;
     });
 
@@ -76,8 +82,10 @@ class PlayerViewModel {
   Future<void> _run(
     Future<void> Function(HMusicAudioHandler handler) command,
   ) async {
+    final request = BackendRequest(_ref);
     final handler = await _handler;
     try {
+      request.requireCurrent();
       await command(handler);
     } on ApiFailure catch (failure) {
       handler.reportNotice(failure.message);

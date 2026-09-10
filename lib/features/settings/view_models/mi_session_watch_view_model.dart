@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/backend_request.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../data/api_mi_account_repository.dart';
 import '../models/mi_account.dart';
 
@@ -39,7 +42,12 @@ class MiSessionWatchViewModel extends Notifier<MiSessionWatchState> {
   static const Duration _quickInterval = Duration(seconds: 30);
 
   @override
-  MiSessionWatchState build() => const MiSessionWatchState();
+  MiSessionWatchState build() {
+    ref.watch(playbackModeProvider);
+    _lastVerifyAt = null;
+    _lastQuickAt = null;
+    return const MiSessionWatchState();
+  }
 
   // 冷启动 / 回前台：请求服务端真校验（与服务端 5min 限频同拍）。
   Future<void> check() async {
@@ -74,11 +82,13 @@ class MiSessionWatchViewModel extends Notifier<MiSessionWatchState> {
   }
 
   Future<void> _refresh({required bool verify}) async {
+    if (ref.read(playbackModeProvider) != PlaybackMode.server) return;
+    final request = BackendRequest(ref);
     try {
       final status = await ref
           .read(miAccountRepositoryProvider)
           .status(verify: verify);
-      applyStatus(status);
+      if (request.current) applyStatus(status);
     } on ApiFailure {
       // 静默：网络失败既不弹横幅也不清横幅。
     }

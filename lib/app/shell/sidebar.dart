@@ -2,147 +2,80 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/playback/playback_mode.dart';
+import '../../core/playback/playback_mode_controller.dart';
+import '../../core/playback/playback_mode_switch.dart';
 import '../../core/providers/infrastructure_providers.dart';
 import '../../core/session/session_providers.dart';
 import '../../shared/layout/shell_metrics.dart';
-import '../../shared/widgets/brand_mark.dart';
 import '../theme/hmusic_palette.dart';
-import 'bottom_nav.dart' show kSidebarDestinations;
+import 'sidebar_content.dart';
 
-// 桌面固定侧栏（结构版），对齐 web .sidebar：232 宽 / 右侧细边 / 品牌 + 7 导航 + 底部退出。
-// 7 项顺序与 web 一致：正在播放/搜索/队列/歌单/榜单/统计/设置（播放与队列即桌面 tab）。
-// side-now 迷你播放态与用户名细节留到「桌面侧栏精修」任务补齐（移动端优先）。
+// rail 与完整侧栏使用同一组目的地，列表可滚动，矮窗和大字都不会挤掉入口。
 class AppSidebar extends ConsumerWidget {
-  const AppSidebar({required this.shell, super.key});
+  const AppSidebar({required this.shell, this.rail = false, super.key});
 
   final StatefulNavigationShell shell;
+  final bool rail;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
-    // macOS 窗后毛玻璃（MainFlutterWindow 垫 NSVisualEffectView）：侧栏改半透明
-    // tint 让壁纸透出，像系统设置 App 的侧栏；Windows/Linux 无窗后采样能力，
-    // 保持不透明暖纸（KISS，不引 flutter_acrylic）。
+    final platform = Theme.of(context).platform;
+    final macGlassWindow = platform == TargetPlatform.macOS;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final macGlassWindow = Theme.of(context).platform == TargetPlatform.macOS;
     return Container(
-      width: kSidebarWidth,
+      width: rail ? kNavigationRailWidth : kSidebarWidth,
       decoration: BoxDecoration(
         color: macGlassWindow
             ? palette.background.withValues(alpha: dark ? 0.55 : 0.60)
             : palette.background,
         border: Border(right: BorderSide(color: palette.line)),
       ),
-      // 顶部 56：品牌行基线对齐内容区页面大标题基线——大标题顶 = 28（外壳
-      // 标题栏余量）+ 24（根页统一顶距），按 NotoSerifSC 度量反推品牌顶距 ≈ 56。
-      // 同时继续让出 macOS 红绿灯悬浮区（fullSizeContentView 下叠在侧栏左上）。
-      // 改任一根页顶距或大标题字号时需同步复核这里。
-      padding: const EdgeInsets.fromLTRB(22, 56, 22, 18),
+      padding: EdgeInsets.fromLTRB(
+        rail ? 12 : 22,
+        MediaQuery.paddingOf(context).top + shellWindowTopInset(platform) + 24,
+        rail ? 12 : 22,
+        18 + MediaQuery.paddingOf(context).bottom,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 26),
-            child: Row(
-              children: <Widget>[
-                const BrandMark(size: 24),
-                const SizedBox(width: 10),
-                Text(
-                  'HMusic',
-                  style: TextStyle(
-                    fontFamily: 'NotoSerifSC',
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: palette.textStrong,
-                  ),
-                ),
-              ],
-            ),
+          SidebarBrandHeader(rail: rail),
+          Expanded(
+            child: SidebarNavigation(shell: shell, rail: rail),
           ),
-          for (final spec in kSidebarDestinations)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: _SideItem(
-                icon: spec.icon,
-                label: spec.label,
-                active: shell.currentIndex == spec.branch,
-                onTap: () => shell.goBranch(
-                  spec.branch,
-                  initialLocation: spec.branch == shell.currentIndex,
-                ),
-              ),
-            ),
-          const Spacer(),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => _logout(ref),
-              icon: const Icon(Icons.logout_rounded, size: 16),
-              label: const Text('退出登录'),
-            ),
-          ),
+          const SizedBox(height: 10),
+          _logoutControl(ref),
         ],
       ),
     );
   }
 
-  Future<void> _logout(WidgetRef ref) async {
-    await ref.read(tokenStoreProvider).clear();
-    ref.read(sessionControllerProvider).invalidate();
-  }
-}
-
-// 侧栏导航项：hover 底→panel-2；active 墨底反白（bg 字 on text-strong 底）。
-class _SideItem extends StatefulWidget {
-  const _SideItem({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  State<_SideItem> createState() => _SideItemState();
-}
-
-class _SideItemState extends State<_SideItem> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final active = widget.active;
-    final fg = active ? palette.background : palette.mutedStrong;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: Material(
-        color: active
-            ? palette.textStrong
-            : _hover
-            ? palette.panelSecondary
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(7),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(7),
-          onTap: widget.onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            child: Row(
-              children: <Widget>[
-                Icon(widget.icon, size: 18, color: fg),
-                const SizedBox(width: 11),
-                Text(widget.label, style: TextStyle(fontSize: 14, color: fg)),
-              ],
-            ),
-          ),
-        ),
+  Widget _logoutControl(WidgetRef ref) {
+    if (rail) {
+      return IconButton(
+        tooltip: '退出登录',
+        onPressed: () => _logout(ref),
+        icon: const Icon(Icons.logout_rounded, size: 20),
+      );
+    }
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () => _logout(ref),
+        icon: const Icon(Icons.logout_rounded, size: 16),
+        label: const Text('退出登录'),
       ),
     );
+  }
+
+  Future<void> _logout(WidgetRef ref) async {
+    if (ref.read(playbackModeProvider) == PlaybackMode.direct) {
+      await ref.read(playbackModeSwitchProvider.notifier).logoutDirect();
+      return;
+    }
+    await ref.read(tokenStoreProvider).clear();
+    ref.read(sessionControllerProvider).invalidate();
   }
 }

@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../app/theme/hmusic_palette.dart';
+import 'hmusic_icon_button.dart';
 
 // 行内操作的「原地确认」按钮：视觉与 HMusicIconButton 同一语言（34 圆 / line 边）。
 // onAction 返回 true（成功）→ 图标原地转青绿 ✓ 驻留 1.6s 再回弹——Apple Music
@@ -42,7 +42,6 @@ class _HMusicConfirmButtonState extends State<HMusicConfirmButton> {
 
   Future<void> _tap() async {
     if (_acting || _confirmed) return;
-    unawaited(HapticFeedback.selectionClick());
     setState(() => _acting = true);
     bool ok;
     try {
@@ -64,24 +63,14 @@ class _HMusicConfirmButtonState extends State<HMusicConfirmButton> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final confirmed = _confirmed;
-    return SizedBox(
-      width: 34,
-      height: 34,
-      child: Material(
-        color: palette.panel,
-        shape: CircleBorder(side: BorderSide(color: palette.line)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: _acting || confirmed ? null : _tap,
-          child: Opacity(
-            opacity: _acting ? 0.5 : 1,
-            child: Icon(
-              confirmed ? Icons.check_rounded : widget.icon,
-              size: 16,
-              color: confirmed ? palette.accent : palette.textStrong,
-            ),
-          ),
-        ),
+    return Semantics(
+      value: confirmed ? '已完成' : (_acting ? '处理中' : null),
+      child: HMusicIconButton(
+        icon: confirmed ? Icons.check_rounded : widget.icon,
+        tooltip: widget.tooltip,
+        onPressed: _acting || confirmed ? null : () => unawaited(_tap()),
+        foregroundColor: confirmed ? palette.accent : null,
+        dimWhenDisabled: !confirmed,
       ),
     );
   }

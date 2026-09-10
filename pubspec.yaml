@@ -7,18 +7,24 @@ environment:
   sdk: ^3.9.2
 
 dependencies:
+  asn1lib: ^1.6.5
   audio_service: ^0.18.19
   audio_session: ^0.2.4
   bonsoir: ^6.0.1
+  cookie_jar: ^4.0.9
+  crypto: ^3.0.7
   dio: ^5.10.0
   file_picker: ^11.0.3
   flutter:
     sdk: flutter
+  flutter_inappwebview: ^6.1.5
+  flutter_js: 0.8.7
   flutter_riverpod: ^3.3.2
   flutter_secure_storage: ^10.3.1
   go_router: ^17.2.3
   json_annotation: ^4.9.0
   just_audio: ^0.10.6
+  pointycastle: ^4.0.0
   qr_flutter: ^4.1.0
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.1
@@ -43,6 +49,7 @@ flutter:
     - shaders/top_edge_blur.frag
 
   assets:
+    - assets/lx/runtime.js
     # 品牌音符（透明底青绿字形，与 web favicon 同图形）；SVG 为源，PNG 打包。
     - assets/icon/brand-mark.png
     # 完整字标（原字标几何，字母换墨色；亮/暗主题各一张）。

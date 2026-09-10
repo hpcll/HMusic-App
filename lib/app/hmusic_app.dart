@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/direct/direct_lifecycle.dart';
+import '../core/direct/direct_session_providers.dart';
 import '../core/session/session_providers.dart';
 import '../core/upgrade/app_update_badge.dart';
 import '../core/upgrade/app_version_guard.dart';
@@ -19,6 +21,8 @@ class HMusicApp extends ConsumerWidget {
     // 会话失效副作用（停本机音频）在 app 根激活。不能由 apiClient 拉起：
     // guard 会进 audioHandler 的依赖链，其监听器反读 audioHandler 即成环。
     ref.watch(sessionGuardProvider);
+    ref.watch(directSessionGuardProvider);
+    ref.watch(directLifecycleProvider);
     // 服务端 403 拒绝老版本 → 立即关强升门（同上，不能由 apiClient 拉起）。
     ref.watch(appVersionGuardProvider);
     // 「播放过的在线歌自动入库」的执行体：挂在根上，任何页面点播都算听过。
@@ -33,24 +37,10 @@ class HMusicApp extends ConsumerWidget {
       theme: HMusicTheme.light(),
       darkTheme: HMusicTheme.dark(),
       themeMode: ThemeMode.system,
-      scrollBehavior: const _NoScrollbarBehavior(),
       // 桌面键盘快捷键挂在 Navigator 之上：push 出去的播放页/弹层同样生效。
       builder: (context, child) =>
           DesktopPlaybackShortcuts(child: child ?? const SizedBox.shrink()),
       routerConfig: router,
     );
   }
-}
-
-// 全局隐藏滚动条：桌面端默认 ScrollBehavior 会给每个可滚动区域自动包一层
-// Scrollbar，这里返回 child 本身把它关掉；滚轮/触控板/拖拽滚动不受影响。
-class _NoScrollbarBehavior extends MaterialScrollBehavior {
-  const _NoScrollbarBehavior();
-
-  @override
-  Widget buildScrollbar(
-    BuildContext context,
-    Widget child,
-    ScrollableDetails details,
-  ) => child;
 }

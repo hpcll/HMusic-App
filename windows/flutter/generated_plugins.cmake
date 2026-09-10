@@ -4,6 +4,8 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   bonsoir_windows
+  flutter_inappwebview_windows
+  flutter_js
   flutter_secure_storage_windows
   url_launcher_windows
 )

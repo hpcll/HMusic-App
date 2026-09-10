@@ -25,6 +25,7 @@ class PlayerModeButton extends StatelessWidget {
     final (icon, label) = _describe(mode);
     return IconButton(
       tooltip: label,
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
       icon: Icon(icon),
       onPressed: () {
         final index = _cycle.indexOf(mode);

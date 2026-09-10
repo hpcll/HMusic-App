@@ -20,6 +20,7 @@
 		B4C5D6E7F8A9B0C1D2E3F4A5 /* GlassShellOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B4C5D6E7F8A9B0C1D2E3F4 /* GlassShellOverlay.swift */; };
 		B5C6D7E8F9A0B1C2D3E4F5A6 /* GlassMiniPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F9A0B1C2D3E4F5 /* GlassMiniPlayer.swift */; };
 		B6C7D8E9F0A1B2C3D4E5F6A7 /* GlassShellHostController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B6C7D8E9F0A1B2C3D4E5F6 /* GlassShellHostController.swift */; };
+		B7C8D9E0F1A2B3C4D5E6F7A8 /* SystemGlassTabBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B7C8D9E0F1A2B3C4D5E6F7 /* SystemGlassTabBarController.swift */; };
 		DD555CD6076CB0BC62DE04A5 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60170DCE879B15A6B9989E9A /* Pods_RunnerTests.framework */; };
 /* End PBXBuildFile section */
 
@@ -72,6 +73,7 @@
 		A3B4C5D6E7F8A9B0C1D2E3F4 /* GlassShellOverlay.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GlassShellOverlay.swift; sourceTree = "<group>"; };
 		A4B5C6D7E8F9A0B1C2D3E4F5 /* GlassMiniPlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GlassMiniPlayer.swift; sourceTree = "<group>"; };
 		A5B6C7D8E9F0A1B2C3D4E5F6 /* GlassShellHostController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GlassShellHostController.swift; sourceTree = "<group>"; };
+		A6B7C8D9E0F1A2B3C4D5E6F7 /* SystemGlassTabBarController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SystemGlassTabBarController.swift; sourceTree = "<group>"; };
 		C89F12482401D32F10FAA570 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		DB10A55CD2567907FE62C389 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		EC1B59780E4F0244857CA21B /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -161,6 +163,7 @@
 				A3B4C5D6E7F8A9B0C1D2E3F4 /* GlassShellOverlay.swift */,
 				A4B5C6D7E8F9A0B1C2D3E4F5 /* GlassMiniPlayer.swift */,
 				A5B6C7D8E9F0A1B2C3D4E5F6 /* GlassShellHostController.swift */,
+				A6B7C8D9E0F1A2B3C4D5E6F7 /* SystemGlassTabBarController.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
 			path = Runner;
@@ -397,6 +400,7 @@
 				B4C5D6E7F8A9B0C1D2E3F4A5 /* GlassShellOverlay.swift in Sources */,
 				B5C6D7E8F9A0B1C2D3E4F5A6 /* GlassMiniPlayer.swift in Sources */,
 				B6C7D8E9F0A1B2C3D4E5F6A7 /* GlassShellHostController.swift in Sources */,
+				B7C8D9E0F1A2B3C4D5E6F7A8 /* SystemGlassTabBarController.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

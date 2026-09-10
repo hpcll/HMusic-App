@@ -1,10 +1,6 @@
 import SwiftUI
 
-// mini player 玻璃胶囊：封面 + 题/歌手 + 播放/下一曲，悬浮在 dock 上方；
-// chrome 收缩时整条内联到图标圆钮左侧，内容不裁剪，题/歌手随剩余宽度截断。
-// 点卡片本体 → openNowPlaying（Dart push 全屏播放页）；按钮回传媒体 intent。
-// 封面经 AsyncImage 拉 Dart 下发的 URL——只是展示资源，不构成业务请求；
-// scrim/文字对比守 HMusic 墨色纪律。
+// 沿用原来的纤细胶囊；展开为曲名/歌手，收起时只保留曲名和播放键。
 @available(iOS 26.0, *)
 struct GlassMiniPlayer: View {
   @ObservedObject var state: GlassShellState
@@ -12,32 +8,49 @@ struct GlassMiniPlayer: View {
   let onIntent: (String, String?) -> Void
 
   var body: some View {
-    HStack(spacing: 12) {
-      artwork
-      VStack(alignment: .leading, spacing: 2) {
-        Text(state.trackTitle)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(Color.primary)
-          .lineLimit(1)
-        Text(state.trackArtist)
-          .font(.system(size: 12))
-          .foregroundStyle(Color.secondary)
-          .lineLimit(1)
+    HStack(spacing: 10) {
+      Button { onIntent("openNowPlaying", nil) } label: {
+        HStack(spacing: 10) {
+          artwork
+          trackText
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .buttonStyle(.plain)
+      .disabled(state.trackId == nil)
+      .accessibilityLabel(state.trackId == nil
+        ? "未在播放" : "\(state.trackTitle)，\(state.trackArtist)，打开播放器")
       controls
     }
     .padding(.horizontal, 12)
-    .frame(height: GlassShellMetrics.miniHeight)
+    .frame(height: state.miniPlayerHeight)
     .frame(maxWidth: .infinity)
     .glassChrome(
-      capsule: true,
       reduceTransparency: reduceTransparency || state.reduceTransparency
     )
-    .contentShape(Capsule(style: .continuous))
-    .onTapGesture { onIntent("openNowPlaying", nil) }
     .accessibilityElement(children: .contain)
-    .accessibilityLabel("正在播放：\(state.trackTitle)，\(state.trackArtist)")
+  }
+
+  private var trackText: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      textLine(state.trackId == nil ? "未在播放" : state.trackTitle,
+        size: state.miniTitleFontSize, strong: true)
+      if !state.minimized && !state.trackArtist.isEmpty {
+        textLine(state.trackArtist, size: state.miniDetailFontSize)
+          .transition(.opacity)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func textLine(_ value: String, size: CGFloat, strong: Bool = false) -> some View {
+    Text(value)
+      .font(.system(size: size, weight: strong ? .semibold : .regular))
+      .foregroundStyle(strong ? Color.primary : Color.secondary)
+      .lineLimit(1)
+      .truncationMode(.tail)
+      .frame(height: size * 1.25)
   }
 
   private var artwork: some View {
@@ -54,7 +67,6 @@ struct GlassMiniPlayer: View {
         artworkPlaceholder
       }
     }
-    // 收小到 32：缩略图只做识别，不抢 dock 的视觉主导（与 Flutter 胶囊同尺寸）。
     .frame(width: 32, height: 32)
     .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
   }
@@ -69,33 +81,29 @@ struct GlassMiniPlayer: View {
   }
 
   private var controls: some View {
-    HStack(spacing: 4) {
-      playPauseButton
-      Button {
-        onIntent("next", nil)
-      } label: {
-        Image(systemName: "forward.fill")
-          .font(.system(size: 17, weight: .semibold))
-          .foregroundStyle(Color.primary)
-          .frame(width: 40, height: 44)
-          .contentShape(Rectangle())
+    HStack(spacing: 0) {
+      control(
+        state.playing ? "pause.fill" : "play.fill",
+        label: state.playing ? "暂停" : "播放",
+        intent: "playPause"
+      )
+      if !state.minimized {
+        control("forward.fill", label: "下一首", intent: "next")
+          .transition(.opacity)
       }
-      .buttonStyle(.plain)
-      .accessibilityLabel("下一曲")
     }
   }
 
-  private var playPauseButton: some View {
-    Button {
-      onIntent("playPause", nil)
-    } label: {
-      Image(systemName: state.playing ? "pause.fill" : "play.fill")
-        .font(.system(size: 19, weight: .semibold))
+  private func control(_ symbol: String, label: String, intent: String) -> some View {
+    Button { onIntent(intent, nil) } label: {
+      Image(systemName: symbol)
+        .font(.system(size: 18, weight: .semibold))
         .foregroundStyle(Color.primary)
-        .frame(width: 40, height: 44)
+        .frame(width: 44, height: 44)
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel(state.playing ? "暂停" : "播放")
+    .disabled(state.trackId == nil)
+    .accessibilityLabel(label)
   }
 }

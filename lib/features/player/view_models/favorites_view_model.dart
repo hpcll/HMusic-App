@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/backend_request.dart';
 import '../../playlists/data/api_playlists_repository.dart';
 import '../../playlists/data/playlists_repository.dart';
 import '../../playlists/models/playlist.dart';
@@ -18,7 +19,10 @@ favoritesViewModelProvider =
 
 class FavoritesViewModel extends Notifier<FavoritesState> {
   @override
-  FavoritesState build() => const FavoritesState();
+  FavoritesState build() {
+    ref.watch(playlistsRepositoryProvider);
+    return const FavoritesState();
+  }
 
   // 曲目判重键：与 web 一致用 source:sourceTrackId（id 可能因解析批次不同）。
   static String _keyOf(HMusicTrack track) =>
@@ -36,8 +40,10 @@ class FavoritesViewModel extends Notifier<FavoritesState> {
 
   // 拉收藏歌单快照。尽力而为（web 同款）：失败静默，心形保持空心可重试。
   Future<void> load() async {
+    final request = BackendRequest(ref), repository = _repository;
     try {
-      final playlists = await _repository.getPlaylists();
+      final playlists = await repository.getPlaylists();
+      if (!request.current) return;
       PlaylistSummary? summary;
       for (final p in playlists) {
         if (p.name == kFavoritesPlaylistName) {
@@ -46,9 +52,8 @@ class FavoritesViewModel extends Notifier<FavoritesState> {
         }
       }
       if (summary == null) return;
-      state = state.copyWith(
-        playlist: await _repository.getPlaylist(summary.id),
-      );
+      final playlist = await repository.getPlaylist(summary.id);
+      if (request.current) state = state.copyWith(playlist: playlist);
     } on ApiFailure {
       // 收藏状态不打扰播放；下次进播放页或点按钮时再取。
     }
@@ -57,29 +62,30 @@ class FavoritesViewModel extends Notifier<FavoritesState> {
   // 收藏/取消收藏当前曲目；失败落 state.error，播放页就地内联渲染
   //（心形不变 = 失败，文字说明原因），不再冒泡给按钮弹浮层。
   Future<void> toggle(HMusicTrack track) async {
+    final request = BackendRequest(ref), repository = _repository;
     if (state.busy) return;
     state = state.copyWith(busy: true, clearError: true);
     try {
       final existing = itemFor(track);
       if (existing != null) {
-        state = state.copyWith(
-          playlist: await _repository.removeItem(
-            state.playlist!.id,
-            existing.id,
-          ),
+        final playlist = await repository.removeItem(
+          state.playlist!.id,
+          existing.id,
         );
+        if (request.current) state = state.copyWith(playlist: playlist);
       } else {
         final playlist =
             state.playlist ??
-            await _repository.createPlaylist(kFavoritesPlaylistName);
-        state = state.copyWith(
-          playlist: await _repository.addTrack(playlist.id, track),
-        );
+            await repository.createPlaylist(kFavoritesPlaylistName);
+        request.requireCurrent();
+        final updated = await repository.addTrack(playlist.id, track);
+        if (request.current) state = state.copyWith(playlist: updated);
       }
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(error: failure.message);
     } finally {
-      state = state.copyWith(busy: false);
+      if (request.current) state = state.copyWith(busy: false);
     }
   }
 

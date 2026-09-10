@@ -3,8 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/app/shell/flutter_glass_shell.dart';
 
 // ScrollMinimizeListener 触发语义（原生壳与回退壳共用）：向下滚（内容上滑）
-// 收缩；中途向上滚保持收缩；只有滚回列表顶部才展开（对齐 iOS 26+ 系统 dock
-// 的收纳行为）。
+// 收缩，向上滚展开（UIKit onScrollDown），横滑不影响底栏。
 void main() {
   late List<bool> signals;
 
@@ -26,7 +25,7 @@ void main() {
     );
   }
 
-  testWidgets('向下滚收缩；中途向上滚不展开；滚回顶部才展开', (tester) async {
+  testWidgets('向下滚收缩，向上滚立即展开，无需回到顶部', (tester) async {
     await pumpList(tester);
 
     // 内容上滑（向下滚）→ 收缩。
@@ -35,11 +34,11 @@ void main() {
     expect(signals, isNotEmpty);
     expect(signals.last, isTrue);
 
-    // 中途向上滚一段（未到顶）→ 不得出现展开信号。
+    // 中途向上滚一段（未到顶）→ 展开。
     signals.clear();
     await tester.drag(find.byType(ListView), const Offset(0, 150));
     await tester.pumpAndSettle();
-    expect(signals.contains(false), isFalse);
+    expect(signals.last, isFalse);
 
     // 继续向上滚回到顶部 → 展开。
     await tester.drag(find.byType(ListView), const Offset(0, 600));

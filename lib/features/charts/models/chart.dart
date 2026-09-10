@@ -4,8 +4,8 @@ import '../../../core/models/hmusic_track.dart';
 
 part 'chart.g.dart';
 
-// 榜单摘要（GET /charts 列表项）。kind: family|netease|qq|apple，按 kind 字符串分组，
-// 保持 String 容错：Server 新增来源时不解码失败，前端分组自然忽略未知组。
+// 榜单摘要（GET /charts 列表项），包含已连接的 Spotify 个人/公开榜。
+// kind 保持 String 容错；未知来源仍可在精选区展示。
 @JsonSerializable(includeIfNull: false)
 class Chart {
   const Chart({

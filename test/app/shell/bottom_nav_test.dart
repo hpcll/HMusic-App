@@ -4,16 +4,17 @@ import 'package:go_router/go_router.dart';
 import 'package:hmusic/app/shell/bottom_nav.dart';
 import 'package:hmusic/app/theme/hmusic_theme.dart';
 
-// 悬浮玻璃 dock（Flutter 回退壳）：展开 = 4 tab 等分胶囊条（搜索并入榜单页头，
-// 不占 dock 位），点 tab 切分支、选中药丸滑到新槽位；收缩 = 当前 tab 的图标
-// 圆钮（无标签），点圆钮只展开、不切 tab（对齐 iOS 26+ 原生壳收缩语义）。
+// 恢复原四项 dock，保留七分支的页面状态。
 
 final GlobalKey<_DockHarnessState> _harnessKey = GlobalKey();
 
-Future<void> _pumpDock(WidgetTester tester) async {
+Future<void> _pumpDock(
+  WidgetTester tester, {
+  int initialBranch = 4,
+  double textScale = 1,
+}) async {
   final router = GoRouter(
-    // 初始分支 4 = kNavDestinations 首项「榜单」。
-    initialLocation: '/b4',
+    initialLocation: '/b$initialBranch',
     routes: <RouteBase>[
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) =>
@@ -32,8 +33,18 @@ Future<void> _pumpDock(WidgetTester tester) async {
       ),
     ],
   );
+  addTearDown(router.dispose);
   await tester.pumpWidget(
-    MaterialApp.router(theme: HMusicTheme.light(), routerConfig: router),
+    MaterialApp.router(
+      theme: HMusicTheme.light(),
+      routerConfig: router,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
+    ),
   );
 }
 
@@ -58,7 +69,7 @@ class _DockHarnessState extends State<_DockHarness> {
       body: widget.shell,
       bottomNavigationBar: AppBottomNav(
         shell: widget.shell,
-        minimized: minimized,
+        progress: minimized ? 1 : 0,
         onExpand: () => setState(() {
           minimized = false;
           expandCount++;
@@ -69,13 +80,12 @@ class _DockHarnessState extends State<_DockHarness> {
 }
 
 void main() {
-  testWidgets('展开态渲染 4 tab，点 tab 切换分支', (tester) async {
+  testWidgets('展开态恢复榜单、歌单、统计、设置，点按切换既有分支', (tester) async {
     await _pumpDock(tester);
 
     for (final label in <String>['榜单', '歌单', '统计', '设置']) {
       expect(find.text(label), findsOneWidget);
     }
-    // 搜索并入榜单页头，dock 不再有搜索 tab。
     expect(find.text('搜索'), findsNothing);
     expect(find.text('page-4'), findsOneWidget);
 
@@ -93,14 +103,12 @@ void main() {
         matching: find.byType(AnimatedAlign),
       ),
     );
-    // 初始分支 4 = kNavDestinations 首项「榜单」，药丸停在最左槽位。
+    // 初始为榜单入口，药丸停在最左槽位。
     expect(pill().alignment, const Alignment(-1, 0));
 
-    await tester.tap(find.text('统计'));
+    await tester.tap(find.text('歌单'));
     await tester.pumpAndSettle();
-    // 「统计」是第 3 槽（下标 2）→ 对齐目标 -1 + 2×2/3（按实现同式算，避免
-    // 1/3 与 -1+4/3 的浮点尾差导致恒等断言失败）。
-    expect(pill().alignment, const Alignment(-1 + 2 * 2 / 3, 0));
+    expect(pill().alignment, const Alignment(-1 + 2 / 3, 0));
   });
 
   testWidgets('收缩态只剩当前 tab 图标圆钮，点圆钮展开且不切 tab', (tester) async {
@@ -117,8 +125,31 @@ void main() {
     await tester.tap(find.byIcon(Icons.local_fire_department_rounded));
     await tester.pumpAndSettle();
     expect(_harnessKey.currentState!.expandCount, 1);
-    // 展开而非切 tab：4 tab 回来，页面仍是榜单分支。
     expect(find.text('歌单'), findsOneWidget);
     expect(find.text('page-4'), findsOneWidget);
+  });
+
+  testWidgets('统计分支选中统计，保留正在看的页面', (tester) async {
+    await _pumpDock(tester, initialBranch: 5);
+    expect(find.text('page-5'), findsOneWidget);
+    final pill = tester.widget<AnimatedAlign>(find.byType(AnimatedAlign));
+    expect(pill.alignment, const Alignment(-1 + 4 / 3, 0));
+  });
+
+  testWidgets('360 宽两倍文字时 dock 增高且四个入口均可见', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _pumpDock(tester, textScale: 2);
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byType(AppBottomNav)).height, greaterThan(62));
+    for (final label in <String>['榜单', '歌单', '统计', '设置']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+    expect(find.text('page-6'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

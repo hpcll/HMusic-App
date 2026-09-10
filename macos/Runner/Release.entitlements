@@ -6,6 +6,9 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- 直连音频代理：允许本机播放器和局域网音箱读取临时音频地址。 -->
+	<key>com.apple.security.network.server</key>
+	<true/>
 	<!-- 曲库上传：file_picker 读取用户选中的音频文件（仅只读，上传不改原文件）。 -->
 	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>

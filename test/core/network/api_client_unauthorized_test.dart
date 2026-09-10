@@ -20,7 +20,11 @@ class _ThrowingDio implements Dio {
     void Function(int, int)? onSendProgress,
     void Function(int, int)? onReceiveProgress,
   }) async {
-    throw _error();
+    final error = _error();
+    if (error is DioException) {
+      error.requestOptions.headers.addAll(options?.headers ?? {});
+    }
+    throw error;
   }
 
   @override

@@ -42,6 +42,8 @@ class ConnectionOpening {
     );
     if (play) {
       unawaited(controller.forward().whenComplete(finish));
+    } else {
+      finish();
     }
   }
 

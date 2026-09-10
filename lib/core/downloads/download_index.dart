@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/settings/data/api_downloads_repository.dart';
 import '../../features/settings/models/download_record.dart';
 import '../models/hmusic_track.dart';
+import '../playback/backend_request.dart';
+import '../playback/playback_mode.dart';
+import '../playback/playback_mode_controller.dart';
 
 // 「这首歌在服务器曲库里了吗」的共享索引：键为 trackKey（source:sourceTrackId），
 // 值为服务端下载记录的状态。榜单行与搜索结果行都靠它决定行尾那一格画什么
@@ -27,6 +30,7 @@ class DownloadIndex extends Notifier<Map<String, DownloadStatus>> {
 
   @override
   Map<String, DownloadStatus> build() {
+    ref.watch(playbackModeProvider);
     ref.onDispose(stop);
     return const <String, DownloadStatus>{};
   }
@@ -44,8 +48,11 @@ class DownloadIndex extends Notifier<Map<String, DownloadStatus>> {
   // 拉一次服务端记录重建索引。失败静默：索引是锦上添花，拉不到就当都没入库，
   // 下载按钮照样能点（服务端对同一 trackKey 幂等）。
   Future<void> refresh() async {
+    if (ref.read(playbackModeProvider) != PlaybackMode.server) return;
+    final request = BackendRequest(ref);
     try {
       final records = await ref.read(downloadsRepositoryProvider).list();
+      if (!request.current) return;
       final next = <String, DownloadStatus>{};
       for (final record in records) {
         final track = record.track;
@@ -61,6 +68,7 @@ class DownloadIndex extends Notifier<Map<String, DownloadStatus>> {
 
   // 刚点下下载：先乐观标成排队中（行立刻转菊花），随后由轮询接管真实状态。
   void markQueued(HMusicTrack track) {
+    if (ref.read(playbackModeProvider) != PlaybackMode.server) return;
     state = <String, DownloadStatus>{
       ...state,
       downloadKeyOf(track): DownloadStatus.pending,

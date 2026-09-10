@@ -1,12 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/direct/direct_providers.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import '../models/search_result.dart';
+import 'direct_search_repository.dart';
 import 'search_repository.dart';
 
 final Provider<SearchRepository> searchRepositoryProvider =
     Provider<SearchRepository>((ref) {
+      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+        return DirectSearchRepository(
+          ref.watch(directMusicSearchProvider),
+          ref.watch(directLocalStoreProvider),
+        );
+      }
       return ApiSearchRepository(apiClient: ref.watch(apiClientProvider));
     });
 

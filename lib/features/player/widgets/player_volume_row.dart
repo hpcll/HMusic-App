@@ -12,12 +12,14 @@ class PlayerVolumeRow extends StatefulWidget {
     required this.initialVolume,
     required this.onChanged,
     this.onChangeEnd,
+    this.enabled = true,
     super.key,
   });
 
   final double initialVolume;
   final ValueChanged<double> onChanged;
   final ValueChanged<double>? onChangeEnd;
+  final bool enabled;
 
   @override
   State<PlayerVolumeRow> createState() => _PlayerVolumeRowState();
@@ -58,18 +60,26 @@ class _PlayerVolumeRowState extends State<PlayerVolumeRow> {
             ),
             child: Slider(
               value: _volume,
-              onChangeStart: (_) => _dragging = true,
-              onChanged: (value) {
-                setState(() => _volume = value);
-                unawaited(Future<void>.sync(() => widget.onChanged(value)));
-              },
-              onChangeEnd: (value) {
-                _dragging = false;
-                final commit = widget.onChangeEnd;
-                if (commit != null) {
-                  unawaited(Future<void>.sync(() => commit(value)));
-                }
-              },
+              semanticFormatterCallback: (value) =>
+                  '音量 ${(value * 100).round()}%',
+              onChangeStart: widget.enabled ? (_) => _dragging = true : null,
+              onChanged: !widget.enabled
+                  ? null
+                  : (value) {
+                      setState(() => _volume = value);
+                      unawaited(
+                        Future<void>.sync(() => widget.onChanged(value)),
+                      );
+                    },
+              onChangeEnd: !widget.enabled
+                  ? null
+                  : (value) {
+                      _dragging = false;
+                      final commit = widget.onChangeEnd;
+                      if (commit != null) {
+                        unawaited(Future<void>.sync(() => commit(value)));
+                      }
+                    },
             ),
           ),
         ),

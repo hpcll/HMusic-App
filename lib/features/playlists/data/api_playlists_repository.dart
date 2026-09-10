@@ -1,14 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/models/hmusic_playback_state.dart';
+import '../../../core/direct/direct_providers.dart';
 import '../../../core/models/hmusic_track.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import '../models/playlist.dart';
+import 'direct_playlists_repository.dart';
 import 'playlists_repository.dart';
 
 final Provider<PlaylistsRepository> playlistsRepositoryProvider =
     Provider<PlaylistsRepository>((ref) {
+      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+        return DirectPlaylistsRepository(
+          ref.watch(directLocalStoreProvider),
+          ref.watch(directPlaylistImporterProvider),
+          ref.watch(directPlaybackRepositoryProvider),
+        );
+      }
       return ApiPlaylistsRepository(apiClient: ref.watch(apiClientProvider));
     });
 

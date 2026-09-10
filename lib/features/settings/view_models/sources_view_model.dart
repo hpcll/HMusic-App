@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/backend_request.dart';
 import '../../../shared/models/hmusic_notice.dart';
 import '../data/api_sources_repository.dart';
 import '../models/lx_plugin.dart';
@@ -15,9 +16,13 @@ sourcesViewModelProvider = NotifierProvider<SourcesViewModel, SourcesState>(
 // 表单三通道（订阅拉取/选文件/粘贴代码）殊途同归都填 form；保存走全量 upsert。
 class SourcesViewModel extends Notifier<SourcesState> {
   @override
-  SourcesState build() => const SourcesState();
+  SourcesState build() {
+    ref.watch(sourcesRepositoryProvider);
+    return const SourcesState();
+  }
 
   Future<void> load() async {
+    final request = BackendRequest(ref);
     try {
       final repo = ref.read(sourcesRepositoryProvider);
       // 列表与健康态并发拉取；health 失败不拖垮列表（各自容错在仓库层）。
@@ -25,12 +30,14 @@ class SourcesViewModel extends Notifier<SourcesState> {
         repo.listPlugins(),
         repo.loadHealth(),
       ]);
+      if (!request.current) return;
       state = state.copyWith(
         plugins: results[0] as List<LxPlugin>,
         health: results[1] as Map<String, SourceHealth>,
         loaded: true,
       );
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(
         loaded: true,
         notice: HMusicNotice.error(failure.message),
@@ -65,6 +72,7 @@ class SourcesViewModel extends Notifier<SourcesState> {
 
   // 订阅链接代拉脚本，成功后预填表单空位（已有内容不覆盖，对齐 web）。
   Future<void> fetchFromUrl() async {
+    final request = BackendRequest(ref);
     final url = state.form.sourceUrl.trim();
     if (url.isEmpty) {
       state = state.copyWith(notice: const HMusicNotice.error('先粘贴订阅链接'));
@@ -76,6 +84,7 @@ class SourcesViewModel extends Notifier<SourcesState> {
       final result = await ref
           .read(sourcesRepositoryProvider)
           .fetchFromUrl(url);
+      if (!request.current) return;
       final form = state.form;
       state = state.copyWith(
         fetching: false,
@@ -92,6 +101,7 @@ class SourcesViewModel extends Notifier<SourcesState> {
         ),
       );
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(
         fetching: false,
         notice: HMusicNotice.error(failure.message),
@@ -101,6 +111,7 @@ class SourcesViewModel extends Notifier<SourcesState> {
 
   // 保存/编辑插件（全量 upsert）。成功返回 true 供 View 清空本地输入控制器。
   Future<bool> save() async {
+    final request = BackendRequest(ref);
     final form = state.form;
     if (form.id.trim().isEmpty ||
         form.name.trim().isEmpty ||
@@ -125,11 +136,14 @@ class SourcesViewModel extends Notifier<SourcesState> {
                 ? null
                 : form.sourceUrl.trim(),
           );
+      if (!request.current) return false;
       state = state.copyWith(busy: false, form: const LxPluginForm());
       await load();
+      if (!request.current) return false;
       state = state.copyWith(notice: const HMusicNotice.success('插件已保存'));
       return true;
     } on ApiFailure catch (failure) {
+      if (!request.current) return false;
       state = state.copyWith(
         busy: false,
         notice: HMusicNotice.error(failure.message),
@@ -140,9 +154,11 @@ class SourcesViewModel extends Notifier<SourcesState> {
 
   // 切换启用：全量 upsert 需带原代码，先取 code 再回写反转的 enabled。
   Future<void> toggleEnabled(LxPlugin plugin) async {
+    final request = BackendRequest(ref);
     try {
       final repo = ref.read(sourcesRepositoryProvider);
       final code = await repo.getCode(plugin.id);
+      request.requireCurrent();
       await repo.savePlugin(
         id: plugin.id,
         name: plugin.name,
@@ -151,16 +167,20 @@ class SourcesViewModel extends Notifier<SourcesState> {
         defaultQuality: plugin.defaultQuality,
         sourceUrl: plugin.sourceUrl,
       );
+      if (!request.current) return;
       await load();
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 
   // 载入既有插件到表单（取全量 code 回填）。
   Future<void> edit(LxPlugin plugin) async {
+    final request = BackendRequest(ref);
     try {
       final code = await ref.read(sourcesRepositoryProvider).getCode(plugin.id);
+      if (!request.current) return;
       state = state.copyWith(
         form: LxPluginForm(
           id: plugin.id,
@@ -173,47 +193,60 @@ class SourcesViewModel extends Notifier<SourcesState> {
         notice: const HMusicNotice.success('插件已载入下方表单，改完保存即可'),
       );
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 
   // 按记住的 sourceUrl 一键更新（防连点：updatingId）。
   Future<void> update(LxPlugin plugin) async {
+    final request = BackendRequest(ref);
     if (state.updatingId.isNotEmpty) return;
     state = state.copyWith(updatingId: plugin.id);
     try {
       await ref.read(sourcesRepositoryProvider).updatePlugin(plugin.id);
+      if (!request.current) return;
       await load();
+      if (!request.current) return;
       state = state.copyWith(
         notice: HMusicNotice.success('「${plugin.name}」已从订阅链接更新'),
       );
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     } finally {
-      state = state.copyWith(updatingId: '');
+      if (request.current) state = state.copyWith(updatingId: '');
     }
   }
 
   Future<void> test(LxPlugin plugin) async {
+    final request = BackendRequest(ref);
     try {
       final message = await ref
           .read(sourcesRepositoryProvider)
           .testPlugin(plugin.id);
+      if (!request.current) return;
       await load();
+      if (!request.current) return;
       state = state.copyWith(
         notice: HMusicNotice.success(message.isEmpty ? '插件加载测试通过' : message),
       );
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }
 
   Future<void> delete(LxPlugin plugin) async {
+    final request = BackendRequest(ref);
     try {
       await ref.read(sourcesRepositoryProvider).deletePlugin(plugin.id);
+      if (!request.current) return;
       await load();
+      if (!request.current) return;
       state = state.copyWith(notice: const HMusicNotice.success('插件已删除'));
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(notice: HMusicNotice.error(failure.message));
     }
   }

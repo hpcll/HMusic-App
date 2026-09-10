@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../app/theme/hmusic_radii.dart';
+import '../../../core/config/build_edition.dart';
+import '../../../core/playback/playback_mode.dart';
 import '../data/lan_server_scanner.dart';
 import '../models/connection_view_state.dart';
 import 'discovered_server_list.dart';
+import 'playback_mode_switch_button.dart';
 import 'server_address_form.dart';
 
 // 发现/手输区本体（连接页 AnimatedSwitcher 的 content 分支）。
@@ -83,6 +86,14 @@ class ConnectionContent extends StatelessWidget {
         // 手动表单：次要路径但永远在场——扫不到时不用先点链接展开，地址
         // 已存时回填直接可见。
         manualForm,
+        if (!BuildEdition.isStore) ...[
+          const SizedBox(height: 16),
+          const PlaybackModeSwitchButton(
+            mode: PlaybackMode.direct,
+            path: '/direct/login',
+            label: '无需服务器，使用直连模式',
+          ),
+        ],
       ],
     );
   }

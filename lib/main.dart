@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app/app_providers.dart';
 import 'app/hmusic_app.dart';
+import 'app/router/routed_mi_web_verifier.dart';
+import 'core/direct/mi_direct_providers.dart';
 import 'shared/widgets/brand_mark.dart';
 
 Future<void> main() async {
@@ -29,5 +32,17 @@ Future<void> main() async {
   // 图片就绪时"啪"地满不透明出现（见 BrandWordmark.warmUp）。代价是开屏窗口多停
   // 几十毫秒——底色与 App 一致，看不出交接。
   await BrandWordmark.warmUp();
-  runApp(const ProviderScope(child: HMusicApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        miWebVerifierProvider.overrideWith(
+          (ref) => RoutedMiWebVerifier(
+            () => ref.read(appRouterProvider),
+            cookies: ref.read(miWebCookiesProvider),
+          ),
+        ),
+      ],
+      child: const HMusicApp(),
+    ),
+  );
 }

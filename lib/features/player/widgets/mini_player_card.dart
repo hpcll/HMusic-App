@@ -4,163 +4,101 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/audio/models/hmusic_playback_state.dart';
 import '../../../core/platform_shell/widgets/adaptive_glass_surface.dart';
 import '../../../shared/layout/shell_metrics.dart';
 import '../../../shared/widgets/hmusic_cover.dart';
 import '../view_models/player_view_model.dart';
 import '../views/player_page.dart';
+import 'mini_player_controls.dart';
+import 'mini_player_track_info.dart';
 
-// mini player 展示卡，对齐 docs/03「mini player：封面、题/歌手、播放与下一曲」
-// 的玻璃控制条形态：内容从玻璃下滚过，off 档（高对比/减动效）自动退回不透明
-// 面板。不显示进度：进度与 seek 都归完整播放页，mini 只承载识别与启停。
-// 两种形态：
-//   桌面/宽屏（capsule=false）：圆角 18 玻璃卡，自带 12/6 外边距。
-//   悬浮胶囊（capsule=true）：高 50 胶囊悬在 dock（66）上方（Flutter 回退壳），
-//   比 dock 矮一档、封面/字号/图标同步收小——dock 是导航主锚点，mini 只是
-//   次级播放状态条；对齐 iOS 26+ 原生 GlassMiniPlayer。自身无外边距：留白、
-//   与 dock 的 gap、收纳飞行轨迹全由外壳几何插值统一，内容不裁剪，只随
-//   剩余宽度截断题/歌手。
+// 保留纤细玻璃胶囊和原有播控；设备选择仍在完整播放器里。
 class MiniPlayerCard extends StatelessWidget {
   const MiniPlayerCard({
-    required this.item,
+    required this.state,
     required this.playbackState,
+    required this.enabled,
     required this.controller,
-    this.capsule = false,
+    this.compactProgress = 0,
     super.key,
   });
 
-  final MediaItem item;
+  final HMusicPlaybackState? state;
   final PlaybackState? playbackState;
+  final bool enabled;
   final PlayerViewModel controller;
-  final bool capsule;
+  final double compactProgress;
 
   @override
   Widget build(BuildContext context) {
-    final isPlaying = playbackState?.playing ?? false;
-    final radius = BorderRadius.all(
-      Radius.circular(capsule ? kChromeMiniHeight / 2 : 18),
-    );
-    final row = Row(
-      children: <Widget>[
-        _Cover(url: item.artUri?.toString(), capsule: capsule),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _TrackText(
-            title: item.title,
-            artist: item.artist,
-            capsule: capsule,
-          ),
-        ),
-        IconButton(
-          tooltip: isPlaying ? '暂停' : '播放',
-          icon: Icon(
-            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          ),
-          iconSize: capsule ? 26 : 30,
-          onPressed: isPlaying ? controller.pause : controller.play,
-        ),
-        IconButton(
-          tooltip: '下一首',
-          icon: const Icon(Icons.skip_next_rounded),
-          iconSize: capsule ? 22 : 26,
-          onPressed: controller.skipToNext,
-        ),
-      ],
-    );
-    final margin = capsule
-        ? EdgeInsets.zero
-        : const EdgeInsets.fromLTRB(12, 6, 12, 6);
-    return Padding(
-      padding: margin,
-      child: AdaptiveGlassSurface(
-        quality: resolveGlassQuality(context),
-        padding: EdgeInsets.zero,
+    final track = state?.track;
+    final playing = playbackState?.playing ?? false;
+    final busy =
+        track != null &&
+        (playbackState == null ||
+            playbackState?.processingState == AudioProcessingState.loading ||
+            playbackState?.processingState == AudioProcessingState.buffering);
+    final height = mobileMiniPlayerHeight(MediaQuery.textScalerOf(context));
+    final radius = BorderRadius.circular(height / 2);
+    final VoidCallback? openPlayer = track == null
+        ? null
+        : () => _openPlayer(context);
+    return AdaptiveGlassSurface(
+      quality: resolveGlassQuality(context),
+      padding: EdgeInsets.zero,
+      borderRadius: radius,
+      child: Material(
+        type: MaterialType.transparency,
         borderRadius: radius,
-        child: Material(
-          type: MaterialType.transparency,
-          borderRadius: radius,
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => _openPlayer(context),
-            child: capsule
-                ? SizedBox(
-                    height: kChromeMiniHeight,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: row,
-                    ),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-                    child: row,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: openPlayer,
+          excludeFromSemantics: true,
+          splashFactory: NoSplash.splashFactory,
+          highlightColor: Colors.transparent,
+          child: SizedBox(
+            height: height,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: <Widget>[
+                  HMusicCover(
+                    url: track?.coverUrl,
+                    size: 32,
+                    radius: 7,
+                    iconSize: 13,
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: MiniPlayerTrackInfo(
+                      state: state,
+                      onOpenPlayer: openPlayer,
+                      compactProgress: compactProgress,
+                    ),
+                  ),
+                  MiniPlayerControls(
+                    controller: controller,
+                    playing: playing,
+                    busy: busy,
+                    enabled: enabled,
+                    hasTrack: track != null,
+                    compactProgress: compactProgress,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  // 桌面（≥860）→ 切到「正在播放」tab（go 切分支，外壳常驻）；
-  // 窄屏 → push 全屏播放页（移动专属交互，下滑/返回可退出）。
   void _openPlayer(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 860;
-    if (wide) {
-      context.go(PlayerPage.tabPath);
-    } else {
+    if (usesBottomNavigation(MediaQuery.sizeOf(context).width)) {
       unawaited(context.push(PlayerPage.path));
+    } else {
+      context.go(PlayerPage.tabPath);
     }
-  }
-}
-
-// mini 小方封面，复用全站封面原子。胶囊形态收小到 32：缩略图只做识别，
-// 不抢 dock 的视觉主导（原生 GlassMiniPlayer artwork 同尺寸）。
-class _Cover extends StatelessWidget {
-  const _Cover({required this.capsule, this.url});
-
-  final String? url;
-  final bool capsule;
-
-  @override
-  Widget build(BuildContext context) {
-    return capsule
-        ? HMusicCover(url: url, size: 32, radius: 7, iconSize: 13)
-        : HMusicCover(url: url, size: 42, radius: 8, iconSize: 18);
-  }
-}
-
-class _TrackText extends StatelessWidget {
-  const _TrackText({
-    required this.title,
-    required this.artist,
-    required this.capsule,
-  });
-
-  final String title;
-  final String? artist;
-  final bool capsule;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          // 胶囊题名降到 titleSmall（14），对齐原生 GlassMiniPlayer 的 14 号纪律。
-          style: capsule ? textTheme.titleSmall : textTheme.titleMedium,
-        ),
-        if (artist != null && artist!.isNotEmpty)
-          Text(
-            artist!,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall,
-          ),
-      ],
-    );
   }
 }

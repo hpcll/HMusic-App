@@ -2,6 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/direct/auth/mi_web_verifier.dart';
+import '../../core/direct/direct_session_providers.dart';
+import '../../core/platform_shell/shell_navigation.dart';
+import '../../core/playback/playback_mode.dart';
+import '../../core/playback/playback_mode_controller.dart';
 import '../../core/session/session_controller.dart';
 import '../../core/session/session_providers.dart';
 import '../../core/upgrade/force_upgrade_page.dart';
@@ -9,14 +14,19 @@ import '../../core/upgrade/upgrade_gate.dart';
 import '../../features/auth/views/auth_page.dart';
 import '../../features/charts/views/charts_page.dart';
 import '../../features/connection/views/connection_page.dart';
+import '../../features/direct_auth/views/direct_login_page.dart';
+import '../../features/direct_auth/views/direct_verification_page.dart';
 import '../../features/player/views/lyrics_page.dart';
 import '../../features/player/views/player_page.dart';
-import '../../features/playlists/views/playlists_page.dart';
 import '../../features/queue/views/queue_page.dart';
 import '../../features/search/views/search_page.dart';
 import '../../features/settings/views/settings_page.dart';
 import '../../features/stats/views/stats_page.dart';
 import '../shell/app_shell.dart';
+import '../shell/library_stats_page.dart';
+import '../views/music_library_page.dart';
+import '../views/playback_settings_page.dart';
+import 'output_picker_page.dart';
 
 // 路由守卫与跳转集中在这里：ViewModel 只负责业务结果（authenticated / connected），
 // 不在多处各自 context.go。SessionController 作为 refreshListenable，
@@ -26,141 +36,136 @@ import '../shell/app_shell.dart';
 // （正在播放/搜索/队列/歌单/榜单/统计/设置）。播放、队列与搜索是「双路由」：
 //   tabPath 分支 → 桌面侧栏 tab（外壳常驻，内容区切换）；
 //   /player、/queue、/search 顶级 push 路由 → 窄屏全屏覆盖（系统返回手势可退出）。
-// 窄屏永不进这三个分支（播放/队列走 mini 入口、搜索走榜单页头胶囊），
-// 桌面永不 push 顶级版。
+// 窄屏入口使用覆盖页，宽屏入口使用分支；窗口缩窄仍保留当前分支页面。
 GoRouter buildAppRouter(Ref ref) {
   final session = ref.read(sessionControllerProvider);
   final refreshNotifier = _SessionRefreshNotifier(session);
   ref.onDispose(refreshNotifier.dispose);
   // 强制升级门翻转时驱动 redirect 重算（命中即押入强升页，解除即放行）。
   ref.listen(upgradeGateProvider, (_, __) => refreshNotifier.refresh());
+  ref.listen(playbackModeProvider, (_, __) => refreshNotifier.refresh());
+  final directSession = ref.watch(directSessionControllerProvider);
+  directSession.addListener(refreshNotifier.refresh);
+  ref.onDispose(() => directSession.removeListener(refreshNotifier.refresh));
 
   return GoRouter(
     initialLocation: ConnectionPage.path,
     refreshListenable: refreshNotifier,
-    redirect: (context, state) {
-      // 强制升级门优先于会话门：命中后除强升页与连接页（换兼容服务器的
-      // 逃生口，页内已先 reset）外全部封锁。
-      final gate = ref.read(upgradeGateProvider);
-      final atGate = state.matchedLocation == ForceUpgradePage.path;
-      if (gate.required && !atGate) {
-        return ForceUpgradePage.path;
-      }
-      if (!gate.required && atGate) {
-        // 重新检测通过后放出去（回榜单首页，窄宽两形态都可达）。
-        return ChartsPage.path;
-      }
-      final invalid = session.isInvalid;
-      final atAuth =
-          state.matchedLocation == AuthPage.path ||
-          state.matchedLocation == ConnectionPage.path;
-      if (invalid && !atAuth && !atGate) {
-        return AuthPage.path;
-      }
-      return null;
-    },
+    redirect: (context, state) => _redirectForState(ref, session, state),
     routes: <RouteBase>[
-      GoRoute(
-        path: ForceUpgradePage.path,
-        builder: (context, state) => const ForceUpgradePage(),
-      ),
-      GoRoute(
-        path: ConnectionPage.path,
-        // 只有冷启动落在这条路由上才接续上次的服务器；「更换服务器」入口走
-        // ConnectionPage.switchPath（?switch=1），接续必须关掉，否则原样连回
-        // 上一台再跳走，用户永远换不成。
-        pageBuilder: (context, state) => _fadePage(
-          state,
-          ConnectionPage(
-            autoResume: state.uri.queryParameters['switch'] != '1',
-          ),
-        ),
-      ),
-      GoRoute(
-        path: AuthPage.path,
-        pageBuilder: (context, state) => _fadePage(state, const AuthPage()),
-      ),
-      StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) =>
-            AppShell(navigationShell: navigationShell),
-        branches: <StatefulShellBranch>[
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: PlayerPage.tabPath,
-                builder: (context, state) => const PlayerPage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: SearchPage.tabPath,
-                builder: (context, state) => const SearchPage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: QueuePage.tabPath,
-                builder: (context, state) => const QueuePage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: PlaylistsPage.path,
-                builder: (context, state) => const PlaylistsPage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: ChartsPage.path,
-                builder: (context, state) => const ChartsPage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: StatsPage.path,
-                builder: (context, state) => const StatsPage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: SettingsPage.path,
-                builder: (context, state) => const SettingsPage(),
-              ),
-            ],
-          ),
-        ],
-      ),
-      GoRoute(
-        path: QueuePage.path,
-        builder: (context, state) => const QueuePage(),
-      ),
-      GoRoute(
-        path: SearchPage.path,
-        builder: (context, state) => const SearchPage(),
-      ),
-      GoRoute(
-        path: PlayerPage.path,
-        builder: (context, state) => const PlayerPage(),
-      ),
-      GoRoute(
-        path: LyricsPage.path,
-        builder: (context, state) => const LyricsPage(),
-      ),
+      ..._entryRoutes(),
+      _mainShellRoute(),
+      ..._overlayRoutes(),
     ],
   );
 }
+
+String? _redirectForState(
+  Ref ref,
+  SessionController session,
+  GoRouterState state,
+) {
+  if (ref.read(playbackModeProvider) == PlaybackMode.direct) {
+    final atLogin =
+        state.matchedLocation == DirectLoginPage.path ||
+        state.matchedLocation == DirectVerificationPage.path;
+    if (!atLogin &&
+        (ref.read(directSessionControllerProvider).isInvalid ||
+            state.matchedLocation == ConnectionPage.path ||
+            state.matchedLocation == AuthPage.path ||
+            state.matchedLocation == ForceUpgradePage.path)) {
+      return DirectLoginPage.path;
+    }
+    return null;
+  }
+  if (state.matchedLocation == DirectLoginPage.path ||
+      state.matchedLocation == DirectVerificationPage.path) {
+    return ConnectionPage.path;
+  }
+  // 强制升级门优先于会话门；连接页换兼容服务器时会先 reset 升级门。
+  final gate = ref.read(upgradeGateProvider);
+  final atGate = state.matchedLocation == ForceUpgradePage.path;
+  if (gate.required && !atGate) return ForceUpgradePage.path;
+  if (!gate.required && atGate) return ChartsPage.path;
+  final atAuth =
+      state.matchedLocation == AuthPage.path ||
+      state.matchedLocation == ConnectionPage.path;
+  if (session.isInvalid && !atAuth && !atGate) return AuthPage.path;
+  return null;
+}
+
+List<RouteBase> _entryRoutes() => <RouteBase>[
+  GoRoute(
+    path: DirectVerificationPage.path,
+    redirect: (_, state) =>
+        state.extra is MiWebAuthRequest ? null : DirectLoginPage.path,
+    pageBuilder: (_, state) => NoTransitionPage<MiWebAuthResult>(
+      key: state.pageKey,
+      child: DirectVerificationPage(request: state.extra! as MiWebAuthRequest),
+    ),
+  ),
+  GoRoute(
+    path: DirectLoginPage.path,
+    pageBuilder: (context, state) => _fadePage(state, const DirectLoginPage()),
+  ),
+  GoRoute(
+    path: ForceUpgradePage.path,
+    builder: (context, state) => const ForceUpgradePage(),
+  ),
+  GoRoute(
+    path: ConnectionPage.path,
+    // 冷启动才接续上次服务器；更换服务器的 ?switch=1 关闭自动接续。
+    pageBuilder: (context, state) => _fadePage(
+      state,
+      ConnectionPage(autoResume: state.uri.queryParameters['switch'] != '1'),
+    ),
+  ),
+  GoRoute(
+    path: AuthPage.path,
+    pageBuilder: (context, state) => _fadePage(state, const AuthPage()),
+  ),
+];
+
+// 七分支顺序是历史路由合同，手机入口的归属不改变此表。
+StatefulShellRoute _mainShellRoute() => StatefulShellRoute.indexedStack(
+  builder: (context, state, shell) => AppShell(navigationShell: shell),
+  branches: <StatefulShellBranch>[
+    _pageBranch(PlayerPage.tabPath, const PlayerPage()),
+    _pageBranch(SearchPage.tabPath, const SearchPage()),
+    _pageBranch(QueuePage.tabPath, const QueuePage()),
+    _pageBranch(MusicLibraryPage.path, const MusicLibraryPage()),
+    _pageBranch(ChartsPage.path, const ChartsPage()),
+    _pageBranch(StatsPage.path, const LibraryStatsPage()),
+    _pageBranch(SettingsPage.path, const PlaybackSettingsPage()),
+  ],
+);
+
+StatefulShellBranch _pageBranch(String path, Widget child) =>
+    StatefulShellBranch(
+      routes: <RouteBase>[
+        GoRoute(path: path, builder: (context, state) => child),
+      ],
+    );
+
+List<RouteBase> _overlayRoutes() => <RouteBase>[
+  GoRoute(
+    path: kOutputPickerPath,
+    pageBuilder: (context, state) => OutputPickerPage(key: state.pageKey),
+  ),
+  GoRoute(path: QueuePage.path, builder: (context, state) => const QueuePage()),
+  GoRoute(
+    path: SearchPage.path,
+    builder: (context, state) => const SearchPage(),
+  ),
+  GoRoute(
+    path: PlayerPage.path,
+    builder: (context, state) => const PlayerPage(),
+  ),
+  GoRoute(
+    path: LyricsPage.path,
+    builder: (context, state) => const LyricsPage(),
+  ),
+];
 
 // 开场三连跳（连接页 →登录页 →token 有效则首页）用淡入淡出，不用平台默认的
 // 滑入：两页的品牌块位置、尺寸完全一致，且都处于静止态，淡入淡出下字标看着是

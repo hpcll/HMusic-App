@@ -1,4 +1,5 @@
 import 'chart.dart';
+import 'chart_catalog.dart';
 
 enum ChartsStatus { initial, loading, loaded, error }
 
@@ -9,6 +10,8 @@ class ChartsViewState {
     this.status = ChartsStatus.initial,
     this.charts = const <Chart>[],
     this.previews = const <String, List<ChartEntry>?>{},
+    this.previewErrors = const <String, String>{},
+    this.selectedSource = 'featured',
     this.active,
     this.detail,
     this.detailLoading = false,
@@ -19,6 +22,12 @@ class ChartsViewState {
   final ChartsStatus status;
   final List<Chart> charts;
   final Map<String, List<ChartEntry>?> previews;
+  final Map<String, String> previewErrors;
+  final String selectedSource;
+
+  List<Chart> get personalCharts =>
+      charts.where((chart) => chart.kind == 'spotify-personal').toList();
+  List<Chart> get discovery => discoveryCharts(charts, selectedSource);
 
   // 当前打开的榜单摘要；null = 卡片墙。
   final Chart? active;
@@ -36,6 +45,8 @@ class ChartsViewState {
     ChartsStatus? status,
     List<Chart>? charts,
     Map<String, List<ChartEntry>?>? previews,
+    Map<String, String>? previewErrors,
+    String? selectedSource,
     Chart? active,
     ChartDetail? detail,
     bool? detailLoading,
@@ -49,6 +60,8 @@ class ChartsViewState {
       status: status ?? this.status,
       charts: charts ?? this.charts,
       previews: previews ?? this.previews,
+      previewErrors: previewErrors ?? this.previewErrors,
+      selectedSource: selectedSource ?? this.selectedSource,
       active: clearActive ? null : (active ?? this.active),
       detail: clearDetail ? null : (detail ?? this.detail),
       detailLoading: detailLoading ?? this.detailLoading,

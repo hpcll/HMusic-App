@@ -4,17 +4,17 @@ import 'package:go_router/go_router.dart';
 import 'package:hmusic/app/shell/app_shell.dart';
 import 'package:hmusic/app/shell/bottom_nav.dart';
 
-// 壳层返回兜底：非主页 tab 一级页按系统返回先回榜单分支（kHomeBranch），
+// 壳层返回兜底：非主页 tab 一级页按系统返回先回找歌分支（kHomeBranch），
 // 主页再返回才放行冒泡（真机上交还系统退出 App）。
-GoRouter _router() {
+GoRouter _router({int initialBranch = 1}) {
   return GoRouter(
-    initialLocation: '/t1',
+    initialLocation: '/t$initialBranch',
     routes: <RouteBase>[
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) =>
             HomeBackFallback(shell: shell, child: shell),
         branches: <StatefulShellBranch>[
-          for (var i = 0; i <= kHomeBranch; i++)
+          for (var i = 0; i < 7; i++)
             StatefulShellBranch(
               routes: <RouteBase>[
                 GoRoute(path: '/t$i', builder: (_, _) => Text('tab$i')),
@@ -42,5 +42,24 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('tab$kHomeBranch'), findsOneWidget);
+  });
+
+  testWidgets('手机统计返回曲库，再返回找歌', (tester) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final router = _router(initialBranch: 5);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    expect(find.text('tab5'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('tab3'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('tab4'), findsOneWidget);
   });
 }

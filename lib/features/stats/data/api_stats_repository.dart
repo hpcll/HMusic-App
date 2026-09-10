@@ -1,13 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/direct/direct_providers.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import '../models/stats.dart';
+import 'direct_stats_repository.dart';
 import 'stats_repository.dart';
 
 final Provider<StatsRepository> statsRepositoryProvider =
     Provider<StatsRepository>((ref) {
+      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+        return DirectStatsRepository(ref.watch(directLocalStoreProvider));
+      }
       return ApiStatsRepository(apiClient: ref.watch(apiClientProvider));
     });
 

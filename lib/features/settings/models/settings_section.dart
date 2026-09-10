@@ -3,7 +3,7 @@ enum SettingsSection {
   mi('小米账号'),
   devices('播放设备'),
   sources('LX 音源插件'),
-  downloads('本地下载'),
+  downloads('服务器下载'),
   tracks('手工曲目'),
   config('运行配置'),
   diag('链路诊断'),
@@ -13,4 +13,14 @@ enum SettingsSection {
   const SettingsSection(this.label);
 
   final String label;
+
+  bool get availableDirect => !const [downloads, diag, security].contains(this);
+
+  String title({bool direct = false}) => direct
+      ? switch (this) {
+          sources => '本机音源',
+          config => '直连配置',
+          _ => label,
+        }
+      : label;
 }

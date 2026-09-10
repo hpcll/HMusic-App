@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/startup/app_opening.dart';
 import '../../auth/views/auth_page.dart';
 import '../data/lan_server_scanner.dart';
@@ -96,6 +98,12 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage>
     }
     unawaited(
       Future<void>.microtask(() async {
+        final mode = await ref.read(playbackModeProvider.notifier).restore();
+        if (!mounted) return;
+        if (mode == PlaybackMode.direct) {
+          context.go('/direct/login');
+          return;
+        }
         final notifier = ref.read(connectionViewModelProvider.notifier);
         // 主动来换服务器：只把上次的地址回填进手输框供修改，绝不自动连回去。
         if (!widget.autoResume) {

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/server_info.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/playback/backend_request.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import 'mdns_discovery.dart';
 
@@ -44,6 +46,9 @@ final Provider<LanServerScanner> lanServerScannerProvider =
         ),
         serverConfigStore: ref.watch(serverConfigStoreProvider),
         tokenStore: ref.watch(tokenStoreProvider),
+        beforeRequest: () => BackendRequest.requireServer(ref),
+        requestGeneration: () =>
+            ref.read(playbackModeProvider.notifier).generation,
       );
       return LanServerScanner(
         probe: (base) => probeClient.getMap(

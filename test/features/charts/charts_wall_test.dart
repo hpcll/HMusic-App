@@ -1,42 +1,67 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hmusic/app/theme/hmusic_theme.dart';
 import 'package:hmusic/core/audio/models/hmusic_playback_state.dart';
 import 'package:hmusic/features/charts/data/api_charts_repository.dart';
 import 'package:hmusic/features/charts/data/charts_repository.dart';
 import 'package:hmusic/features/charts/models/chart.dart';
 import 'package:hmusic/features/charts/view_models/charts_view_model.dart';
-import 'package:hmusic/features/charts/widgets/charts_featured_lead.dart';
-import 'package:hmusic/features/charts/widgets/charts_hero.dart';
-import 'package:hmusic/features/charts/widgets/charts_section_row.dart';
+import 'package:hmusic/features/charts/widgets/chart_card.dart';
+import 'package:hmusic/features/charts/widgets/charts_source_filter.dart';
 import 'package:hmusic/features/charts/widgets/charts_wall.dart';
 
-// 假仓库：本站 1 榜（分区应被判纯重复而隐藏）、网易云 2 榜（分区保留完整目录），
-// 详情带 Top3（含 #1 封面）供 Hero 与预览取用，避开 apiClient → 平台通道。
 class _FakeChartsRepository implements ChartsRepository {
-  const _FakeChartsRepository();
+  const _FakeChartsRepository({this.spotify = false});
+  final bool spotify;
 
   @override
-  Future<List<Chart>> getCharts() async => const <Chart>[
-    Chart(id: 'family-hot', name: '本站热歌榜', kind: 'family'),
-    Chart(id: 'netease-hot', name: '云村飙升榜', kind: 'netease'),
-    Chart(id: 'netease-new', name: '云村新歌榜', kind: 'netease'),
+  Future<List<Chart>> getCharts() async => <Chart>[
+    if (spotify) ...const <Chart>[
+      Chart(
+        id: 'spotify-top-short',
+        name: '最近常听',
+        kind: 'spotify-personal',
+        description: 'Spotify 最近 4 周常听曲目',
+      ),
+      Chart(
+        id: 'spotify-top-medium',
+        name: '半年常听',
+        kind: 'spotify-personal',
+        description: 'Spotify 最近 6 个月常听曲目',
+      ),
+      Chart(
+        id: 'spotify-top-long',
+        name: '长期常听',
+        kind: 'spotify-personal',
+        description: 'Spotify 较长时间的常听曲目',
+      ),
+      Chart(
+        id: 'spotify-global-top',
+        name: 'Global Top 50',
+        kind: 'spotify-public',
+      ),
+    ],
+    const Chart(id: 'family-hot', name: '家庭热播', kind: 'family'),
+    const Chart(id: 'netease-hot', name: '热歌榜', kind: 'netease'),
+    const Chart(id: 'netease-new', name: '新歌榜', kind: 'netease'),
+    const Chart(id: 'qq-hot', name: '巅峰热歌榜', kind: 'qq'),
+    const Chart(id: 'apple-cn', name: '热门歌曲 · 中国', kind: 'apple'),
   ];
 
   @override
   Future<ChartDetail> getChart(String id) async => ChartDetail(
     id: id,
-    name: id == 'family-hot' ? '本站热歌榜' : '云村飙升榜',
-    kind: id == 'family-hot' ? 'family' : 'netease',
+    name: id,
+    kind: id.startsWith('spotify-top') ? 'spotify-personal' : 'family',
     entries: const <ChartEntry>[
-      ChartEntry(
-        rank: 1,
-        title: '晴天',
-        artist: '周杰伦',
-        coverUrl: 'https://example.com/1.jpg',
-      ),
+      ChartEntry(rank: 1, title: '晴天', artist: '周杰伦'),
       ChartEntry(rank: 2, title: '稻香', artist: '周杰伦'),
       ChartEntry(rank: 3, title: '七里香', artist: '周杰伦'),
     ],
@@ -47,11 +72,8 @@ class _FakeChartsRepository implements ChartsRepository {
       throw UnimplementedError();
 }
 
-// 只在 initState 触发一次 load()，对齐真实 ChartsPage 的行为——
-// 若写在 build/Consumer builder 里会每帧重调，++_generation 把预取回填判为旧代丢弃。
 class _LoadOnce extends ConsumerStatefulWidget {
   const _LoadOnce();
-
   @override
   ConsumerState<_LoadOnce> createState() => _LoadOnceState();
 }
@@ -60,7 +82,6 @@ class _LoadOnceState extends ConsumerState<_LoadOnce> {
   @override
   void initState() {
     super.initState();
-    // microtask 包裹：避开 initState 内直接改 provider（对齐 ChartsPage.initState）。
     unawaited(
       Future<void>.microtask(
         () => ref.read(chartsViewModelProvider.notifier).load(),
@@ -72,59 +93,188 @@ class _LoadOnceState extends ConsumerState<_LoadOnce> {
   Widget build(BuildContext context) => const ChartsWall();
 }
 
-Future<void> _pump(WidgetTester tester) async {
+Future<void> _pump(
+  WidgetTester tester, {
+  bool spotify = false,
+  double scale = 1,
+  bool dark = false,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         chartsRepositoryProvider.overrideWithValue(
-          const _FakeChartsRepository(),
+          _FakeChartsRepository(spotify: spotify),
         ),
       ],
-      child: const MaterialApp(home: Scaffold(body: _LoadOnce())),
+      child: MaterialApp(
+        theme: dark ? HMusicTheme.dark() : HMusicTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
+        home: const RepaintBoundary(
+          key: ValueKey('charts-review-surface'),
+          child: Scaffold(body: _LoadOnce()),
+        ),
+      ),
     ),
   );
-  // load() 经 microtask 触发 → 目录到达 → 预览预取（二段异步）逐条回填。
-  // pumpAndSettle 推进到静止：骨架↔内容 180ms 淡化是有限动画，无无限循环，不会 hang。
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets('renders view title, hero carousel and section rows', (
-    tester,
-  ) async {
-    await _pump(tester);
-
-    expect(find.text('榜单'), findsOneWidget);
-    // Hero 主推轮播存在（每来源取旗舰一张）。
-    expect(find.byType(ChartsHeroCarousel), findsOneWidget);
-    // 本站只有旗舰一张榜（纯重复分区隐藏），仅网易云（2 榜）保留分区行。
-    expect(find.byType(ChartsSectionRow), findsOneWidget);
-    // 分区标题不挂 chevron：卡带已陈列全部榜单，无下级目的地，箭头是假承诺。
-    expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
-  });
-
-  testWidgets('hero shows source label and serif chart name', (tester) async {
-    await _pump(tester);
-
-    // Hero 卡底部渲染来源小字 + 衬线榜名（首张旗舰 = family）。
-    expect(find.text('本站'), findsWidgets);
-    expect(find.text('本站热歌榜'), findsWidgets);
-  });
-
-  testWidgets('wide layout swaps hero carousel for featured lead strip', (
-    tester,
-  ) async {
-    // ≥860 走桌面分支：主打横滑带（每来源一张主打卡）替代全幅轮播。
-    tester.view.physicalSize = const Size(1280, 800);
+  _registerVisualCaptures();
+  testWidgets('手机默认精选去重，保留搜索入口，榜单页不出现 Spotify 设置', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await _pump(tester);
-
-    // 两个来源各一张主打卡（1280 视口下两张 460 宽卡都可见）。
-    expect(find.byType(ChartsFeaturedLead), findsNWidgets(2));
-    expect(find.byType(ChartsHeroCarousel), findsNothing);
-    // 主打卡渲染眉题（来源 · 每日更新）与 Top3 富文本行。
-    expect(find.text('本站 · 每日更新'), findsOneWidget);
-    expect(find.textContaining('晴天', findRichText: true), findsWidgets);
+    expect(find.text('找歌'), findsOneWidget);
+    expect(find.text('发现榜单'), findsOneWidget);
+    expect(find.text('搜索歌曲或歌手'), findsOneWidget);
+    expect(find.text('家庭热播'), findsOneWidget);
+    expect(find.text('热歌榜'), findsOneWidget);
+    expect(find.text('新歌榜'), findsNothing);
+    expect(find.text('Spotify 设置'), findsNothing);
+    expect(find.text('查看全部'), findsNothing);
   });
+
+  testWidgets('选择平台后展示完整目录，卡片不再重复陈列', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pump(tester);
+    final netease = find.descendant(
+      of: find.byType(ChartsSourceFilter),
+      matching: find.text('网易云音乐'),
+    );
+    await tester.tap(netease);
+    await tester.pumpAndSettle();
+    expect(find.text('新歌榜'), findsOneWidget);
+    expect(find.text('热歌榜'), findsOneWidget);
+    expect(find.text('家庭热播'), findsNothing);
+    expect(find.byType(ChartCard), findsNWidgets(2));
+  });
+
+  testWidgets('宽屏三个 Spotify 常听榜直接显示曲目，无需先打开详情', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pump(tester, spotify: true);
+    expect(find.text('我的 Spotify 榜单'), findsOneWidget);
+    expect(find.text('来自 Spotify 的收听记录'), findsOneWidget);
+    for (final title in ['最近常听', '半年常听', '长期常听']) {
+      final card = find.ancestor(
+        of: find.text(title),
+        matching: find.byType(ChartCard),
+      );
+      expect(
+        find.descendant(of: card, matching: find.text('晴天')),
+        findsOneWidget,
+      );
+    }
+    final horizontal = tester
+        .stateList<ScrollableState>(find.byType(Scrollable))
+        .where(
+          (scrollable) =>
+              scrollable.widget.axisDirection == AxisDirection.right,
+        );
+    for (final scrollable in horizontal) {
+      expect(scrollable.position.maxScrollExtent, 0);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final width in [360.0, 768.0, 1280.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final dark in [false, true]) {
+        testWidgets('榜单 ${width}px / ${scale}x / ${dark ? '深色' : '浅色'} 不溢出', (
+          tester,
+        ) async {
+          tester.view.physicalSize = Size(width, 1000);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          await _pump(tester, spotify: true, scale: scale, dark: dark);
+          expect(tester.takeException(), isNull);
+          final target = find.descendant(
+            of: find.byType(ChartsSourceFilter),
+            matching: find.text('Apple Music'),
+          );
+          await tester.ensureVisible(target);
+          await tester.pumpAndSettle();
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+          expect(find.text('热门歌曲 · 中国'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+}
+
+// 可选的本地视觉验收；正常测试不写文件，不改变字体或依赖宿主字体。
+void _registerVisualCaptures() {
+  const directory = String.fromEnvironment('HMUSIC_CHARTS_CAPTURE_DIR');
+  if (directory.isEmpty) return;
+  const spotify = bool.fromEnvironment(
+    'HMUSIC_CHARTS_CAPTURE_SPOTIFY',
+    defaultValue: true,
+  );
+  const source = String.fromEnvironment('HMUSIC_CHARTS_CAPTURE_SOURCE');
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    final serif = FontLoader('NotoSerifSC')
+      ..addFont(rootBundle.load('assets/fonts/NotoSerifSC-Medium.ttf'))
+      ..addFont(rootBundle.load('assets/fonts/NotoSerifSC-SemiBold.ttf'));
+    await serif.load();
+    await (FontLoader(
+      'MaterialIcons',
+    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    final systemFont = File('/System/Library/Fonts/STHeiti Light.ttc');
+    final bytes = systemFont.existsSync()
+        ? ByteData.sublistView(await systemFont.readAsBytes())
+        : await rootBundle.load('assets/fonts/NotoSerifSC-Medium.ttf');
+    await (FontLoader('Roboto')..addFont(Future.value(bytes))).load();
+    await (FontLoader('PingFang SC')..addFont(Future.value(bytes))).load();
+  });
+  for (final (name, size, scale, dark) in <(String, Size, double, bool)>[
+    ('desktop-light', const Size(1280, 1050), 1, false),
+    ('desktop-dark', const Size(1280, 1050), 1, true),
+    ('mobile', const Size(390, 844), 1, false),
+    ('mobile-large-text', const Size(390, 844), 2, false),
+  ]) {
+    testWidgets('榜单视觉 $name', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await _pump(tester, spotify: spotify, scale: scale, dark: dark);
+      if (source.isNotEmpty) {
+        final target = find.descendant(
+          of: find.byType(ChartsSourceFilter),
+          matching: find.text(source),
+        );
+        await tester.ensureVisible(target);
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+      }
+      expect(tester.takeException(), isNull);
+      final surface = tester.renderObject<RenderRepaintBoundary>(
+        find.byKey(const ValueKey('charts-review-surface')),
+      );
+      await tester.runAsync(() async {
+        final image = await surface.toImage();
+        try {
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          await Directory(directory).create(recursive: true);
+          await File(
+            '$directory/app-$name.png',
+          ).writeAsBytes(bytes!.buffer.asUint8List());
+        } finally {
+          image.dispose();
+        }
+      });
+    });
+  }
 }

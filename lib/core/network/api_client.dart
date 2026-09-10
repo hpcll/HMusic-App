@@ -5,6 +5,8 @@ import '../config/server_config_store.dart';
 import '../security/token_store.dart';
 import 'api_failure.dart';
 
+part 'api_client_errors.dart';
+
 typedef UnauthorizedHandler = Future<void> Function();
 
 // 服务端按版本门槛拒绝服务时回调（403 APP_VERSION_TOO_OLD），参数是它要求的最低版本。
@@ -20,16 +22,35 @@ class ApiClient {
     required ServerConfigStore serverConfigStore,
     required TokenStore tokenStore,
     UnauthorizedHandler? onUnauthorized,
+    Future<void> Function()? beforeRequest,
+    int Function()? requestGeneration,
   }) : _dio = dio,
        _serverConfigStore = serverConfigStore,
        _tokenStore = tokenStore,
-       _onUnauthorized = onUnauthorized;
+       _onUnauthorized = onUnauthorized,
+       _beforeRequest = beforeRequest,
+       _requestGeneration = requestGeneration;
 
   final Dio _dio;
   final ServerConfigStore _serverConfigStore;
   final TokenStore _tokenStore;
   UnauthorizedHandler? _onUnauthorized;
   VersionRejectedHandler? _onVersionRejected;
+  final Future<void> Function()? _beforeRequest;
+  final int Function()? _requestGeneration;
+
+  bool _current(int? generation) =>
+      generation == null || generation == _requestGeneration?.call();
+
+  void _requireCurrent(int? generation) {
+    if (!_current(generation)) throw _backendChanged;
+  }
+
+  static const _backendChanged = ApiFailure(
+    kind: ApiFailureKind.invalidConfiguration,
+    code: 'PLAYBACK_BACKEND_CHANGED',
+    message: '播放模式已切换，请重新操作',
+  );
 
   // 由 SessionGuard 注入：401 时触发停本机音频，并经 SessionController 单飞跳登录页。
   void registerUnauthorizedHandler(UnauthorizedHandler handler) {
@@ -101,7 +122,10 @@ class ApiClient {
     required String filePath,
     void Function(int sent, int total)? onProgress,
   }) async {
+    int? generation;
     try {
+      await _beforeRequest?.call();
+      generation = _requestGeneration?.call();
       final base = await _serverConfigStore.read();
       if (base == null) {
         throw const ApiFailure(
@@ -117,15 +141,21 @@ class ApiClient {
       final form = FormData.fromMap(<String, Object?>{
         'file': await MultipartFile.fromFile(filePath),
       });
+      _requireCurrent(generation);
       final response = await _dio.requestUri<Object?>(
         _buildUri(base, path, null),
         data: form,
         options: Options(method: 'POST', headers: headers),
         onSendProgress: onProgress,
       );
+      _requireCurrent(generation);
       return _asMap(response.data);
     } on DioException catch (error) {
-      throw await _mapDioFailure(error, authenticated: true);
+      throw await _mapDioFailure(
+        error,
+        authenticated: true,
+        generation: generation,
+      );
     } on ApiFailure {
       rethrow;
     } catch (error) {
@@ -148,7 +178,10 @@ class ApiClient {
     // 存储读取（server base / token）也必须在 try 内：钥匙串锁定等底层
     // PlatformException 要归一成 ApiFailure，否则「on ApiFailure 尽力而为」
     // 的调用方（周期上报、ended 推进）会被裸异常击穿。
+    int? generation;
     try {
+      await _beforeRequest?.call();
+      generation = _requestGeneration?.call();
       final base = serverBase ?? await _serverConfigStore.read();
       if (base == null) {
         throw const ApiFailure(
@@ -165,14 +198,20 @@ class ApiClient {
         }
       }
 
+      _requireCurrent(generation);
       final response = await _dio.requestUri<Object?>(
         _buildUri(base, path, query),
         data: body,
         options: Options(method: method, headers: headers),
       );
+      _requireCurrent(generation);
       return _asMap(response.data);
     } on DioException catch (error) {
-      throw await _mapDioFailure(error, authenticated: authenticated);
+      throw await _mapDioFailure(
+        error,
+        authenticated: authenticated,
+        generation: generation,
+      );
     } on ApiFailure {
       rethrow;
     } catch (error) {
@@ -203,77 +242,5 @@ class ApiClient {
       kind: ApiFailureKind.invalidResponse,
       message: '服务器返回了无法识别的数据',
     );
-  }
-
-  Future<ApiFailure> _mapDioFailure(
-    DioException error, {
-    required bool authenticated,
-  }) async {
-    if (error.type == DioExceptionType.connectionTimeout ||
-        error.type == DioExceptionType.sendTimeout ||
-        error.type == DioExceptionType.receiveTimeout) {
-      return const ApiFailure(
-        kind: ApiFailureKind.timeout,
-        message: '连接服务器超时，请检查地址和网络',
-      );
-    }
-    if (error.type == DioExceptionType.connectionError) {
-      return const ApiFailure(
-        kind: ApiFailureKind.offline,
-        message: '连不上服务器，检查地址和网络后重试',
-      );
-    }
-
-    final statusCode = error.response?.statusCode;
-    final payload = _tryMap(error.response?.data);
-    final nestedError = _tryMap(payload?['error']);
-    final code = nestedError?['code'] as String?;
-    final message = nestedError?['message'] as String?;
-    // 服务端按版本门槛拒绝服务：当场关强升门（不等门控下一轮自检），并把它
-    // 要求的版本透出去。门槛由部署者掌握（见 Server shared/version.ts）。
-    if (statusCode == 403 && code == 'APP_VERSION_TOO_OLD') {
-      final details = _tryMap(nestedError?['details']);
-      final required = '${details?['minAppVersion'] ?? ''}';
-      _onVersionRejected?.call(required);
-      return ApiFailure(
-        kind: ApiFailureKind.server,
-        message: message ?? '当前 App 版本过旧，请升级后使用',
-        code: code,
-        statusCode: statusCode,
-        details: nestedError?['details'],
-      );
-    }
-    if (statusCode == 401) {
-      // 只有带凭据的请求收到 401 才意味着「本会话失效」。未认证探测
-      //（连接页探活、局域网扫描）撞上陌生设备的 401 不能清 token 登出。
-      if (authenticated) {
-        await _tokenStore.clear();
-        final handler = _onUnauthorized;
-        if (handler != null) {
-          // SessionController 内部去重，这里重复触发也安全。
-          await handler();
-        }
-      }
-      return ApiFailure(
-        kind: ApiFailureKind.unauthorized,
-        message: message ?? '登录已失效，请重新登录',
-        code: code ?? 'UNAUTHORIZED',
-        statusCode: statusCode,
-        details: nestedError?['details'],
-      );
-    }
-    return ApiFailure(
-      kind: ApiFailureKind.server,
-      message: message ?? '服务器请求失败 (${statusCode ?? '未知状态'})',
-      code: code,
-      statusCode: statusCode,
-      details: nestedError?['details'],
-    );
-  }
-
-  Map<String, Object?>? _tryMap(Object? value) {
-    if (value is Map<String, Object?>) return value;
-    if (value is Map<String, dynamic>) return Map<String, Object?>.from(value);
-    return null;
   }
 }

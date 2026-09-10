@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../core/audio/models/hmusic_playback_state.dart';
+import '../../../core/platform/client_playback_capabilities.dart';
 import '../view_models/lyric_view_model.dart';
 import '../view_models/player_view_model.dart';
 import '../widgets/lyric_scroll_view.dart';
@@ -45,7 +46,7 @@ class _LyricsBody extends ConsumerWidget {
     // 进度真相源经 playbackPositionOf 分流（本机 just_audio / 远端服务端回读）。
     final positionMs = playbackPositionOf(ref, state).inMilliseconds;
     final activeLine = ref
-        .read(lyricViewModelProvider.notifier)
+        .watch(lyricViewModelProvider)
         .activeLineFor(positionMs);
 
     return Column(
@@ -58,12 +59,14 @@ class _LyricsBody extends ConsumerWidget {
         Expanded(
           child: LyricScrollView(
             activeLine: activeLine,
-            seekEnabled: state.seekEnabled,
+            seekEnabled:
+                state.seekEnabled &&
+                ref.watch(clientPlaybackCapabilitiesProvider).canControl(state),
             onLineTap: (timeMs) =>
                 controller.seek(Duration(milliseconds: timeMs)),
           ),
         ),
-        LyricsMiniControls(state: state, controller: controller),
+        LyricsMiniControls(state: state),
       ],
     );
   }

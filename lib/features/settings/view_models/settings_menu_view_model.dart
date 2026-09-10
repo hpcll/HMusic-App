@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/playback/backend_request.dart';
 
 import '../data/api_settings_repository.dart';
 import '../models/settings_menu_state.dart';
@@ -13,12 +14,22 @@ settingsMenuViewModelProvider =
 // 设置中心框架：子页导航 + 菜单实时摘要（并发五路拉取，见 repository）。
 class SettingsMenuViewModel extends Notifier<SettingsMenuState> {
   @override
-  SettingsMenuState build() => const SettingsMenuState();
+  SettingsMenuState build() {
+    ref.watch(settingsRepositoryProvider);
+    return const SettingsMenuState();
+  }
 
   Future<void> loadSummary() async {
+    final request = BackendRequest(ref);
     state = state.copyWith(summaryLoading: true);
-    final summary = await ref.read(settingsRepositoryProvider).loadSummary();
-    state = state.copyWith(summary: summary, summaryLoading: false);
+    try {
+      final summary = await ref.read(settingsRepositoryProvider).loadSummary();
+      if (request.current) {
+        state = state.copyWith(summary: summary, summaryLoading: false);
+      }
+    } catch (_) {
+      if (request.current) state = state.copyWith(summaryLoading: false);
+    }
   }
 
   void open(SettingsSection section) {

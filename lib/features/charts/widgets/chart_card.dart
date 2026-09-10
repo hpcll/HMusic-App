@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/hmusic_palette.dart';
 import '../../../shared/widgets/hmusic_card.dart';
-import '../../../shared/widgets/hmusic_cover.dart';
-import '../../../shared/widgets/pressable_scale.dart';
 import '../models/chart.dart';
+import 'chart_card_header.dart';
+import 'chart_preview_song.dart';
 
-// 榜单卡片，对齐 web .chart-card：卡头(#1 封面 + 衬线榜名) + Top3 可点播预览。
-// 整卡点击进详情（不再放「查看全部」文字行——与整卡点击同义的冗余入口）。
-// preview: null 且 pending=true → 骨架占位；null 且 pending=false → 回退描述；非空 → Top3 行。
+// 榜单卡片：方封面、两行榜名和分层的 Top3；固定包络按实际字号计算。
 class ChartCard extends StatelessWidget {
   const ChartCard({
     required this.chart,
@@ -16,6 +14,8 @@ class ChartCard extends StatelessWidget {
     required this.pending,
     required this.onOpen,
     required this.onPlayEntry,
+    this.errorMessage,
+    this.onRetry,
     super.key,
   });
 
@@ -24,14 +24,19 @@ class ChartCard extends StatelessWidget {
   final bool pending;
   final VoidCallback onOpen;
   final void Function(ChartEntry entry) onPlayEntry;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
+
+  static double heightFor(TextScaler scaler) =>
+      28 +
+      ChartCardHeader.heightFor(scaler) +
+      12 +
+      ChartPreviewSong.heightFor(scaler) * 3;
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    final cover = (preview != null && preview!.isNotEmpty)
-        ? preview!.first.coverUrl
-        : null;
-
+    final scaler = MediaQuery.textScalerOf(context);
+    final cover = preview?.isNotEmpty == true ? preview!.first.coverUrl : null;
     return HMusicCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       onTap: onOpen,
@@ -39,39 +44,14 @@ class ChartCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              HMusicCover(url: cover, size: 44, radius: 7, iconSize: 16),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  chart.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'NotoSerifSC',
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: palette.textStrong,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // 固定预览区高度：Top3 不足 3 首或走描述回退时卡片仍等高，网格对齐（对齐 web min-height）。
-          // 78 = 3 行 × (文本行高 + 6 竖向内距) 的包络，Android 字体度量比桌面高零点几像素，
-          // 76 会精确溢出 0.563px（黄黑警告条），留 2px 余量。包络随 textScaler 等比伸缩
-          //（padding 部分不随字号，等比即富余），任何字号档都不溢出。
-          // 骨架 ↔ 内容切换走 180ms 淡化（同 toast 入场档），避免加载完成瞬跳。
+          ChartCardHeader(chart: chart, cover: cover),
+          const SizedBox(height: 12),
           SizedBox(
-            height: 78 * MediaQuery.textScalerOf(context).scale(1),
+            height: ChartPreviewSong.heightFor(scaler) * 3,
             child: AnimatedSwitcher(
               duration: MediaQuery.disableAnimationsOf(context)
                   ? Duration.zero
                   : const Duration(milliseconds: 180),
-              switchInCurve: Curves.easeOut,
-              switchOutCurve: Curves.easeIn,
               child: _preview(context),
             ),
           ),
@@ -83,117 +63,69 @@ class ChartCard extends StatelessWidget {
   Widget _preview(BuildContext context) {
     final palette = context.palette;
     if (pending && preview == null) {
-      return const _PreviewSkeleton();
+      return Column(
+        children: <Widget>[
+          for (final width in const <double>[0.9, 0.72, 0.55])
+            SizedBox(
+              height: ChartPreviewSong.heightFor(
+                MediaQuery.textScalerOf(context),
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: width,
+                  child: Container(
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: palette.panelSecondary,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
     }
     final entries = preview;
+    if (errorMessage != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            errorMessage!,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: palette.muted, height: 1.5),
+          ),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onRetry, child: const Text('重试')),
+        ],
+      );
+    }
     if (entries == null || entries.isEmpty) {
-      return Text(
-        chart.description ?? '',
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 12, color: palette.muted, height: 1.5),
+      return Align(
+        alignment: Alignment.topLeft,
+        child: Text(
+          entries == null
+              ? chart.description ?? '暂无榜单曲目'
+              : chart.kind == 'family'
+              ? '在 HMusic 听几首歌，这里就会有你的常听记录。'
+              : chart.kind == 'spotify-personal'
+              ? 'Spotify 暂无这个时段的收听记录。'
+              : '暂无榜单曲目',
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 12, color: palette.muted, height: 1.5),
+        ),
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        for (final entry in entries)
-          _PreviewSong(entry: entry, onTap: () => onPlayEntry(entry)),
+        for (final entry in entries.take(3))
+          ChartPreviewSong(entry: entry, onTap: () => onPlayEntry(entry)),
       ],
-    );
-  }
-}
-
-// 加载骨架：三行递减灰条复用 78 包络（行高对齐真实预览行 24），静态不闪烁——
-// 预览接口够快，呼吸动画反而喧宾夺主。
-class _PreviewSkeleton extends StatelessWidget {
-  const _PreviewSkeleton();
-
-  static const List<double> _widths = <double>[0.9, 0.72, 0.55];
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        for (final width in _widths)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: width,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: palette.panelSecondary,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const SizedBox(height: 12),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// 卡片内预览行：序号 + 歌名 + 歌手，点击直接点播（不冒泡进详情）。
-// 第一名序号用衬线 + 加深墨色（web .chart-rank.top 范式：强调不靠颜色）。
-class _PreviewSong extends StatelessWidget {
-  const _PreviewSong({required this.entry, required this.onTap});
-
-  final ChartEntry entry;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final top = entry.rank == 1;
-    return PressableScale(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: <Widget>[
-            SizedBox(
-              width: 13,
-              child: Text(
-                '${entry.rank}',
-                style: top
-                    ? TextStyle(
-                        fontFamily: 'NotoSerifSC',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: palette.textStrong,
-                      )
-                    : TextStyle(fontSize: 12, color: palette.muted),
-              ),
-            ),
-            const SizedBox(width: 7),
-            Flexible(
-              child: Text(
-                entry.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 13, color: palette.text),
-              ),
-            ),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                entry.artist,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: palette.muted),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

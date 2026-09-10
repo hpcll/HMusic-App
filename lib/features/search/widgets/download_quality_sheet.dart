@@ -25,15 +25,26 @@ Future<String?> showDownloadQualitySheet(
   BuildContext context,
   HMusicTrack track,
 ) {
-  final qualities = track.qualities.isNotEmpty
-      ? track.qualities
-      : _standardQualities;
   return showModalBottomSheet<String>(
     context: context,
     showDragHandle: true,
-    builder: (context) {
-      final palette = context.palette;
-      return SafeArea(
+    builder: (context) => _DownloadQualityOptions(track: track),
+  );
+}
+
+class _DownloadQualityOptions extends StatelessWidget {
+  const _DownloadQualityOptions({required this.track});
+
+  final HMusicTrack track;
+
+  @override
+  Widget build(BuildContext context) {
+    final qualities = track.qualities.isNotEmpty
+        ? track.qualities
+        : _standardQualities;
+    final palette = context.palette;
+    return SafeArea(
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -43,6 +54,13 @@ Future<String?> showDownloadQualitySheet(
               child: Text(
                 '下载到服务器',
                 style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text(
+                '保存到已连接的服务器',
+                style: TextStyle(fontSize: 12.5, color: palette.muted),
               ),
             ),
             Padding(
@@ -70,7 +88,7 @@ Future<String?> showDownloadQualitySheet(
             const SizedBox(height: 8),
           ],
         ),
-      );
-    },
-  );
+      ),
+    );
+  }
 }

@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_version.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/backend_request.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/upgrade/app_update_badge.dart';
 import '../../../core/upgrade/upgrade_config_store.dart';
 import '../../../shared/models/hmusic_notice.dart';
@@ -24,6 +27,7 @@ class UpdateViewModel extends Notifier<UpdateState> {
 
   @override
   UpdateState build() {
+    ref.watch(playbackModeProvider);
     ref.onDispose(_stopPolling);
     return const UpdateState();
   }
@@ -35,7 +39,8 @@ class UpdateViewModel extends Notifier<UpdateState> {
   // 「检查更新」才看得到「下载并安装」。红点说的和这一页说的必须是同一件事。
   Future<void> load() async {
     await Future.wait(<Future<void>>[
-      _loadServerVersion(),
+      if (ref.read(playbackModeProvider) == PlaybackMode.server)
+        _loadServerVersion(),
       loadAppRelease(),
       _loadRemoteLinks(),
     ]);
@@ -46,11 +51,12 @@ class UpdateViewModel extends Notifier<UpdateState> {
   // iOS 链接没有——没上架时 iOS 端本来就不给下载动作，这条退路恰恰在网络
   // 最差时才被用到，不能反过来依赖网络。
   Future<void> _loadRemoteLinks() async {
+    final request = BackendRequest(ref);
     try {
       final config =
           await ref.read(updateRepositoryProvider).remoteAppConfig() ??
           await ref.read(upgradeConfigStoreProvider).read();
-      if (config == null) return;
+      if (config == null || !request.current) return;
       final netdisk = config.netdiskUrl ?? '';
       if (netdisk.isNotEmpty) state = state.copyWith(netdiskUrl: netdisk);
       final ios = config.iosUrl ?? '';
@@ -61,8 +67,10 @@ class UpdateViewModel extends Notifier<UpdateState> {
   }
 
   Future<void> _loadServerVersion() async {
+    final request = BackendRequest(ref);
     try {
       final version = await ref.read(updateRepositoryProvider).serverVersion();
+      if (!request.current) return;
       state = state.copyWith(serverVersion: version);
     } catch (_) {
       // 拿不到就先空着，检查更新时会再报具体错误。
@@ -70,11 +78,13 @@ class UpdateViewModel extends Notifier<UpdateState> {
   }
 
   Future<void> loadAppRelease() async {
+    final request = BackendRequest(ref);
     if (state.checkingApp) return;
     try {
       final release = await ref
           .read(updateRepositoryProvider)
           .latestAppRelease();
+      if (!request.current) return;
       state = state.copyWith(appRelease: release, appReleaseChecked: true);
       // 顺手把版本号记给红点，省掉它自己再发一次请求。
       await ref
@@ -86,10 +96,13 @@ class UpdateViewModel extends Notifier<UpdateState> {
   }
 
   Future<void> checkServer() async {
+    if (ref.read(playbackModeProvider) != PlaybackMode.server) return;
+    final request = BackendRequest(ref);
     if (state.checkingServer || state.upgrading) return;
     state = state.copyWith(checkingServer: true, clearServerUpdate: true);
     try {
       final info = await ref.read(updateRepositoryProvider).checkServer();
+      if (!request.current) return;
       state = state.copyWith(
         checkingServer: false,
         serverUpdate: info,
@@ -97,6 +110,7 @@ class UpdateViewModel extends Notifier<UpdateState> {
         notice: info.hasUpdate ? null : const HMusicNotice.success('服务端已是最新版本'),
       );
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(
         checkingServer: false,
         notice: HMusicNotice.error(failure.message),
@@ -105,15 +119,18 @@ class UpdateViewModel extends Notifier<UpdateState> {
   }
 
   Future<void> checkApp() async {
+    final request = BackendRequest(ref);
     if (state.checkingApp) return;
     state = state.copyWith(checkingApp: true, clearAppRelease: true);
     try {
       final release = await ref
           .read(updateRepositoryProvider)
           .latestAppRelease();
+      if (!request.current) return;
       await ref
           .read(appUpdateBadgeProvider.notifier)
           .noteVersion(release?.version ?? '');
+      if (!request.current) return;
       state = state.copyWith(
         checkingApp: false,
         appRelease: release,
@@ -125,6 +142,7 @@ class UpdateViewModel extends Notifier<UpdateState> {
             : const HMusicNotice.success('App 已是最新版本'),
       );
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(
         checkingApp: false,
         appReleaseChecked: true,
@@ -134,12 +152,16 @@ class UpdateViewModel extends Notifier<UpdateState> {
   }
 
   Future<void> upgradeServer() async {
+    if (ref.read(playbackModeProvider) != PlaybackMode.server) return;
+    final request = BackendRequest(ref);
     if (state.upgrading) return;
     final before = state.serverUpdate?.current ?? state.serverVersion;
     state = state.copyWith(upgrading: true);
     try {
       await ref.read(updateRepositoryProvider).triggerServerUpdate();
+      if (!request.current) return;
     } on ApiFailure catch (failure) {
+      if (!request.current) return;
       state = state.copyWith(
         upgrading: false,
         notice: HMusicNotice.error(failure.message),
@@ -153,6 +175,7 @@ class UpdateViewModel extends Notifier<UpdateState> {
   // 版本号变化 = 升级完成；超时不代表失败（弱设备 npm install 可能很慢），
   // 提示去看服务端日志。按轮询次数计超时（不依赖真实时钟，可测）。
   void _pollUntilVersionChanges(String before) {
+    final request = BackendRequest(ref);
     _stopPolling();
     final maxTicks =
         _pollTimeout.inMilliseconds ~/ _pollInterval.inMilliseconds;
@@ -163,6 +186,7 @@ class UpdateViewModel extends Notifier<UpdateState> {
         final version = await ref
             .read(updateRepositoryProvider)
             .serverVersion();
+        if (!request.current) return;
         if (version.isNotEmpty && version != before) {
           _stopPolling();
           state = state.copyWith(
@@ -177,6 +201,7 @@ class UpdateViewModel extends Notifier<UpdateState> {
         // 服务端正在重启，下一轮再探。
       }
       if (ticks >= maxTicks) {
+        if (!request.current) return;
         _stopPolling();
         state = state.copyWith(
           upgrading: false,

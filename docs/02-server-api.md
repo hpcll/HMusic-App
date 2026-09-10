@@ -2,7 +2,9 @@
 
 > 读者：写数据层的人。基址 `{SERVER}/api/v1`（`{SERVER}` = 用户填的 `http://IP:8090`）。
 > 除标注「公开」外，全部需 `Authorization: Bearer <token>`。
-> 错误统一格式：`{ error: { code, message, details } }`；HTTP 401 一律视为登录失效清 token。
+> 错误统一格式：`{ error: { code, message, details } }`；当前 Server 会话的 HTTP 401 清 token。
+> 旧模式/旧 token 的迟到响应不得清新会话。本文只描述 Server 契约；直连小米与音乐上游
+> 使用独立传输、凭据及错误处理，见 [14 - 直连模式](14-direct-mode-migration-plan.md)。
 > 来源：`HMusic-Server/src/app.ts` 路由表 + 各 `*.routes.ts` 的 Zod schema（2026-07-12 复核）。
 > 审计基线：HMusic-Server main + 当前工作树（queueIndex/真探测/切设备同步/下载缓存/策略配置生效）。
 
@@ -141,19 +143,28 @@ DownloadRecord { id;trackKey;source;title;artist;album?;coverUrl?;track;quality?
 
 ## 7. Charts `/charts`
 
-| GET | `/` | → `{charts: {id,name,description,kind}[]}` kind: family\|netease\|qq\|apple |
+| GET | `/` | → `{charts: {id,name,description,kind}[]}` kind: family\|netease\|qq\|apple\|spotify-personal\|spotify-public；已连接 Spotify 时自动包含其榜单。`?includeSpotify=false` 排除 Spotify（商店版使用） |
 | GET | `/:id` | → `{...summary, updatedAt, entries: ChartEntry[]}` |
-| POST | `/:id/play` | `{startIndex?, deviceId?}` 整榜播放（仅条目带 track 的榜；Apple 榜返回 409 CHART_NOT_PLAYABLE） |
+| POST | `/:id/play` | `{startIndex?, deviceId?}` 整榜播放；Apple/Spotify 元数据榜先匹配，首个命中开播、其余后台追加 |
 
 ChartEntry: `{rank,title,artist,album?,coverUrl?,playCount?,track?}`。
 榜单 id：`family` / `wy-hot,wy-new,wy-soar,wy-origin` / `qq-hot,qq-new,qq-soar` /
 `apple-cn,apple-us,apple-jp,apple-kr,apple-tw,apple-hk`。
 family/wy-*/qq-* 的 entry 带 track（点了直接播）；apple-* 无 track（前端搜索匹配）。
 
-## 7½. Spotify `/spotify`（个人自用，2026-09-04 契约冻结；App 接入待做）
+2026-09-08：Spotify 榜单纳入相同目录、详情及整榜播放契约。个人榜 id 为
+`spotify-top-short` / `spotify-top-medium` / `spotify-top-long`；公开榜为
+`spotify-global-top` / `spotify-global-viral` / `spotify-hk-top`。详情返回最多 50 首
+元数据，卡片取前三首；预览与详情复用同一请求，个人榜不再等打开详情后才加载。
+Spotify 整榜播放继续使用既有匹配和队列取消规则。此 `/charts` 入口的上游登录
+失效为 **409 `SPOTIFY_SESSION_INVALID`**，不能让 Spotify 过期清掉 HMusic 登录。
+商店版在 Repository 禁用 Spotify 目录、详情和播放；旧 Server 不支持这些 id 时
+仍可正常使用原有榜单。
+
+## 7½. Spotify `/spotify`（个人自用；App 已接统一榜单，账号管理和个人歌单待接）
 
 非官方个人通道（ADR-0003 边界内，商店版禁用）：服务端持 `sp_dc` 换 web player
-token，数据走 Spotify 官方 /v1，播放一律 LX 匹配链。详细行为见 HMusic-Server
+token，数据默认走 Web Player Pathfinder，`SPOTIFY_DATA_API=api` 为显式回退；播放沿用 LX 匹配链。详细行为见 HMusic-Server
 docs/FEATURES.md §五½。错误码：`SPOTIFY_NOT_LINKED`(409 未绑定)、
 `SPOTIFY_SESSION_INVALID`(401 sp_dc 失效→重新粘贴)、`SPOTIFY_SECRETS_*`/
 `SPOTIFY_TOKEN_UNREACHABLE`/`SPOTIFY_API_*`(502 上游)、`SPOTIFY_MATCH_EMPTY`(409)。

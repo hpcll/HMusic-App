@@ -1,14 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../audio/models/hmusic_playback_state.dart' show PlayMode, PlayModeWire;
+import '../direct/direct_providers.dart';
 import '../models/hmusic_track.dart';
 import '../network/api_client.dart';
+import '../playback/playback_mode.dart';
+import '../playback/playback_mode_controller.dart';
 import '../providers/infrastructure_providers.dart';
 import 'models/hmusic_queue.dart';
 import 'queue_repository.dart';
 
 final Provider<QueueRepository> queueRepositoryProvider =
     Provider<QueueRepository>((ref) {
+      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+        return ref.watch(directQueueRepositoryProvider);
+      }
       return ApiQueueRepository(apiClient: ref.watch(apiClientProvider));
     });
 

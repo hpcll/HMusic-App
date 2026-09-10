@@ -3,167 +3,35 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hmusic/core/audio/models/hmusic_playback_state.dart' as server;
 import 'package:hmusic/core/platform_shell/platform_shell_bridge.dart';
 import 'package:hmusic/core/platform_shell/platform_shell_controller.dart';
-import 'package:hmusic/features/charts/views/charts_page.dart';
-import 'package:hmusic/features/player/view_models/player_view_model.dart';
 import 'package:hmusic/features/player/views/player_page.dart';
-import 'package:hmusic/features/search/views/search_page.dart';
 import 'package:hmusic/features/settings/views/settings_page.dart';
 
-class _FakeBridge implements PlatformShellBridge {
-  // ignore: close_sinks - closed in tearDown
-  final StreamController<ShellIntent> intentController =
-      StreamController<ShellIntent>.broadcast();
-  // ignore: close_sinks - closed in tearDown
-  final StreamController<ShellReady> readyController =
-      StreamController<ShellReady>.broadcast();
-  // ignore: close_sinks - closed in tearDown
-  final StreamController<ShellLayout> layoutController =
-      StreamController<ShellLayout>.broadcast();
-
-  String? lastTab;
-  String? lastTitle;
-  bool? lastCanGoBack;
-  bool configuredDark = false;
-  (String?, String?, String?, String?, bool)? lastNowPlaying;
-  (bool, bool)? lastLayout;
-  final List<bool> scrollReports = <bool>[];
-
-  @override
-  Stream<ShellReady> get readyEvents => readyController.stream;
-
-  @override
-  Stream<ShellLayout> get layoutChanges => layoutController.stream;
-
-  @override
-  Stream<ShellIntent> get intents => intentController.stream;
-
-  @override
-  Future<void> configure({
-    required bool darkMode,
-    required bool reduceMotion,
-    required bool reduceTransparency,
-  }) async {
-    configuredDark = darkMode;
-  }
-
-  @override
-  Future<void> updateNavigation({
-    required String selectedTab,
-    required String title,
-    required bool canGoBack,
-  }) async {
-    lastTab = selectedTab;
-    lastTitle = title;
-    lastCanGoBack = canGoBack;
-  }
-
-  @override
-  Future<void> updateNowPlaying({
-    required String? trackId,
-    required String? title,
-    required String? artist,
-    required String? artworkUrl,
-    required bool playing,
-  }) async {
-    lastNowPlaying = (trackId, title, artist, artworkUrl, playing);
-  }
-
-  @override
-  Future<void> updateLayout({
-    required bool showTabBar,
-    required bool showMiniPlayer,
-  }) async {
-    lastLayout = (showTabBar, showMiniPlayer);
-  }
-
-  @override
-  Future<void> updateScroll({required bool minimized}) async {
-    scrollReports.add(minimized);
-  }
-}
-
-class _RecordingPlayerViewModel implements PlayerViewModel {
-  final List<String> calls = <String>[];
-
-  @override
-  Future<void> play() async => calls.add('play');
-
-  @override
-  Future<void> pause() async => calls.add('pause');
-
-  @override
-  Future<void> seek(Duration position) async => calls.add('seek');
-
-  @override
-  Future<void> skipToNext() async => calls.add('next');
-
-  @override
-  Future<void> setDeviceVolume(int volume) async =>
-      calls.add('setDeviceVolume');
-
-  @override
-  Future<void> skipToPrevious() async => calls.add('previous');
-
-  @override
-  Future<void> setPlayMode(server.PlayMode mode) async => calls.add('mode');
-
-  @override
-  Future<void> setLocalVolume(double volume) async => calls.add('volume');
-
-  @override
-  Future<double> readLocalVolume() async => 0.5;
-}
-
-Widget _placeholder(String label) => Scaffold(body: Text(label));
-
-GoRouter _router() => GoRouter(
-  initialLocation: SearchPage.path,
-  routes: <RouteBase>[
-    GoRoute(
-      path: SearchPage.path,
-      builder: (context, state) => _placeholder('search'),
-    ),
-    GoRoute(
-      path: ChartsPage.path,
-      builder: (context, state) => _placeholder('charts'),
-    ),
-    GoRoute(
-      path: SettingsPage.path,
-      builder: (context, state) => _placeholder('settings'),
-    ),
-    GoRoute(
-      path: PlayerPage.path,
-      builder: (context, state) => _placeholder('player'),
-    ),
-  ],
-);
+import 'support/platform_shell_fixture.dart';
 
 void main() {
-  late _FakeBridge bridge;
-  late _RecordingPlayerViewModel player;
+  late FakeShellBridge bridge;
+  late RecordingShellPlayer player;
   late PlatformShellController controller;
   late GoRouter router;
 
   setUp(() {
-    bridge = _FakeBridge();
-    player = _RecordingPlayerViewModel();
-    router = _router();
+    bridge = FakeShellBridge();
+    player = RecordingShellPlayer();
+    router = createShellRouter();
     controller = PlatformShellController(
       bridge: bridge,
       router: router,
       playerViewModel: player,
     );
+    useMobileShellViewport(controller);
   });
 
   tearDown(() {
     controller.dispose();
     router.dispose();
-    unawaited(bridge.intentController.close());
-    unawaited(bridge.readyController.close());
-    unawaited(bridge.layoutController.close());
+    bridge.dispose();
   });
 
   testWidgets('openNowPlaying pushes the player route', (tester) async {
@@ -242,6 +110,22 @@ void main() {
     bridge.readyController.add(const ShellReady(capabilities: <String>[]));
     await pumpEventQueue();
     expect(controller.nativeChromeActive, isFalse);
+  });
+
+  test('ready 晚到重放最近一次主题和无障碍配置', () async {
+    await controller.configure(
+      darkMode: true,
+      reduceMotion: true,
+      reduceTransparency: true,
+    );
+    bridge.readyController.add(
+      const ShellReady(capabilities: <String>['bottomBar', 'miniPlayer']),
+    );
+    await pumpEventQueue();
+    expect(bridge.configurations, <(bool, bool, bool)>[
+      (true, true, true),
+      (true, true, true),
+    ]);
   });
 
   test('layoutChanged exposes native bottom inset', () async {

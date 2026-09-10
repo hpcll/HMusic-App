@@ -2,15 +2,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/models/hmusic_playback_state.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../../../core/providers/infrastructure_providers.dart';
 import '../../../core/security/token_store.dart';
 import '../models/config_options.dart';
 import '../models/server_config.dart';
 import '../models/settings_summary.dart';
+import 'direct_settings_repository.dart';
 import 'settings_repository.dart';
 
 final Provider<SettingsRepository> settingsRepositoryProvider =
     Provider<SettingsRepository>((ref) {
+      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+        return ref.watch(directSettingsRepositoryProvider);
+      }
       return ApiSettingsRepository(
         apiClient: ref.watch(apiClientProvider),
         tokenStore: ref.watch(tokenStoreProvider),
