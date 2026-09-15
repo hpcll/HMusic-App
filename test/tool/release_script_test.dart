@@ -55,4 +55,25 @@ void main() {
     // 汇总文件由最后那个 checksums job 统一产出并追加到 Release。
     expect(workflow, contains('SHA256SUMS.txt'));
   });
+
+  // 四个安卓包必须同号，否则装过分架构包的设备收到通用包会被安卓当降级拒装，只报一句
+  // 「应用未安装」——网盘里放的正是不分架构的通用包。Flutter 的 --split-per-abi 默认会
+  // 把分架构包的版本号改写成「芯片基数 * 1000 + 构建号」，靠 android/app/build.gradle.kts
+  // 里的 versionCodeOverride 掰回来。这两处任一处被删掉，发版当天才会发现，这里先守一层。
+  test('安卓四个包的 versionCode 统一：Gradle 掰回了 Flutter 的 ABI 改写', () {
+    final String gradle = File('android/app/build.gradle.kts').readAsStringSync();
+
+    expect(gradle, contains('ApkVariantOutput'));
+    expect(gradle, contains('versionCodeOverride'));
+    // 只碰 APK 产物：AAB 的输出不是 ApkVariantOutput，硬转会在 bundleRelease 崩。
+    expect(gradle, contains('as?'));
+  });
+
+  test('发布脚本逐个校验安卓包版本号，并守住构建号下界', () {
+    final String script = commands('tool/build_release.sh');
+
+    expect(script, contains('apk_version_code.py'));
+    expect(script, contains('MIN_ANDROID_VERSION_CODE'));
+    expect(File('tool/apk_version_code.py').existsSync(), isTrue);
+  });
 }

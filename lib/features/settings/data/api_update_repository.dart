@@ -162,12 +162,16 @@ class ApiUpdateRepository implements UpdateRepository {
       final config = await remoteAppConfig();
       final version = config?.latestVersion ?? '';
       if (version.isEmpty) return null;
+      // 退路也按本机架构挑包。只给通用包会踩降级：Flutter 给分架构包改写版本号
+      // （abi 基数 * 1000 + 构建号），已经装过 arm64 包的设备版本号是 2007，
+      // 再收到版本号 8 的通用包会被安卓按降级拒装。
+      final matched = config?.apkFor(_abiTag);
       return AppReleaseInfo(
         version: version,
         notes: config?.notice,
         url: config?.downloadUrl,
-        apkUrl: config?.apkUrl,
-        apkSize: config?.apkSize,
+        apkUrl: matched?.url ?? config?.apkUrl,
+        apkSize: matched?.size ?? config?.apkSize,
       );
     } catch (_) {
       return null;

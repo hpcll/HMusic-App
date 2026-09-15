@@ -207,4 +207,37 @@ for abi in arm64-v8a armeabi-v7a x86_64; do
   hash_file "$SPLIT_APK"
 done
 
+# 四个安卓包必须同号，否则装过小包的用户会被安卓按降级拒装——只报一句「应用未安装」。
+# 原因和修法见 android/app/build.gradle.kts 里 versionCodeOverride 那段注释。
+# Flutter 哪天换了 ABI 版本号的算法，这个前提就会破，必须在这里炸掉，
+# 而不是把互相装不上的包静默发出去。
+#
+# 下界 4009：统号之前 Flutter 给分架构包改写过 versionCode 为「芯片基数 * 1000 + 构建号」
+# （armeabi-v7a=1 / arm64-v8a=2 / x86_64=4），0.1.8 的 x86_64 包到过 4008。已经装了
+# 那个包的设备只接受版本号 >= 4008 的新包，而统号之后构建号就是版本号，所以构建号
+# 必须一路大于它。忘了这茬会直接在这里构建失败。
+MIN_ANDROID_VERSION_CODE=4009
+VERSION_CODES=""
+APK_COUNT=0
+for apk in "$DIST_DIR"/hmusic-"${VERSION}"-android*.apk; do
+  VERSION_CODES="$VERSION_CODES $(python3 "$ROOT_DIR/tool/apk_version_code.py" "$apk")"
+  APK_COUNT=$((APK_COUNT + 1))
+done
+[ "$APK_COUNT" -eq 4 ] || {
+  echo "安卓包应有 4 个（通用 + 3 个分架构），实际 $APK_COUNT 个" >&2
+  exit 1
+}
+UNIQUE_CODES="$(printf '%s\n' $VERSION_CODES | sort -u | tr -d ' ')"
+if [ "$UNIQUE_CODES" != "$(printf '%s\n' $VERSION_CODES | head -n 1)" ]; then
+  echo "四个安卓包的 versionCode 不一致：$VERSION_CODES" >&2
+  echo "装过小包的用户会收到装不上的更新，检查 android/app/build.gradle.kts 的 versionCodeOverride" >&2
+  exit 1
+fi
+if [ "$UNIQUE_CODES" -lt "$MIN_ANDROID_VERSION_CODE" ]; then
+  echo "安卓 versionCode 是 $UNIQUE_CODES，低于 $MIN_ANDROID_VERSION_CODE" >&2
+  echo "已经装了 0.1.8 分架构包（最高 4008）的用户会升不上来，pubspec.yaml 的构建号要往上跳" >&2
+  exit 1
+fi
+printf '四个安卓包 versionCode 一致：%s\n' "$UNIQUE_CODES"
+
 printf '发布产物已写入 %s\n' "$DIST_DIR"

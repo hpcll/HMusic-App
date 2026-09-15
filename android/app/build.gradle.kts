@@ -77,3 +77,29 @@ android {
 flutter {
     source = "../.."
 }
+
+// 把分架构包的 versionCode 掰回构建号本身，让四个安卓包同号。
+//
+// flutter build apk --split-per-abi 会给每个带芯片标记的产物把 versionCode 改写成
+// 「芯片基数 * 1000 + 构建号」（基数见 Flutter Gradle 插件的 FlutterPluginConstants.ABI_VERSION：
+// armeabi-v7a=1 / arm64-v8a=2 / x86_64=4），官方注释写明是为了让多个 APK 能一起传上
+// Google Play——Play 要求同一应用的多个 APK 版本号互不相同。代价是四个包版本号不一致，
+// 而安卓只允许「版本号不低于已装包」的覆盖安装：装过 arm64 包（2008）的设备再收到通用包（8）
+// 会被当降级拒装，只报一句「应用未安装」。网盘里放的就是通用包，手动下载正好踩这个坑。
+// 我们只走 GitHub Release + 网盘、不上 Play，不受这条约束。
+//
+// 时序上必须注册在 plugins 块之后：Flutter 插件是在 apply() 里注册 configureEach 的，
+// Gradle 按注册顺序回调，这里晚于它，所以这次赋值会盖掉它的改写。
+// 谁把这个前提改坏了（比如以后 Flutter 换成 androidComponents.onVariants），
+// tool/build_release.sh 的版本号一致性校验会直接让发布失败。
+android.applicationVariants.configureEach {
+    outputs.forEach { output ->
+        // 只碰 APK 产物：AAB（bundleRelease）的输出不是 ApkVariantOutput，
+        // 而且 AAB 的版本号本来就取自 defaultConfig，不需要改。
+        @Suppress("DEPRECATION")
+        val apkOutput = output as? com.android.build.gradle.api.ApkVariantOutput
+        if (apkOutput != null) {
+            apkOutput.versionCodeOverride = flutter.versionCode
+        }
+    }
+}

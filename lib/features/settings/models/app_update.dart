@@ -78,9 +78,30 @@ class AppReleaseInfo {
   bool hasUpdateOver(String current) => isNewerVersion(version, current);
 }
 
+// app-config.json 里的分架构 APK 条目。
+//
+// 为什么要单独存一份：Flutter 给分架构包改写了版本号（abi 基数 * 1000 + 构建号，
+// 见 flutter_tools 的 FlutterPlugin.kt），于是通用包的版本号天生比所有分架构包小。
+// 一台已经装过 arm64 包的设备（版本号 2007）再收到通用包（版本号 8）会被安卓判成
+// 降级、直接拒装。退路也按本机架构挑，才既省流量又不会让版本号往回走。
+class AppRemoteApk {
+  const AppRemoteApk({required this.abi, required this.url, this.size});
+
+  factory AppRemoteApk.fromJson(Map<String, Object?> json) => AppRemoteApk(
+    abi: '${json['abi'] ?? ''}',
+    url: '${json['url'] ?? ''}',
+    size: (json['size'] as num?)?.toInt(),
+  );
+
+  // arm64-v8a / armeabi-v7a / x86_64，与资产名和 Abi.current() 的写法一致。
+  final String abi;
+  final String url;
+  final int? size;
+}
+
 // App 仓库根的 app-config.json：不发服务端新版也能全局控制老 App 准入。
 // minVersion 高于当前版本即强制升级；notice/downloadUrl 展示在强升页。
-// latestVersion/apkUrl/apkSize 是「检查更新」的国内退路：api.github.com 在大陆
+// latestVersion/apkUrl/apkSize/apks 是「检查更新」的国内退路：api.github.com 在大陆
 // （乃至挂代理时）常不通，而这份文件有 Gitee/raw/jsDelivr 三镜像 + 服务端中转，
 // 发版时把它们填上，App 拉不到 GitHub 也能看到新版并直装。
 class AppRemoteConfig {
@@ -91,6 +112,7 @@ class AppRemoteConfig {
     this.latestVersion = '',
     this.apkUrl,
     this.apkSize,
+    this.apks = const <AppRemoteApk>[],
     this.netdiskUrl,
     this.iosUrl,
   });
@@ -105,9 +127,19 @@ class AppRemoteConfig {
       latestVersion: '${json['latestVersion'] ?? ''}',
       apkUrl: json['apkUrl'] == null ? null : '${json['apkUrl']}',
       apkSize: (json['apkSize'] as num?)?.toInt(),
+      apks: _parseApks(json['apks']),
       netdiskUrl: json['netdiskUrl'] == null ? null : '${json['netdiskUrl']}',
       iosUrl: json['iosUrl'] == null ? null : '${json['iosUrl']}',
     );
+  }
+
+  static List<AppRemoteApk> _parseApks(Object? raw) {
+    if (raw is! List<Object?>) return const <AppRemoteApk>[];
+    return raw
+        .whereType<Map<String, Object?>>()
+        .map(AppRemoteApk.fromJson)
+        .where((apk) => apk.abi.isNotEmpty && apk.url.isNotEmpty)
+        .toList(growable: false);
   }
 
   final String minVersion;
@@ -116,8 +148,23 @@ class AppRemoteConfig {
 
   // 最新可下版本（空 = 这份配置没带更新信息）。
   final String latestVersion;
+
+  // 通用包（含全部架构）。老版本 App 只认这两个字段，所以保留；新版本在本机
+  // 架构命中 apks 时优先用分架构包。
   final String? apkUrl;
   final int? apkSize;
+
+  // 分架构包列表，未命中时调用方退回通用包。
+  final List<AppRemoteApk> apks;
+
+  // 本机架构对应的分架构包；没有匹配项返回 null。
+  AppRemoteApk? apkFor(String abiTag) {
+    if (abiTag.isEmpty) return null;
+    for (final apk in apks) {
+      if (apk.abi == abiTag) return apk;
+    }
+    return null;
+  }
 
   // 网盘下载入口（没梯子时的退路；空则用内置的 kNetdiskDownloadUrl）。
   final String? netdiskUrl;

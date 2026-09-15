@@ -49,15 +49,32 @@ Android 侧一次出四个 APK：
 （`api_update_repository._pickApkAsset` 按 `-<abi>.` 整段匹配），**改名要同步改那里**。
 发布工作流按 `dist/*-android*.apk` 收集，分包会自动跟着上 Release。
 
+### 四个包的 versionCode 必须相同
+
+`tool/build_release.sh` 会把四个 APK 的 `versionCode` 逐个读出来校验（`tool/apk_version_code.py`
+直接解析 AXML，不依赖 aapt），不一致、包数不对、或低于下界都会直接构建失败。
+
+原因：安卓只允许「版本号不低于已装包」的覆盖安装，被拒时只报一句「应用未安装」。四个包不同号时，
+装过分架构包的设备再拿到通用包就装不上——而网盘里放的正是不分架构的通用包，手动下载正好踩这个坑。
+
+Flutter 的 `--split-per-abi` 默认会给带芯片标记的产物把版本号改写成「芯片基数 × 1000 + 构建号」
+（`armeabi-v7a=1 / arm64-v8a=2 / x86_64=4`，官方注释写明是为了让多个 APK 能一起传上 Google Play——
+Play 要求同一应用的多个 APK 版本号互不相同）。我们只走 GitHub Release + 网盘、不上 Play，
+不受这条约束，所以在 `android/app/build.gradle.kts` 里把它掰回构建号本身。
+
+**构建号下界 4009**：0.1.8 的 x86_64 分架构包版本号到过 4008，已经装了它的设备只接受 ≥ 4008 的新包。
+统号之后构建号就是版本号，所以**下一个版本的 `pubspec.yaml` 构建号必须跳到 4009 以上**
+（例如 `0.1.9+4009`），此后正常递增。忘了这茬，上面的校验会直接拦下来。
+
 发 Release 之后顺手更新仓库根的 `app-config.json`（三镜像 + 服务端中转，见 docs/02）：
 
 ```bash
 bash tool/fill_app_config_size.sh --push
 ```
 
-该脚本从 `pubspec.yaml` 取版本、从 Release 直链取 Android 通用包的字节数，写好
-`latestVersion` / `apkUrl` / `apkSize` 后提交推送。产物还没生成时它退 3 并提示，直接重跑即可。
-不填 `apkSize` 也能用（实际下载按响应的 content-length 走，`apkSize` 只负责开头那一瞬间的
+该脚本从 `pubspec.yaml` 取版本，再从 Release 直链（不消耗 GitHub API 配额）读出通用包和三个分架构包的
+字节数，写好 `latestVersion` / `apkUrl` / `apkSize` / `apks` 后提交推送。四个包缺任何一个都退 3 不写文件，
+提示后重跑即可。不填这些字节数也能用（实际下载按响应的 content-length 走，`size` 只负责开头那一瞬间的
 显示和缺 content-length 时的兜底），但填上更完整。文件长这样：
 
 ```json
@@ -65,10 +82,18 @@ bash tool/fill_app_config_size.sh --push
   "latestVersion": "v0.1.6",
   "apkUrl": "https://github.com/.../hmusic-0.1.6-android.apk",
   "apkSize": 61266359,
+  "apks": [
+    { "abi": "arm64-v8a", "url": "...", "size": 27967194 },
+    { "abi": "armeabi-v7a", "url": "...", "size": 25463226 },
+    { "abi": "x86_64", "url": "...", "size": 29270486 }
+  ],
   "netdiskUrl": "https://pan.quark.cn/s/c6534914a56b",
   "iosUrl": ""
 }
 ```
+
+`apks` 是 App 走 app-config 这条退路时的挑包依据，和 GitHub 那条路一样按本机架构选：
+只给通用包会让装过分架构包的设备收到更小的版本号而被安卓拒装（见上面「四个包的 versionCode 必须相同」）。
 
 `netdiskUrl` 是没梯子用户的退路（关于页常驻那条「从网盘下载」）：检查更新能靠 Gitee 镜像绕开
 GitHub，下载直链却在 github.com 上。换网盘链接改这里即可，不用发新版；App 内置了同一条链接兜底
