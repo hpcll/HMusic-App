@@ -51,6 +51,15 @@ Android 侧一次出四个 APK：
 
 发 Release 之后顺手更新仓库根的 `app-config.json`（三镜像 + 服务端中转，见 docs/02）：
 
+```bash
+bash tool/fill_app_config_size.sh --push
+```
+
+该脚本从 `pubspec.yaml` 取版本、从 Release 直链取 Android 通用包的字节数，写好
+`latestVersion` / `apkUrl` / `apkSize` 后提交推送。产物还没生成时它退 3 并提示，直接重跑即可。
+不填 `apkSize` 也能用（实际下载按响应的 content-length 走，`apkSize` 只负责开头那一瞬间的
+显示和缺 content-length 时的兜底），但填上更完整。文件长这样：
+
 ```json
 {
   "latestVersion": "v0.1.6",
