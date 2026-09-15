@@ -4,24 +4,24 @@
   "downloadUrl": "https://github.com/hpcll/HMusic-App/releases/latest",
   "latestVersion": "v0.1.9",
   "apkUrl": "https://github.com/hpcll/HMusic-App/releases/download/v0.1.9/hmusic-0.1.9-android.apk",
-  "apkSize": 0,
+  "apkSize": 69526628,
   "netdiskUrl": "https://pan.quark.cn/s/c6534914a56b",
   "iosUrl": "",
   "apks": [
     {
       "abi": "arm64-v8a",
       "url": "https://github.com/hpcll/HMusic-App/releases/download/v0.1.9/hmusic-0.1.9-android-arm64-v8a.apk",
-      "size": 0
+      "size": 27967198
     },
     {
       "abi": "armeabi-v7a",
       "url": "https://github.com/hpcll/HMusic-App/releases/download/v0.1.9/hmusic-0.1.9-android-armeabi-v7a.apk",
-      "size": 0
+      "size": 25463230
     },
     {
       "abi": "x86_64",
       "url": "https://github.com/hpcll/HMusic-App/releases/download/v0.1.9/hmusic-0.1.9-android-x86_64.apk",
-      "size": 0
+      "size": 29270490
     }
   ]
 }
