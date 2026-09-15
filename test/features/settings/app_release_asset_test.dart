@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/network/api_client.dart';
 import 'package:hmusic/core/network/api_failure.dart';
 import 'package:hmusic/features/settings/data/api_update_repository.dart';
+import 'package:hmusic/features/settings/models/app_update.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
@@ -56,6 +57,47 @@ Map<String, Object?> _apk(String name, int size) => <String, Object?>{
   'name': name,
   'browser_download_url': 'https://example.com/$name',
   'size': size,
+};
+
+// GitHub API 报 500、app-config 镜像可达：走退路。abiTag 决定挑哪个分架构包。
+Future<AppReleaseInfo?> _fallbackRelease(
+  Map<String, Object?> config, {
+  String abiTag = '',
+}) {
+  final dio = Dio()..httpClientAdapter = _MirrorAdapter(config);
+  final apiClient = _MockApiClient();
+  when(
+    () => apiClient.getMap(any(), authenticated: any(named: 'authenticated')),
+  ).thenThrow(Exception('no server'));
+  return ApiUpdateRepository(
+    apiClient: apiClient,
+    github: dio,
+    abiTag: abiTag,
+  ).latestAppRelease();
+}
+
+// 发版时 app-config.json 的真实形状：通用包 + 三个分架构包。
+Map<String, Object?> _configWithApks() => <String, Object?>{
+  'latestVersion': 'v0.1.8',
+  'apkUrl': 'https://mirror.example.com/hmusic-0.1.8-android.apk',
+  'apkSize': 69526624,
+  'apks': <Map<String, Object?>>[
+    <String, Object?>{
+      'abi': 'arm64-v8a',
+      'url': 'https://mirror.example.com/hmusic-0.1.8-android-arm64-v8a.apk',
+      'size': 27967198,
+    },
+    <String, Object?>{
+      'abi': 'armeabi-v7a',
+      'url': 'https://mirror.example.com/hmusic-0.1.8-android-armeabi-v7a.apk',
+      'size': 25463230,
+    },
+    <String, Object?>{
+      'abi': 'x86_64',
+      'url': 'https://mirror.example.com/hmusic-0.1.8-android-x86_64.apk',
+      'size': 29270490,
+    },
+  ],
 };
 
 void main() {
@@ -148,24 +190,53 @@ void main() {
   // GitHub 不通时的国内退路：app-config.json（三镜像 + 服务端中转）里带了
   // latestVersion/apkUrl 就照常给出新版，不报错。
   test('GitHub 挂了但 app-config 带了新版信息：走退路，不报错', () async {
-    final dio = Dio()
-      ..httpClientAdapter = _MirrorAdapter(<String, Object?>{
-        'latestVersion': 'v0.1.7',
-        'apkUrl': 'https://mirror.example.com/hmusic.apk',
-        'apkSize': 24000000,
-        'notice': '镜像下发的说明',
-      });
-    final apiClient = _MockApiClient();
-    when(
-      () => apiClient.getMap(any(), authenticated: any(named: 'authenticated')),
-    ).thenThrow(Exception('no server'));
-    final repository = ApiUpdateRepository(apiClient: apiClient, github: dio);
-
-    final release = await repository.latestAppRelease();
+    final release = await _fallbackRelease(<String, Object?>{
+      'latestVersion': 'v0.1.7',
+      'apkUrl': 'https://mirror.example.com/hmusic.apk',
+      'apkSize': 24000000,
+      'notice': '镜像下发的说明',
+    });
 
     expect(release?.version, 'v0.1.7');
     expect(release?.apkUrl, 'https://mirror.example.com/hmusic.apk');
     expect(release?.apkSize, 24000000);
+  });
+
+  // 退路只给通用包会踩降级拒装：Flutter 给分架构包改写版本号（abi 基数 * 1000 +
+  // 构建号），装过 arm64 包（2008）的设备再收到通用包（8）会被安卓直接拒掉。
+  // 所以退路也要按本机架构挑，和 GitHub 那条路同一个口径。
+  test('退路里带 apks：按本机架构挑分架构包，不回落通用包', () async {
+    final release = await _fallbackRelease(
+      _configWithApks(),
+      abiTag: 'arm64-v8a',
+    );
+
+    expect(release?.version, 'v0.1.8');
+    expect(release?.apkUrl, endsWith('hmusic-0.1.8-android-arm64-v8a.apk'));
+    expect(release?.apkSize, 27967198);
+  });
+
+  test('退路里带 apks 但本机架构不在其中：回落通用包', () async {
+    final release = await _fallbackRelease(_configWithApks(), abiTag: 'x86');
+
+    expect(release?.apkUrl, endsWith('hmusic-0.1.8-android.apk'));
+    expect(release?.apkSize, 69526624);
+  });
+
+  // app-config.json 是人手写的，缺字段的条目要整条丢掉，别让空 url 混进下载流程。
+  test('退路里 apks 条目缺 abi 或 url：整条丢掉，回落通用包', () async {
+    final release = await _fallbackRelease(<String, Object?>{
+      'latestVersion': 'v0.1.8',
+      'apkUrl': 'https://mirror.example.com/hmusic-0.1.8-android.apk',
+      'apkSize': 69526624,
+      'apks': <Map<String, Object?>>[
+        <String, Object?>{'abi': 'arm64-v8a'},
+        <String, Object?>{'url': 'https://mirror.example.com/broken.apk'},
+      ],
+    }, abiTag: 'arm64-v8a');
+
+    expect(release?.apkUrl, endsWith('hmusic-0.1.8-android.apk'));
+    expect(release?.apkSize, 69526624);
   });
 }
 
