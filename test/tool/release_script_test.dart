@@ -61,7 +61,9 @@ void main() {
   // 把分架构包的版本号改写成「芯片基数 * 1000 + 构建号」，靠 android/app/build.gradle.kts
   // 里的 versionCodeOverride 掰回来。这两处任一处被删掉，发版当天才会发现，这里先守一层。
   test('安卓四个包的 versionCode 统一：Gradle 掰回了 Flutter 的 ABI 改写', () {
-    final String gradle = File('android/app/build.gradle.kts').readAsStringSync();
+    final String gradle = File(
+      'android/app/build.gradle.kts',
+    ).readAsStringSync();
 
     expect(gradle, contains('ApkVariantOutput'));
     expect(gradle, contains('versionCodeOverride'));

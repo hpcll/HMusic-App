@@ -1,8 +1,10 @@
 // App 自身版本号，「关于与更新」页展示与新版比对用。
 // 与 pubspec.yaml 的 version 保持一致（test/core/app_version_test.dart 机械校验）。
 // pubspec 里 `+N` 是构建号（Android versionCode / iOS CFBundleVersion），每次发版递增，
-// 不属于版本号本身，这里不带。
-const String kAppVersion = '0.1.8';
+// 不属于版本号本身，这里不带。0.1.9 的构建号从 8 跳到 4009：统号之后构建号就是 versionCode，
+// 而 0.1.8 的分架构包被 Flutter 改写过（x86_64 到过 4008），必须跳过去老用户才升得上，
+// 详见 tool/build_release.sh 开头。
+const String kAppVersion = '0.1.9';
 
 // App 发布仓库（GitHub Releases 检查更新指向这里）。
 const String kAppReleaseRepo = 'hpcll/HMusic-App';
