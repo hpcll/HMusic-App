@@ -30,10 +30,18 @@ import '../widgets/settings_wide_layout.dart';
 // 内容容得下菜单与正文时双栏；窄内容区复用菜单/子页，不按整个窗口宽度硬切。
 // 窄屏两级——菜单页 ↔ 子页，返回时刷新菜单摘要。
 class SettingsPage extends ConsumerStatefulWidget {
-  const SettingsPage({super.key, this.modeSwitch, this.direct = false});
+  const SettingsPage({
+    super.key,
+    this.modeSwitch,
+    this.direct = false,
+    this.localOnly = false,
+    this.initialSection,
+  });
 
   final Widget? modeSwitch;
   final bool direct;
+  final bool localOnly;
+  final SettingsSection? initialSection;
 
   static const String path = '/settings';
 
@@ -50,9 +58,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void initState() {
     super.initState();
     unawaited(
-      Future<void>.microtask(
-        () => ref.read(settingsMenuViewModelProvider.notifier).loadSummary(),
-      ),
+      Future<void>.microtask(() async {
+        final notifier = ref.read(settingsMenuViewModelProvider.notifier);
+        if (widget.initialSection case final section?) notifier.open(section);
+        await notifier.loadSummary();
+      }),
     );
   }
 
@@ -71,9 +81,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         final wide = constraints.maxWidth >= menuWidth + 32 + 480 + 32;
         _wideLayout = wide;
         if (wide && state.section == null) _rememberDefaultSection();
-        final selectedSection = state.section ?? SettingsSection.mi;
+        final selectedSection = state.section ?? _defaultSection;
         final menu = SettingsMenu(
           direct: widget.direct,
+          localOnly: widget.localOnly,
           summary: state.summary,
           activeSection: wide ? selectedSection : null,
           updateAvailable: updateAvailable,
@@ -82,10 +93,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         if (wide) {
           return SettingsWideLayout(
             direct: widget.direct,
+            localOnly: widget.localOnly,
             menuWidth: menuWidth,
             menu: menu,
             menuFooter: _footer(context),
-            sectionTitle: selectedSection.title(direct: widget.direct),
+            sectionTitle: _title(selectedSection),
             child: _sectionBody(selectedSection),
           );
         }
@@ -93,7 +105,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         final section = state.section;
         if (section == null) return _menuPage(context, menu);
         return SettingsSectionSubpage(
-          title: section.title(direct: widget.direct),
+          title: _title(section),
           onBack: () => notifier.back(),
           child: _sectionBody(section),
         );
@@ -109,9 +121,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ref.read(settingsMenuViewModelProvider).section != null) {
         return;
       }
-      ref.read(settingsMenuViewModelProvider.notifier).open(SettingsSection.mi);
+      ref.read(settingsMenuViewModelProvider.notifier).open(_defaultSection);
     });
   }
+
+  SettingsSection get _defaultSection =>
+      widget.localOnly ? SettingsSection.sources : SettingsSection.mi;
+
+  String _title(SettingsSection section) =>
+      section.title(direct: widget.direct, localOnly: widget.localOnly);
 
   Widget _menuPage(BuildContext context, Widget menu) => ListView(
     // 顶/底累加环境 padding：为顶部消融带与悬浮 mini/dock 让位。
@@ -122,7 +140,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       32 + MediaQuery.paddingOf(context).bottom,
     ),
     children: <Widget>[
-      SettingsOverview(direct: widget.direct),
+      SettingsOverview(direct: widget.direct, localOnly: widget.localOnly),
       const SizedBox(height: 24),
       menu,
       _footer(context),
@@ -160,7 +178,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           SettingsSection.downloads => const DownloadsSectionView(),
           SettingsSection.config =>
             widget.direct
-                ? const DirectOptionsSection()
+                ? DirectOptionsSection(localOnly: widget.localOnly)
                 : const ConfigSectionView(),
           SettingsSection.diag => const DiagSectionView(),
           SettingsSection.security => const SecuritySectionView(),

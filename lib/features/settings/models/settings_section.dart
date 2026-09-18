@@ -15,11 +15,13 @@ enum SettingsSection {
   final String label;
 
   bool get availableDirect => !const [downloads, diag, security].contains(this);
+  bool get availablePlayer =>
+      const [sources, tracks, config, about].contains(this);
 
-  String title({bool direct = false}) => direct
+  String title({bool direct = false, bool localOnly = false}) => direct
       ? switch (this) {
           sources => '本机音源',
-          config => '直连配置',
+          config => localOnly ? '播放偏好' : '直连配置',
           _ => label,
         }
       : label;

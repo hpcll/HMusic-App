@@ -10,6 +10,8 @@ import '../../../core/direct/music/direct_music_http.dart';
 import '../../../core/direct/music/platform_track_mapper.dart';
 import '../../../core/direct/storage/direct_local_store.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../models/config_options.dart';
 import '../models/direct_options.dart';
 import '../models/server_config.dart';
@@ -19,7 +21,10 @@ import 'settings_repository.dart';
 final directSettingsRepositoryProvider = Provider<DirectSettingsRepository>(
   (ref) => DirectSettingsRepository(
     ref.watch(directLocalStoreProvider),
-    account: ref.watch(miDirectAccountRepositoryProvider),
+    account: ref.watch(playbackModeProvider) == PlaybackMode.player
+        ? null
+        : ref.watch(miDirectAccountRepositoryProvider),
+    localOnly: ref.watch(playbackModeProvider) == PlaybackMode.player,
   ),
 );
 
@@ -27,12 +32,14 @@ class DirectSettingsRepository implements SettingsRepository {
   const DirectSettingsRepository(
     this._store, {
     MiDirectAccountRepository? account,
+    this.localOnly = false,
   }) : _account = account;
   final DirectLocalStore _store;
   final MiDirectAccountRepository? _account;
+  final bool localOnly;
 
   ServerConfig _config(Map<String, Object?> data) => ServerConfig(
-    serverName: '本机直连',
+    serverName: localOnly ? '纯播放器' : '本机直连',
     defaultQuality: '${data['defaultQuality'] ?? '320k'}',
     searchStrategy: '${data['searchStrategy'] ?? 'qqFirst'}',
     resolveStrategy: '${data['resolveStrategy'] ?? 'originalFirst'}',
@@ -134,7 +141,7 @@ class DirectSettingsRepository implements SettingsRepository {
     final enabled = plugins.where((plugin) => plugin['enabled'] == true).length;
     return SettingsSummary(
       mi: await _miSummary(),
-      devices: selected?['name']?.toString() ?? '本机播放',
+      devices: localOnly ? '本机播放' : selected?['name']?.toString() ?? '本机播放',
       sources: plugins.isEmpty
           ? '尚未添加音源'
           : '${plugins.length} 个音源 · $enabled 个启用',

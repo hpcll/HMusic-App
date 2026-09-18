@@ -60,11 +60,14 @@ class DirectMusicHttp {
     Map<String, Object?>? query,
     Object? body,
     Map<String, Object?>? headers,
+    Duration? timeout,
   }) async {
     validateMusicUri(url);
+    final cancel = CancelToken();
     try {
-      final response = await dio.request<String>(
+      final request = dio.request<String>(
         url,
+        cancelToken: cancel,
         queryParameters: query,
         data: body,
         options: Options(
@@ -73,6 +76,19 @@ class DirectMusicHttp {
           headers: headers,
         ),
       );
+      final response = timeout == null
+          ? await request
+          : await request.timeout(
+              timeout,
+              onTimeout: () {
+                cancel.cancel();
+                throw const ApiFailure(
+                  kind: ApiFailureKind.timeout,
+                  code: 'DIRECT_MUSIC_REQUEST_FAILED',
+                  message: '连接音乐平台超时，请检查网络后重试',
+                );
+              },
+            );
       return response.data ?? '';
     } on DioException catch (error) {
       throw ApiFailure(

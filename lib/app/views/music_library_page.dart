@@ -32,7 +32,7 @@ class _MusicLibraryPageState extends ConsumerState<MusicLibraryPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+    if (ref.watch(playbackModeProvider).usesLocalBackend) {
       return const PlaylistsPage();
     }
     final inPlaylist = _tab == _LibraryTab.playlists;

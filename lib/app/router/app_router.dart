@@ -20,6 +20,7 @@ import '../../features/player/views/lyrics_page.dart';
 import '../../features/player/views/player_page.dart';
 import '../../features/queue/views/queue_page.dart';
 import '../../features/search/views/search_page.dart';
+import '../../features/settings/models/settings_section.dart';
 import '../../features/settings/views/settings_page.dart';
 import '../../features/stats/views/stats_page.dart';
 import '../shell/app_shell.dart';
@@ -65,7 +66,20 @@ String? _redirectForState(
   SessionController session,
   GoRouterState state,
 ) {
-  if (ref.read(playbackModeProvider) == PlaybackMode.direct) {
+  final mode = ref.read(playbackModeProvider);
+  if (mode == PlaybackMode.player) {
+    return const [
+          ConnectionPage.path,
+          AuthPage.path,
+          DirectLoginPage.path,
+          DirectVerificationPage.path,
+          ForceUpgradePage.path,
+          kOutputPickerPath,
+        ].contains(state.matchedLocation)
+        ? ChartsPage.path
+        : null;
+  }
+  if (mode == PlaybackMode.direct) {
     final atLogin =
         state.matchedLocation == DirectLoginPage.path ||
         state.matchedLocation == DirectVerificationPage.path;
@@ -136,7 +150,18 @@ StatefulShellRoute _mainShellRoute() => StatefulShellRoute.indexedStack(
     _pageBranch(MusicLibraryPage.path, const MusicLibraryPage()),
     _pageBranch(ChartsPage.path, const ChartsPage()),
     _pageBranch(StatsPage.path, const LibraryStatsPage()),
-    _pageBranch(SettingsPage.path, const PlaybackSettingsPage()),
+    StatefulShellBranch(
+      routes: [
+        GoRoute(
+          path: SettingsPage.path,
+          builder: (_, state) => PlaybackSettingsPage(
+            initialSection: state.uri.queryParameters['section'] == 'sources'
+                ? SettingsSection.sources
+                : null,
+          ),
+        ),
+      ],
+    ),
   ],
 );
 

@@ -46,7 +46,8 @@ class AppSidebar extends ConsumerWidget {
             child: SidebarNavigation(shell: shell, rail: rail),
           ),
           const SizedBox(height: 10),
-          _logoutControl(ref),
+          if (ref.watch(playbackModeProvider) != PlaybackMode.player)
+            _logoutControl(ref),
         ],
       ),
     );

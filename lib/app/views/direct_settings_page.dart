@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 
-import '../../core/playback/playback_mode.dart';
-import '../../features/connection/widgets/playback_mode_switch_button.dart';
+import '../../features/connection/widgets/playback_mode_actions.dart';
+import '../../features/settings/models/settings_section.dart';
 import '../../features/settings/views/settings_page.dart';
 
-// 两种模式共用设置框架，只在装配层提供适用入口。
+// 本地模式共用设置框架，纯播放器只展示本机音源与播放偏好。
 class DirectSettingsPage extends StatelessWidget {
-  const DirectSettingsPage({super.key});
+  const DirectSettingsPage({
+    this.localOnly = false,
+    this.initialSection,
+    super.key,
+  });
+  final bool localOnly;
+  final SettingsSection? initialSection;
 
   @override
-  Widget build(BuildContext context) => const SettingsPage(
+  Widget build(BuildContext context) => SettingsPage(
     direct: true,
-    modeSwitch: PlaybackModeSwitchButton(
-      mode: PlaybackMode.server,
-      path: '/connect',
-      label: '切换到服务器模式',
-    ),
+    localOnly: localOnly,
+    initialSection: initialSection,
+    modeSwitch: const PlaybackModeActions(),
   );
 }

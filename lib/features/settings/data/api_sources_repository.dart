@@ -11,7 +11,7 @@ import 'sources_repository.dart';
 
 final Provider<SourcesRepository> sourcesRepositoryProvider =
     Provider<SourcesRepository>((ref) {
-      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+      if (ref.watch(playbackModeProvider).usesLocalBackend) {
         return DirectSourcesRepository(ref.watch(directLxSourcesProvider));
       }
       return ApiSourcesRepository(apiClient: ref.watch(apiClientProvider));

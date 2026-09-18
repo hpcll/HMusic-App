@@ -13,7 +13,7 @@ import 'direct_devices_repository.dart';
 
 final Provider<DevicesRepository> devicesRepositoryProvider =
     Provider<DevicesRepository>((ref) {
-      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+      if (ref.watch(playbackModeProvider).usesLocalBackend) {
         return DirectDevicesRepository(
           ref.watch(directDeviceRegistryProvider),
           ref.watch(directPlaybackRepositoryProvider),

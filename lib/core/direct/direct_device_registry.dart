@@ -7,10 +7,16 @@ import 'music/platform_track_mapper.dart';
 import 'storage/direct_local_store.dart';
 
 class DirectDeviceRegistry {
-  DirectDeviceRegistry(this.account, this._store, this.capabilities);
+  DirectDeviceRegistry(
+    this.account,
+    this._store,
+    this.capabilities, {
+    this.localOnly = false,
+  });
   final MiDirectAccountRepository account;
   final DirectLocalStore _store;
   final ClientPlaybackCapabilities capabilities;
+  final bool localOnly;
   final Map<String, DateTime> _onlineUntil = {};
 
   bool isOnline(String id) =>
@@ -19,6 +25,7 @@ class DirectDeviceRegistry {
       _onlineUntil[id] = DateTime.now().add(const Duration(minutes: 1));
 
   Future<List<MiDirectDevice>> devices({bool refresh = false}) async {
+    if (localOnly) return const [];
     var current = account.cachedAccount;
     if (refresh) current = await account.restore();
     if (current != null) {
@@ -54,6 +61,10 @@ class DirectDeviceRegistry {
   }
 
   Future<String> selectedId() async {
+    if (localOnly) {
+      capabilities.requireLocalPlayback();
+      return HMusicPlaybackState.localDeviceId;
+    }
     final saved = (await _store.read('devices'))['selectedId'] as String?;
     final available = await devices();
     if (saved == HMusicPlaybackState.localDeviceId &&
@@ -71,6 +82,7 @@ class DirectDeviceRegistry {
 
   Future<void> select(String id) async {
     await device(id);
+    if (localOnly) return;
     await _store.update('devices', (data) {
       data['selectedId'] = id;
     });
@@ -80,6 +92,13 @@ class DirectDeviceRegistry {
     if (id == HMusicPlaybackState.localDeviceId) {
       capabilities.requireLocalPlayback();
       return null;
+    }
+    if (localOnly) {
+      throw const ApiFailure(
+        kind: ApiFailureKind.invalidConfiguration,
+        code: 'PLAYER_LOCAL_ONLY',
+        message: '纯播放器使用本机播放，连接音箱请切换到直连或服务器模式',
+      );
     }
     var found = (await devices())
         .where((device) => device.id == id)

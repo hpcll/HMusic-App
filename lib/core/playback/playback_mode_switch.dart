@@ -25,10 +25,11 @@ class PlaybackModeSwitch extends Notifier<ModeSwitchState> {
 
   Future<bool> select(PlaybackMode target) => _run(() async {
     final controller = ref.read(playbackModeProvider.notifier);
+    controller.requireSupported(target);
     final previous = await controller.restore();
     if (previous == target) return;
     await _transition((controlled) async {
-      if (previous == PlaybackMode.direct) {
+      if (previous.usesLocalBackend) {
         await _closeDirect(
           preservePosition: true,
           controlPlayback: !controlled,
@@ -84,7 +85,9 @@ class PlaybackModeSwitch extends Notifier<ModeSwitchState> {
     if (ref.exists(directAudioProxyProvider)) {
       await ref.read(directAudioProxyProvider).close();
     }
-    await ref.read(miDirectAccountRepositoryProvider).cancelLogin();
+    if (ref.read(playbackModeProvider) == PlaybackMode.direct) {
+      await ref.read(miDirectAccountRepositoryProvider).cancelLogin();
+    }
   }
 
   Future<bool> _run(Future<void> Function() action) async {

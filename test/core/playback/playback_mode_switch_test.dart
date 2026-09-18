@@ -4,6 +4,7 @@ import 'package:hmusic/core/audio/hmusic_audio_handler.dart';
 import 'package:hmusic/core/direct/direct_providers.dart';
 import 'package:hmusic/core/direct/direct_session_providers.dart';
 import 'package:hmusic/core/direct/mi_direct_providers.dart';
+import 'package:hmusic/core/platform/client_playback_capabilities.dart';
 import 'package:hmusic/core/playback/playback_mode.dart';
 import 'package:hmusic/core/playback/playback_mode_controller.dart';
 import 'package:hmusic/core/playback/playback_mode_switch.dart';
@@ -40,6 +41,49 @@ void main() {
       expect(container.read(playbackModeProvider), PlaybackMode.direct);
       expect(await coordinator.select(PlaybackMode.server), isTrue);
       expect(container.read(playbackModeProvider), PlaybackMode.server);
+    },
+  );
+
+  test(
+    'unsupported player switch leaves the active speaker untouched',
+    () async {
+      container.dispose();
+      final audio = AudioFixture(fixture.playback);
+      addTearDown(audio.handler.disposeHandler);
+      container = ProviderContainer(
+        overrides: [
+          keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+          miDirectAccountRepositoryProvider.overrideWithValue(fixture.account),
+          directPlaybackRepositoryProvider.overrideWithValue(fixture.playback),
+          hmusicAudioHandlerProvider.overrideWith((ref) async => audio.handler),
+          clientPlaybackCapabilitiesProvider.overrideWithValue(
+            const ClientPlaybackCapabilities(supportsLocalPlayback: false),
+          ),
+        ],
+      );
+      await container
+          .read(playbackModeProvider.notifier)
+          .select(PlaybackMode.direct);
+      await container.read(hmusicAudioHandlerProvider.future);
+      await fixture.init(remote: true);
+      container.read(directPlaybackRepositoryProvider);
+      await audio.handler.playTrack(directTrack('speaker'));
+      fixture.adapter.calls.clear();
+
+      expect(
+        await container
+            .read(playbackModeSwitchProvider.notifier)
+            .select(PlaybackMode.player),
+        isFalse,
+      );
+      expect(container.read(playbackModeProvider), PlaybackMode.direct);
+      expect(
+        container.read(playbackModeSwitchProvider).error,
+        ClientPlaybackCapabilities.localPlaybackUnavailableReason,
+      );
+      expect(fixture.adapter.calls, isEmpty);
+      expect(audio.handler.serverState?.track?.id, 'wy:speaker');
+      expect(fixture.sessionStore.session, isNotNull);
     },
   );
 

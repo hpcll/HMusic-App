@@ -10,12 +10,14 @@ class PlaybackModeSwitchButton extends ConsumerWidget {
     required this.mode,
     required this.path,
     required this.label,
+    this.showError = true,
     super.key,
   });
 
   final PlaybackMode mode;
   final String path;
   final String label;
+  final bool showError;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,14 +34,14 @@ class PlaybackModeSwitchButton extends ConsumerWidget {
                       .select(mode);
                   if (ok && context.mounted) context.go(path);
                 },
-          icon: Icon(
-            mode == PlaybackMode.direct
-                ? Icons.speaker_group_outlined
-                : Icons.lan_outlined,
-          ),
+          icon: Icon(switch (mode) {
+            PlaybackMode.direct => Icons.speaker_group_outlined,
+            PlaybackMode.server => Icons.lan_outlined,
+            PlaybackMode.player => Icons.headphones_outlined,
+          }),
           label: Text(state.busy ? '正在切换…' : label),
         ),
-        if (state.error != null)
+        if (showError && state.error != null)
           Text(
             state.error!,
             style: TextStyle(color: Theme.of(context).colorScheme.error),

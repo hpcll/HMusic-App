@@ -11,7 +11,7 @@ import 'search_repository.dart';
 
 final Provider<SearchRepository> searchRepositoryProvider =
     Provider<SearchRepository>((ref) {
-      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+      if (ref.watch(playbackModeProvider).usesLocalBackend) {
         return DirectSearchRepository(
           ref.watch(directMusicSearchProvider),
           ref.watch(directLocalStoreProvider),

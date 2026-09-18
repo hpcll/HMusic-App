@@ -12,7 +12,7 @@ import 'stats_repository.dart';
 
 final Provider<StatsRepository> statsRepositoryProvider =
     Provider<StatsRepository>((ref) {
-      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+      if (ref.watch(playbackModeProvider).usesLocalBackend) {
         return DirectStatsRepository(ref.watch(directLocalStoreProvider));
       }
       return ApiStatsRepository(apiClient: ref.watch(apiClientProvider));

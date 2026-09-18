@@ -12,7 +12,7 @@ import 'queue_repository.dart';
 
 final Provider<QueueRepository> queueRepositoryProvider =
     Provider<QueueRepository>((ref) {
-      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+      if (ref.watch(playbackModeProvider).usesLocalBackend) {
         return ref.watch(directQueueRepositoryProvider);
       }
       return ApiQueueRepository(apiClient: ref.watch(apiClientProvider));

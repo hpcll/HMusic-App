@@ -1,5 +1,6 @@
 import 'chart.dart';
 import 'chart_catalog.dart';
+import 'chart_home_preferences.dart';
 
 enum ChartsStatus { initial, loading, loaded, error }
 
@@ -12,6 +13,7 @@ class ChartsViewState {
     this.previews = const <String, List<ChartEntry>?>{},
     this.previewErrors = const <String, String>{},
     this.selectedSource = 'featured',
+    this.homePreferences = const ChartHomePreferences(),
     this.active,
     this.detail,
     this.detailLoading = false,
@@ -25,9 +27,13 @@ class ChartsViewState {
   final Map<String, String> previewErrors;
   final String selectedSource;
 
-  List<Chart> get personalCharts =>
-      charts.where((chart) => chart.kind == 'spotify-personal').toList();
-  List<Chart> get discovery => discoveryCharts(charts, selectedSource);
+  final ChartHomePreferences homePreferences;
+  List<Chart> get personalCharts => selectedSource == 'featured'
+      ? const []
+      : charts.where((chart) => chart.kind == 'spotify-personal').toList();
+  List<Chart> get discovery => selectedSource == 'featured'
+      ? homePreferences.home(charts)
+      : discoveryCharts(charts, selectedSource);
 
   // 当前打开的榜单摘要；null = 卡片墙。
   final Chart? active;
@@ -47,6 +53,7 @@ class ChartsViewState {
     Map<String, List<ChartEntry>?>? previews,
     Map<String, String>? previewErrors,
     String? selectedSource,
+    ChartHomePreferences? homePreferences,
     Chart? active,
     ChartDetail? detail,
     bool? detailLoading,
@@ -62,6 +69,7 @@ class ChartsViewState {
       previews: previews ?? this.previews,
       previewErrors: previewErrors ?? this.previewErrors,
       selectedSource: selectedSource ?? this.selectedSource,
+      homePreferences: homePreferences ?? this.homePreferences,
       active: clearActive ? null : (active ?? this.active),
       detail: clearDetail ? null : (detail ?? this.detail),
       detailLoading: detailLoading ?? this.detailLoading,

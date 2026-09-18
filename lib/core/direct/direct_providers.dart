@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../platform/client_playback_capabilities.dart';
+import '../playback/playback_mode.dart';
+import '../playback/playback_mode_controller.dart';
 import '../providers/infrastructure_providers.dart';
 import '../queue/direct_queue_repository.dart';
 import 'direct_device_registry.dart';
@@ -55,6 +57,7 @@ final directDeviceRegistryProvider = Provider<DirectDeviceRegistry>(
     ref.watch(miDirectAccountRepositoryProvider),
     ref.watch(directLocalStoreProvider),
     ref.watch(clientPlaybackCapabilitiesProvider),
+    localOnly: ref.watch(playbackModeProvider) == PlaybackMode.player,
   ),
 );
 final directPlaylistImporterProvider = Provider<DirectPlaylistImporter>(

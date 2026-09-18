@@ -14,7 +14,7 @@ final Provider<PlaybackRepository> playbackRepositoryProvider =
     Provider<PlaybackRepository>((ref) {
       return RoutedPlaybackRepository(() async {
         await ref.read(playbackModeProvider.notifier).restore();
-        return ref.read(playbackModeProvider) == PlaybackMode.direct
+        return ref.read(playbackModeProvider).usesLocalBackend
             ? ref.read(directPlaybackRepositoryProvider)
             : ApiPlaybackRepository(apiClient: ref.read(apiClientProvider));
       });

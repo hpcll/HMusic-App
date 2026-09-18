@@ -11,6 +11,7 @@ class SettingsWideLayout extends StatelessWidget {
     required this.sectionTitle,
     required this.child,
     this.direct = false,
+    this.localOnly = false,
     this.menuFooter,
     super.key,
   });
@@ -18,7 +19,7 @@ class SettingsWideLayout extends StatelessWidget {
   final Widget menu, child;
   final Widget? menuFooter;
   final String sectionTitle;
-  final bool direct;
+  final bool direct, localOnly;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -29,7 +30,7 @@ class SettingsWideLayout extends StatelessWidget {
       32 + MediaQuery.paddingOf(context).bottom,
     ),
     children: [
-      SettingsOverview(direct: direct),
+      SettingsOverview(direct: direct, localOnly: localOnly),
       const SizedBox(height: 28),
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -15,12 +15,13 @@ class SettingsMenu extends StatelessWidget {
     this.activeSection,
     this.updateAvailable = false,
     this.direct = false,
+    this.localOnly = false,
     super.key,
   });
   final SettingsSummary summary;
   final ValueChanged<SettingsSection> onOpen;
   final SettingsSection? activeSection;
-  final bool updateAvailable, direct;
+  final bool updateAvailable, direct, localOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +29,13 @@ class SettingsMenu extends StatelessWidget {
       for (final group in _groups)
         (
           group.$1,
-          group.$2.where((item) => !direct || item.$1.availableDirect).toList(),
+          group.$2
+              .where(
+                (item) => localOnly
+                    ? item.$1.availablePlayer
+                    : !direct || item.$1.availableDirect,
+              )
+              .toList(),
         ),
     ].where((group) => group.$2.isNotEmpty).toList();
     final palette = context.palette;
@@ -64,7 +71,7 @@ class SettingsMenu extends StatelessWidget {
                     Divider(height: 1, indent: 60, color: palette.lineSoft),
                   SettingsMenuRow(
                     icon: item.$2,
-                    label: item.$1.title(direct: direct),
+                    label: item.$1.title(direct: direct, localOnly: localOnly),
                     summary: _summaryFor(item.$1),
                     active: activeSection == item.$1,
                     badged: updateAvailable && item.$1 == SettingsSection.about,

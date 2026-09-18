@@ -24,12 +24,20 @@ extension _DirectPlaybackStorage on DirectPlaybackRepository {
           )
         : HMusicPlaybackState.fromJson(saved).update(
             deviceId: id,
+            deviceName: id == HMusicPlaybackState.localDeviceId
+                ? '本机播放'
+                : saved['deviceId'] == id
+                ? saved['deviceName'] as String?
+                : '小爱音箱',
+            seekEnabled: id == HMusicPlaybackState.localDeviceId ? true : null,
             status: saved['track'] == null
                 ? PlaybackStatus.idle
                 : PlaybackStatus.paused,
             clearStream: true,
           );
-    final ownerUserId = await _devices.account.storedUserId();
+    final ownerUserId = _state!.isLocalDevice
+        ? null
+        : await _devices.account.storedUserId();
     _remoteAudioId =
         ownerUserId != null &&
             saved['deviceId'] == id &&

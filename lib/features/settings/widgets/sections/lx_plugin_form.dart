@@ -64,7 +64,7 @@ class _LxPluginFormState extends ConsumerState<LxPluginFormCard> {
           const SizedBox(height: 12),
           SettingsField(
             label: '订阅链接（推荐）',
-            hint: '服务端会拉取脚本并预填下方表单；保存后列表里可一键「更新」。',
+            hint: '粘贴链接并拉取，保存后即可使用，也可在列表中更新音源。',
             child: Row(
               children: <Widget>[
                 Expanded(

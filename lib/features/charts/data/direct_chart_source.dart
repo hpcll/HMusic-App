@@ -111,9 +111,19 @@ class DirectChartSource {
   }
 
   Future<List<ChartEntry>> _spotify(String playlistId) async {
-    final html = await _http.text(
-      'https://open.spotify.com/embed/playlist/$playlistId',
-    );
+    final String html;
+    try {
+      html = await _http.text(
+        'https://open.spotify.com/embed/playlist/$playlistId',
+        timeout: const Duration(seconds: 8),
+      );
+    } on ApiFailure catch (failure) {
+      throw ApiFailure(
+        kind: failure.kind,
+        code: 'DIRECT_SPOTIFY_UNREACHABLE',
+        message: '当前网络无法访问 Spotify，请检查网络或先听其他榜单',
+      );
+    }
     final json = RegExp(
       r'<script\b[^>]*\bid="__NEXT_DATA__"[^>]*>([\s\S]*?)</script>',
     ).firstMatch(html)?.group(1);

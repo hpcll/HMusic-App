@@ -5,8 +5,12 @@
 > 错误统一格式：`{ error: { code, message, details } }`；当前 Server 会话的 HTTP 401 清 token。
 > 旧模式/旧 token 的迟到响应不得清新会话。本文只描述 Server 契约；直连小米与音乐上游
 > 使用独立传输、凭据及错误处理，见 [14 - 直连模式](14-direct-mode-migration-plan.md)。
-> 来源：`HMusic-Server/src/app.ts` 路由表 + 各 `*.routes.ts` 的 Zod schema（2026-07-12 复核）。
+> 来源：`HMusic-Server/src/app.ts` 路由表 + 各 `*.routes.ts` 的 Zod schema（2026-07-12 全量复核）。
 > 审计基线：HMusic-Server main + 当前工作树（queueIndex/真探测/切设备同步/下载缓存/策略配置生效）。
+>
+> **复核状态**：2026-09-17 重跑了路由注册核对（18 处注册，与本文结构一致）并修正了
+> 文末「上架相关 API」一节；§1.1 之后的逐字段 schema 仍是 07-12 那一轮的结果，
+> 期间新增的 `spotify`、`library` 等模块以各自章节的标注日期为准。
 
 ## 0. 通用数据模型（src/shared/contracts.ts）
 
@@ -308,8 +312,12 @@ Range。Flutter 必须保留返回 URL 的 path/query，并把 scheme/host/port 
 `GET /app/` 由服务端 `@fastify/static` 伺服 `web/` 目录——**这是网页端入口，客户端不用**
 。Flutter 原生实现只把它作为行为与视觉对照，不加载或同步其中的 JavaScript/CSS。
 
-## 上架相关 API 缺口
+## 上架相关 API
 
-当前 Auth 只有 setup/login/password，没有账户删除能力。由于 App 内允许首次 setup 创建管理员，
-正式上架前必须先通过 ADR 确认单管理员自托管系统的删除语义，再实现 Server API 和 App 内入口。
-不能把“退出登录”或“联系支持”当成删除账户。
+**账户删除（已实现）**：`DELETE /api/v1/auth/account`，body `{password}` 二次确认。
+删除会联动清理 mi 账号、播放态、队列和 Spotify 状态（见 `auth.routes.ts`）。App 侧入口在
+「设置 → 安全」区块，成功后清会话回登录页。
+
+> 2026-09-17 复核：本节此前写着「没有账户删除能力」，已过期。其余上架前置项（隐私政策、
+> 审核 Demo Server、内容权利审查、商店签名）属流程工作，不涉及 Server API 缺口，
+> 清单见 `docs/11-release-compliance.md`。

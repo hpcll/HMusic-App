@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/models/hmusic_playback_state.dart';
+import '../../../core/playback/playback_mode.dart';
+import '../../../core/playback/playback_mode_controller.dart';
 import '../models/playback_output_label.dart';
 import 'device_picker_sheet.dart';
 
-class PlayerOutputButton extends StatelessWidget {
+class PlayerOutputButton extends ConsumerWidget {
   const PlayerOutputButton({
     required this.state,
     this.showLabel = false,
@@ -15,7 +18,10 @@ class PlayerOutputButton extends StatelessWidget {
   final bool showLabel;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(playbackModeProvider) == PlaybackMode.player) {
+      return const SizedBox.shrink();
+    }
     final label = playbackOutputLabel(state);
     final icon = Icon(
       state?.isLocalDevice ?? false

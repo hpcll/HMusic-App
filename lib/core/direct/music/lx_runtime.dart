@@ -1,15 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_js/flutter_js.dart';
-import 'package:flutter_js/javascriptcore/jscore_runtime.dart';
 
 import '../../network/api_failure.dart';
 import 'direct_music_http.dart';
 import 'lx_crypto_bridge.dart';
 import 'lx_http_bridge.dart';
+import 'lx_javascript_engine.dart';
 import 'platform_track_mapper.dart';
 
 abstract interface class LxRuntime {
@@ -53,13 +52,7 @@ class FlutterLxRuntime implements LxRuntime {
     try {
       final bootstrap = await _bootstrap();
       if (_closed) throw _failure;
-      _engine = Platform.isIOS || Platform.isMacOS
-          ? JavascriptCoreRuntime()
-          : QuickJsRuntime2(
-              timeout: 5000,
-              memoryLimit: 64 * 1024 * 1024,
-              hostPromiseRejectionHandler: (_) {},
-            );
+      _engine = createLxJavascriptEngine();
       _engine!.onMessage('ConsoleLog', (_) {});
       _engine!.onMessage(
         'HMusicLx',

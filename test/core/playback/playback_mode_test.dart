@@ -6,11 +6,15 @@ void main() {
   test('mode wire values are stable', () {
     expect(PlaybackMode.server.wireName, 'server');
     expect(PlaybackMode.direct.wireName, 'direct');
+    expect(PlaybackMode.player.wireName, 'player');
+    expect(PlaybackMode.player.usesLocalBackend, isTrue);
+    expect(PlaybackMode.server.usesLocalBackend, isFalse);
   });
 
   test('unknown persisted values fail closed to server mode', () {
     expect(PlaybackModeWire.parse(null), PlaybackMode.server);
     expect(PlaybackModeWire.parse('legacy'), PlaybackMode.server);
     expect(PlaybackModeWire.parse('direct'), PlaybackMode.direct);
+    expect(PlaybackModeWire.parse('player'), PlaybackMode.player);
   });
 }

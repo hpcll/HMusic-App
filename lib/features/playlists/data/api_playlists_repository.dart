@@ -13,7 +13,7 @@ import 'playlists_repository.dart';
 
 final Provider<PlaylistsRepository> playlistsRepositoryProvider =
     Provider<PlaylistsRepository>((ref) {
-      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+      if (ref.watch(playbackModeProvider).usesLocalBackend) {
         return DirectPlaylistsRepository(
           ref.watch(directLocalStoreProvider),
           ref.watch(directPlaylistImporterProvider),

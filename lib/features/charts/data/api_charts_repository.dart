@@ -17,7 +17,7 @@ import 'direct_charts_repository.dart';
 
 final Provider<ChartsRepository> chartsRepositoryProvider =
     Provider<ChartsRepository>((ref) {
-      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+      if (ref.watch(playbackModeProvider).usesLocalBackend) {
         final repository = DirectChartsRepository(
           source: DirectChartSource(
             ref.watch(directMusicHttpProvider),

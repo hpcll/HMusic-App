@@ -9,7 +9,7 @@ class ModeStreamUrlRebaser extends StreamUrlRebaser {
   }) : _mode = mode;
   final PlaybackMode Function() _mode;
   @override
-  Future<Uri> rebase(String streamUrl) => _mode() == PlaybackMode.direct
+  Future<Uri> rebase(String streamUrl) => _mode().usesLocalBackend
       ? Future.value(validateMusicUri(streamUrl))
       : super.rebase(streamUrl);
 }

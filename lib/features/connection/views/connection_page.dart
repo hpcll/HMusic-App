@@ -100,8 +100,8 @@ class _ConnectionPageState extends ConsumerState<ConnectionPage>
       Future<void>.microtask(() async {
         final mode = await ref.read(playbackModeProvider.notifier).restore();
         if (!mounted) return;
-        if (mode == PlaybackMode.direct) {
-          context.go('/direct/login');
+        if (mode.usesLocalBackend) {
+          context.go(mode == PlaybackMode.player ? '/charts' : '/direct/login');
           return;
         }
         final notifier = ref.read(connectionViewModelProvider.notifier);

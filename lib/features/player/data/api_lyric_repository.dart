@@ -12,7 +12,7 @@ import 'lyric_repository.dart';
 
 final Provider<LyricRepository> lyricRepositoryProvider =
     Provider<LyricRepository>((ref) {
-      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+      if (ref.watch(playbackModeProvider).usesLocalBackend) {
         return DirectLyricRepository(
           ref.watch(directMusicHttpProvider),
           ref.watch(directLxSourcesProvider),

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/models/server_info.dart';
@@ -100,6 +101,35 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('从网盘下载'), findsOneWidget);
+    final netdiskButton = find.ancestor(
+      of: find.text('从网盘下载'),
+      matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
+    );
+    expect(netdiskButton, findsOneWidget);
+    expect(tester.getSize(netdiskButton).height, greaterThanOrEqualTo(48));
+    expect(find.byIcon(Icons.cloud_download_outlined), findsOneWidget);
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    final launches = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      launches.add(call);
+      return true;
+    });
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      );
+    });
+    await tester.ensureVisible(netdiskButton);
+    await tester.tap(netdiskButton);
+    await tester.pump();
+    expect(launches.single.method, 'launch');
+    expect(
+      (launches.single.arguments as Map)['url'],
+      'https://pan.quark.cn/s/mirror',
+    );
     final container = ProviderScope.containerOf(
       tester.element(find.byType(AboutSectionView)),
       listen: false,

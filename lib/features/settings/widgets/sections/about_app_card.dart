@@ -114,21 +114,27 @@ class _AppCard extends ConsumerWidget {
           // 下发、内置常量兜底，所以网络最差时它也在。iOS 例外——网盘里是
           // APK/ipa 装包，装不上 iPhone，露出来只会误导。
           if (!isIos) ...<Widget>[
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton(
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 32),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: palette.textStrong,
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                 ),
                 onPressed: () => unawaited(_openUrl(state.netdiskUrl)),
-                child: Text(
-                  '从网盘下载（国内直连，含各平台安装包）',
-                  style: TextStyle(fontSize: 12.5, color: palette.muted),
-                ),
+                icon: const Icon(Icons.cloud_download_outlined, size: 20),
+                label: const Text('从网盘下载'),
               ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '国内可访问 · 含各平台安装包',
+              style: TextStyle(fontSize: 12.5, color: palette.muted),
             ),
           ],
         ],

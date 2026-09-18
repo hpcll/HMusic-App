@@ -28,26 +28,28 @@
 HMusic-App/
 ├── lib/
 │   ├── main.dart
-│   ├── app/                  # MaterialApp、router、theme、应用级 provider
+│   ├── app/                  # hmusic_app、router、theme、shell、views、应用级 provider
 │   ├── core/
+│   │   ├── async/            # 异步结果代际与取消
+│   │   ├── audio/            # HMusicAudioHandler、同步协调器、URL 重绑定
 │   │   ├── config/           # ServerConfig、持久化与 URL 规则
-│   │   ├── network/          # ApiClient、ApiError、auth interceptor
+│   │   ├── direct/           # 直连模式：小米认证/设备、LX 音源、代理、本地仓库
+│   │   ├── downloads/        # 服务端下载状态
 │   │   ├── models/           # 跨 feature 的 Track/Playback/Queue DTO
-│   │   ├── audio/            # HMusicAudioHandler、同步协调器
-│   │   ├── playback/         # Server/direct 模式、切换事务、异步结果代际
-│   │   ├── direct/           # 小米认证/设备、音源解析、代理和本地播放仓库
-│   │   └── platform_shell/   # Dart 侧 chrome 状态、命令和降级实现
-│   └── features/
-│       ├── connection/       # 服务端地址与探活
-│       ├── auth/
-│       ├── direct_auth/      # 独立小米登录、验证码和会话导入
-│       ├── player/
-│       ├── search/
-│       ├── queue/
-│       ├── playlists/
-│       ├── charts/
-│       ├── stats/
-│       └── settings/
+│   │   ├── network/          # ApiClient、ApiError、auth interceptor
+│   │   ├── platform/         # 平台能力探测
+│   │   ├── platform_shell/   # Dart 侧 chrome 状态、命令、AdaptiveGlassSurface 与降级
+│   │   ├── playback/         # Server/direct 模式路由、切换事务
+│   │   ├── providers/        # 应用级 provider 装配
+│   │   ├── queue/            # 本地队列模型与仓库
+│   │   ├── security/         # secure storage 封装
+│   │   ├── session/          # 401 单飞会话控制
+│   │   ├── startup/          # 启动状态机
+│   │   ├── storage/          # preferences 键值存储
+│   │   └── upgrade/          # 强升门与版本门禁
+│   ├── features/             # connection / auth / direct_auth / player / search / queue /
+│   │                         # playlists / charts / stats / settings / library
+│   └── shared/               # formatters / layout / models / widgets
 ├── test/                     # 纯 Dart/Widget 测试
 ├── integration_test/         # 真 Server 契约和主链路
 ├── ios/Runner/               # Swift/SwiftUI NativeGlassShell 与 MethodChannel
@@ -91,6 +93,7 @@ Flutter 内容必须为原生底部 chrome 预留由 Swift 回报的动态安全
 ```text
 启动
   -> 恢复 PlaybackMode（StoreEdition 固定 Server）
+  -> player：免登录进入应用壳，不探测 Server 或恢复小米会话（仅支持本机音频的平台）
   -> direct：恢复安全小米会话 -> 无会话进入直连登录 -> 应用壳
   -> server：读取 server base
   -> 无地址：连接服务器页
@@ -101,7 +104,10 @@ Flutter 内容必须为原生底部 chrome 预留由 Swift 回报的动态安全
   -> authenticated=true：进入应用壳，拉 playback/queue
 ```
 
-连接页与设置页均可选择模式；直连冷启动不探测 Server。模式切换先暂停旧后端并保存进度，
+连接页与设置页均可选择模式；本地模式冷启动不探测 Server。纯播放器首次选择与后续冷启动
+均进入首页（榜单 `/charts`），不强制打开音源设置；与直连共享本地队列/收藏/音源，但固定本机目标且不读取小米凭据。
+StoreEdition 固定 Server，Windows/Linux 未接本机后端时不开放纯播放器。
+模式切换先校验目标能力，再暂停旧后端并保存进度，
 再释放本机音频、持久化新模式；两模式保留各自的会话、队列、目标和设置。切回 Server 自动
 恢复上次连接。本机已暂停时，旧 Server 离线不阻断切换并提示进度未同步；音箱暂停失败仍保留
 旧模式。退出账号继续先停止再清会话。详细实现及平台边界见 [14](14-direct-mode-migration-plan.md)。
@@ -162,12 +168,15 @@ URL 重绑定示例：已连接 `http://192.168.1.10:8090`，服务端返回
 - 契约测试：对真实 HMusic-Server 覆盖 system/auth/search/play/local-report/queue。
 - 真机：iOS 27 液态玻璃与旧 iOS 回退；Android 高/中/低画质；后台音频、中断和媒体控制。
 
-## 实现状态
+## 实现状态（2026-09-17）
 
-- [x] 架构定案
-- [ ] Flutter 工程生成
-- [ ] 核心 DTO 与 ApiClient
-- [ ] AudioHandler 纵切
-- [ ] iOS Swift/SwiftUI NativeGlassShell spike
-- [ ] Android AdaptiveGlassSurface spike
-- [ ] P0 集成测试
+- [x] 架构定案（ADR-0001）
+- [x] Flutter 工程生成，五平台可编译
+- [x] 核心 DTO 与 ApiClient
+- [x] AudioHandler 纵切（Server 模式与直连模式共用单一 Handler）
+- [x] iOS Swift/SwiftUI NativeGlassShell（iOS 26+；旧 iOS 回退 Flutter 壳）
+- [x] Android AdaptiveGlassSurface 三档（high/medium/off）
+- [x] P0 集成测试与真 Server 契约测试
+- [x] 直连模式迁移（P7，代码完成；真实小米账号与音箱待真机实测）
+- [ ] P3 移动质量真机门禁（见 `docs/09` §6）
+- [ ] P4 桌面常驻能力（托盘、窗口状态、Windows/Linux 本机音频）

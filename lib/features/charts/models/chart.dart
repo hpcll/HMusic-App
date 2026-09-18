@@ -62,6 +62,7 @@ class ChartDetail {
     this.description,
     this.updatedAt,
     this.entries = const <ChartEntry>[],
+    this.notice,
   });
 
   factory ChartDetail.fromJson(Map<String, Object?> json) =>
@@ -73,6 +74,8 @@ class ChartDetail {
   final String? description;
   final int? updatedAt;
   final List<ChartEntry> entries;
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  final String? notice;
 
   Map<String, Object?> toJson() => _$ChartDetailToJson(this);
 

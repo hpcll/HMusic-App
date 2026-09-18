@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/audio/models/hmusic_playback_state.dart';
 import 'package:hmusic/core/downloads/download_index.dart';
 import 'package:hmusic/core/models/hmusic_track.dart';
+import 'package:hmusic/core/providers/infrastructure_providers.dart';
+import 'package:hmusic/core/storage/key_value_store.dart';
 import 'package:hmusic/features/charts/data/api_charts_repository.dart';
 import 'package:hmusic/features/charts/data/charts_repository.dart';
 import 'package:hmusic/features/charts/models/chart.dart';
@@ -98,6 +100,7 @@ Future<ProviderContainer> _openChart(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         chartsRepositoryProvider.overrideWithValue(
           const _FakeChartsRepository(),
         ),

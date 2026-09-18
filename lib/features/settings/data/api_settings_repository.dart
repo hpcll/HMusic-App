@@ -14,7 +14,7 @@ import 'settings_repository.dart';
 
 final Provider<SettingsRepository> settingsRepositoryProvider =
     Provider<SettingsRepository>((ref) {
-      if (ref.watch(playbackModeProvider) == PlaybackMode.direct) {
+      if (ref.watch(playbackModeProvider).usesLocalBackend) {
         return ref.watch(directSettingsRepositoryProvider);
       }
       return ApiSettingsRepository(

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/downloads/download_index.dart';
 import 'package:hmusic/core/network/api_failure.dart';
+import 'package:hmusic/core/providers/infrastructure_providers.dart';
+import 'package:hmusic/core/storage/key_value_store.dart';
 import 'package:hmusic/features/charts/data/api_charts_repository.dart';
 import 'package:hmusic/features/charts/data/charts_repository.dart';
 import 'package:hmusic/features/charts/models/chart.dart';
@@ -49,6 +51,7 @@ void main() {
     );
     container = ProviderContainer(
       overrides: [
+        keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         chartsRepositoryProvider.overrideWithValue(repository),
         downloadIndexProvider.overrideWith(_Downloads.new),
       ],

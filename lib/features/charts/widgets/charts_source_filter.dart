@@ -12,12 +12,14 @@ class ChartsSourceFilter extends StatelessWidget {
     required this.charts,
     required this.selected,
     required this.onSelected,
+    this.onManage,
     super.key,
   });
 
   final List<Chart> charts;
   final String selected;
   final ValueChanged<String> onSelected;
+  final VoidCallback? onManage;
 
   void _select(BuildContext chipContext, String kind) {
     onSelected(kind);
@@ -49,14 +51,26 @@ class ChartsSourceFilter extends StatelessWidget {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            '发现榜单',
-            style: TextStyle(
-              fontFamily: 'NotoSerifSC',
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: palette.textStrong,
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '发现榜单',
+                  style: TextStyle(
+                    fontFamily: 'NotoSerifSC',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: palette.textStrong,
+                  ),
+                ),
+              ),
+              if (onManage != null)
+                IconButton(
+                  tooltip: '首页推荐管理',
+                  onPressed: onManage,
+                  icon: const Icon(Icons.tune_rounded),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 12),

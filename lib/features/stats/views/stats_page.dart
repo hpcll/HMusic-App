@@ -57,10 +57,10 @@ class _StatsPageState extends ConsumerState<StatsPage> {
         ),
         children: <Widget>[
           const ViewTitle('听歌统计'),
-          if (ref.watch(playbackModeProvider) == PlaybackMode.direct) ...[
+          if (ref.watch(playbackModeProvider).usesLocalBackend) ...[
             const SizedBox(height: 8),
             Text(
-              '直连模式 · 仅统计本机最近 5000 条播放记录',
+              '本地模式 · 仅统计本机最近 5000 条播放记录',
               style: TextStyle(color: palette.muted),
             ),
           ],

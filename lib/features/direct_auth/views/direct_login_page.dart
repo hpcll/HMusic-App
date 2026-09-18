@@ -4,9 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/playback/playback_mode.dart';
 import '../../../shared/widgets/brand_mark.dart';
-import '../../connection/widgets/playback_mode_switch_button.dart';
+import '../../connection/widgets/playback_mode_actions.dart';
 import '../view_models/direct_login_view_model.dart';
 import '../widgets/direct_credentials_form.dart';
 import '../widgets/direct_password_form.dart';
@@ -74,11 +73,7 @@ class _DirectLoginPageState extends ConsumerState<DirectLoginPage> {
                   const SizedBox(height: 16),
                   const DirectCredentialsForm(),
                   const SizedBox(height: 24),
-                  const PlaybackModeSwitchButton(
-                    mode: PlaybackMode.server,
-                    path: '/connect',
-                    label: '使用 HMusic Server',
-                  ),
+                  const PlaybackModeActions(entry: true),
                 ],
               ),
             ),

@@ -13,26 +13,23 @@ import 'package:hmusic/core/storage/key_value_store.dart';
 
 void main() {
   group('StoreEdition direct boundary', () {
-    test(
-      'stored direct selection restores Server and cannot be re-enabled',
-      () async {
-        final preferences = MemoryKeyValueStore();
-        await PlaybackModeStore(
-          preferences: preferences,
-        ).write(PlaybackMode.direct);
-        final container = ProviderContainer(
-          overrides: [keyValueStoreProvider.overrideWithValue(preferences)],
-        );
-        addTearDown(container.dispose);
-        final mode = container.read(playbackModeProvider.notifier);
-        expect(await mode.restore(), PlaybackMode.server);
-        await expectLater(
-          mode.select(PlaybackMode.direct),
-          throwsA(isA<ApiFailure>()),
-        );
-        expect(container.read(playbackModeProvider), PlaybackMode.server);
-      },
-    );
+    for (final localMode in [PlaybackMode.direct, PlaybackMode.player]) {
+      test(
+        'stored $localMode selection restores Server and cannot be re-enabled',
+        () async {
+          final preferences = MemoryKeyValueStore();
+          await PlaybackModeStore(preferences: preferences).write(localMode);
+          final container = ProviderContainer(
+            overrides: [keyValueStoreProvider.overrideWithValue(preferences)],
+          );
+          addTearDown(container.dispose);
+          final mode = container.read(playbackModeProvider.notifier);
+          expect(await mode.restore(), PlaybackMode.server);
+          await expectLater(mode.select(localMode), throwsA(isA<ApiFailure>()));
+          expect(container.read(playbackModeProvider), PlaybackMode.server);
+        },
+      );
+    }
 
     test(
       'script save and execution stay disabled even through repositories',

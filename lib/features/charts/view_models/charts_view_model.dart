@@ -16,17 +16,21 @@ import '../data/api_charts_repository.dart';
 import '../data/chart_detail_loader.dart';
 import '../models/chart.dart';
 import '../models/charts_view_state.dart';
+import 'chart_home_preferences_view_model.dart';
+
+part 'charts_previews.dart';
 
 final NotifierProvider<ChartsViewModel, ChartsViewState>
 chartsViewModelProvider = NotifierProvider<ChartsViewModel, ChartsViewState>(
   ChartsViewModel.new,
 );
 
-class ChartsViewModel extends Notifier<ChartsViewState> {
+class ChartsViewModel extends Notifier<ChartsViewState> with _ChartsPreviews {
   // 预取代数：reload 时自增，丢弃旧代回填的预览，避免竞态。
   int _generation = 0;
   int _detailRevision = 0;
   bool _disposed = false;
+  @override
   late ChartDetailLoader _loader;
 
   @override
@@ -39,9 +43,18 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
       _detailRevision++;
       _loader.clear();
     });
-    return const ChartsViewState();
+    ref.listen(chartHomePreferencesProvider, (_, preferences) {
+      state = state.copyWith(homePreferences: preferences);
+      if (state.status == ChartsStatus.loaded) {
+        unawaited(_prefetchPreviews(state.discovery, _generation));
+      }
+    });
+    return ChartsViewState(
+      homePreferences: ref.read(chartHomePreferencesProvider),
+    );
   }
 
+  @override
   bool _isCurrent(int generation) => !_disposed && generation == _generation;
 
   Future<void> load() async {
@@ -58,6 +71,7 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
     final List<Chart> charts;
     try {
       charts = await ref.read(chartsRepositoryProvider).getCharts();
+      await ref.read(chartHomePreferencesProvider.notifier).restore();
     } on ApiFailure catch (failure) {
       if (!_isCurrent(generation)) return;
       state = state.copyWith(
@@ -80,42 +94,6 @@ class ChartsViewModel extends Notifier<ChartsViewState> {
       ...state.personalCharts,
       ...state.discovery,
     ], generation);
-  }
-
-  // 只预取当前可见卡片（包含全部三个个人榜），最多两个请求在途。
-  Future<void> _prefetchPreviews(List<Chart> charts, int generation) async {
-    var cursor = 0;
-    Future<void> worker() async {
-      while (_isCurrent(generation) && cursor < charts.length) {
-        final chart = charts[cursor++];
-        if (state.previews.containsKey(chart.id)) continue;
-        try {
-          final detail = await _loader.read(chart.id);
-          if (_isCurrent(generation)) {
-            _writePreview(chart.id, detail.entries.take(3).toList());
-          }
-        } catch (error) {
-          if (_isCurrent(generation)) {
-            _writePreview(
-              chart.id,
-              null,
-              error is ApiFailure ? error.message : '暂时无法加载，稍后重试',
-            );
-          }
-        }
-      }
-    }
-
-    await Future.wait([worker(), worker()]);
-  }
-
-  void _writePreview(String id, List<ChartEntry>? top, [String? error]) {
-    final errors = {...state.previewErrors}..remove(id);
-    if (error != null) errors[id] = error;
-    state = state.copyWith(
-      previews: <String, List<ChartEntry>?>{...state.previews, id: top},
-      previewErrors: errors,
-    );
   }
 
   Future<void> selectSource(String source) async {

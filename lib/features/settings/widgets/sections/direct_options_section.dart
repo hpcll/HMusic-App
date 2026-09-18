@@ -14,7 +14,8 @@ import 'direct_speaker_options.dart';
 import 'settings_choice_field.dart';
 
 class DirectOptionsSection extends ConsumerStatefulWidget {
-  const DirectOptionsSection({super.key});
+  const DirectOptionsSection({this.localOnly = false, super.key});
+  final bool localOnly;
   @override
   ConsumerState<DirectOptionsSection> createState() =>
       _DirectOptionsSectionState();
@@ -130,14 +131,16 @@ class _DirectOptionsSectionState extends ConsumerState<DirectOptionsSection> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        DirectSpeakerOptions(
-          qqDirect: _qqDirect,
-          onQqDirectChanged: (v) => setState(() => _qqDirect = v),
-          host: _host,
-          extraModels: _models,
-          enabled: !state.saving,
-        ),
+        if (!widget.localOnly) ...[
+          const SizedBox(height: 16),
+          DirectSpeakerOptions(
+            qqDirect: _qqDirect,
+            onQqDirectChanged: (v) => setState(() => _qqDirect = v),
+            host: _host,
+            extraModels: _models,
+            enabled: !state.saving,
+          ),
+        ],
         const SizedBox(height: 20),
         if (state.message != null) ...[
           HMusicInlineNotice(
@@ -149,7 +152,13 @@ class _DirectOptionsSectionState extends ConsumerState<DirectOptionsSection> {
         ],
         FilledButton(
           onPressed: state.saving ? null : _save,
-          child: Text(state.saving ? '保存中…' : '保存直连配置'),
+          child: Text(
+            state.saving
+                ? '保存中…'
+                : widget.localOnly
+                ? '保存播放偏好'
+                : '保存直连配置',
+          ),
         ),
       ],
     );

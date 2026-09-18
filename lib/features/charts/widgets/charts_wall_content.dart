@@ -4,10 +4,11 @@ import '../../../shared/models/hmusic_notice.dart';
 import '../../../shared/widgets/hmusic_inline_notice.dart';
 import '../models/charts_view_state.dart';
 import '../view_models/charts_view_model.dart';
+import 'chart_home_editor.dart';
 import 'charts_section_row.dart';
 import 'charts_source_filter.dart';
 
-// 个人常听与热门发现分层，精选只陈列各来源一个榜单，完整目录由筛选进入。
+// 首页精选按本机偏好混排；平台分类仍保留完整目录与个人常听入口。
 class ChartsWallContent extends StatelessWidget {
   const ChartsWallContent({
     required this.state,
@@ -46,7 +47,16 @@ class ChartsWallContent extends StatelessWidget {
           charts: state.charts,
           selected: state.selectedSource,
           onSelected: notifier.selectSource,
+          onManage: () => showChartHomeEditor(context, state.charts),
         ),
+        if (state.selectedSource == 'featured' && state.discovery.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextButton(
+              onPressed: () => showChartHomeEditor(context, state.charts),
+              child: const Text('首页推荐已关闭，点此管理或切换平台查看榜单'),
+            ),
+          ),
         ChartsSectionRow(
           label: '',
           charts: state.discovery,

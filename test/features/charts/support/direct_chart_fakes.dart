@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hmusic/core/direct/music/direct_music_http.dart';
 import 'package:hmusic/core/models/hmusic_track.dart';
+import 'package:hmusic/core/network/api_failure.dart';
 import 'package:hmusic/features/search/data/search_repository.dart';
 import 'package:hmusic/features/search/models/search_result.dart';
 
@@ -11,6 +12,8 @@ class ChartHttpFixture extends Fake implements DirectMusicHttp {
       <({String url, Map<String, Object?>? query, Object? body})>[];
   FutureOr<Map<String, Object?>> Function(String, Object?)? reply;
   String html = '';
+  ApiFailure? textFailure;
+  Duration? textTimeout;
 
   @override
   Future<Map<String, Object?>> json(
@@ -29,8 +32,11 @@ class ChartHttpFixture extends Fake implements DirectMusicHttp {
     Map<String, Object?>? query,
     Object? body,
     Map<String, Object?>? headers,
+    Duration? timeout,
   }) async {
     requests.add((url: url, query: query, body: body));
+    textTimeout = timeout;
+    if (textFailure case final failure?) throw failure;
     return html;
   }
 }

@@ -63,6 +63,10 @@ class ChartDetailHeader extends StatelessWidget {
                 const SizedBox(height: 10),
                 HMusicInlineNotice(HMusicNotice.error(state.errorMessage!)),
               ],
+              if (state.detail?.notice case final notice?) ...[
+                const SizedBox(height: 10),
+                HMusicInlineNotice(HMusicNotice(notice)),
+              ],
             ],
           ),
         ),
